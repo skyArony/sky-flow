@@ -1,6 +1,6 @@
 ---
 name: to-next-acceptance
-description: 'Derive the next concise Sky Flow acceptance round from an existing acceptance artifact and current plan/task runtime state; classify feedback, preserve unmentioned items, identify scope, confirmation steps, evidence gaps, blockers, residual risks, and update the acceptance artifact for the next human review.'
+description: "Derive the next concise Sky Flow acceptance round from an existing acceptance artifact and current plan/task runtime state; classify feedback, preserve unmentioned items, identify scope, confirmation steps, evidence gaps, blockers, residual risks, and update the acceptance artifact for the next human review."
 ---
 
 # to-next-acceptance
@@ -63,42 +63,44 @@ description: 'Derive the next concise Sky Flow acceptance round from an existing
 - 未关闭项不要复制长上下文；重写成下一轮可执行、可判断的简洁验收步骤。
 - `Evidence` 只保留当前轮需要的证据入口和结论；完整长输出用路径或报告引用。
 - `待确认` / `Confirm With Human` 只放需要人工判定的问题，并按背景、确认步骤、明确结论组织；普通后续行动放到 plan / task 或 `Next Round`。
-- 固定核心单元是验收组，每组必须连续出现「问题 / 需求」「验收步骤」「验收结论（人类填）」；其他 section 按实际验收价值保留，不要填低效占位。
+- 固定核心单元是验收组，每组用 `## 验收组 <N>：<简短主题>` 作为二级标题；组内用三级标题连续出现「问题 / 需求」「验收步骤」「验收结论（人类填）」。其他 section 按实际验收价值保留，不要填低效占位。
 - 能明确关联到某个验收组的 task artifact 或 commit，写入该组的 `关联` section；不能可靠关联时不要猜，也不要写占位。
-- 与某个验收组相关的关联、证据、待确认、待补充或风险，放在该组验收结论之后、下一组问题 / 需求之前；文档级 `Next Round` / `Archive` 可放在全文末尾。
+- 与某个验收组相关的关联、证据、待确认、待补充或风险，放在该组验收结论之后、下一组验收组之前，并使用三级标题；文档级 `Next Round` / `Archive` 可放在全文末尾并使用二级标题。
 - `关联` 只写可追溯引用：task artifact id / 路径、commit hash 和简短 subject；不要粘贴完整 commit diff 或长日志。
 - 如果所有验收项都有明确结论且无下一轮动作，可把 `status` 设为 `completed`；否则保持 `in_progress` 或 `draft`。
 
 ## Next Round Template
 
-可直接更新到原 acceptance 文档中，按实际内容裁剪空 section。下一轮也必须保持简洁，一个问题 / 需求 一组，每组固定包含「问题 / 需求」「验收步骤」「验收结论（人类填）」。
+可直接更新到原 acceptance 文档中，按实际内容裁剪空 section。下一轮也必须保持简洁，一个问题 / 需求 一组，每组用二级标题 `验收组` 承载，组内固定包含三级标题「问题 / 需求」「验收步骤」「验收结论（人类填）」。
 
 ```markdown
-## 问题 / 需求
+## 验收组 1：<简短主题>
+
+### 问题 / 需求
 
 <用 2-4 句话说明本轮要复验的问题、失败反馈或补充要求。>
 
-## 验收步骤
+### 验收步骤
 
 1. <先做什么操作、打开什么页面、运行什么命令或查看什么 artifact。>
 2. <再做什么操作或切到哪个状态。>
 3. 观察 <预期看到的修复结果、剩余异常、字段、页面状态或验收口径。>
 
-## 验收结论（人类填）
+### 验收结论（人类填）
 
 - 结论：
 - 反馈：
 
-## 关联
+### 关联
 
 - Task: <能明确关联到本验收组的 task artifact id / 路径；不能可靠关联时省略>
 - Commit: <能明确关联到本验收组的 commit hash 和简短 subject；不能可靠关联时省略>
 
-## 证据
+### 证据
 
 - <已有证据入口和结论；没有时省略>
 
-## 待确认
+### 待确认
 
 <用 1-2 句话说明为什么需要人工确认；没有人工确认项时省略。>
 
@@ -106,11 +108,11 @@ description: 'Derive the next concise Sky Flow acceptance round from an existing
 2. <再对比什么口径、反馈或预期结果。>
 3. 确认 <需要人类给出的明确结论，例如通过、驳回、补充证据或调整范围。>
 
-## 待补充
+### 待补充
 
 - <缺少但需要补齐的背景、证据、artifact 链接或验收材料；没有明确补充项时省略。>
 
-## 残余风险
+### 残余风险
 
 - <仍需人类知情或阻塞通过的风险>
 
@@ -141,7 +143,7 @@ description: 'Derive the next concise Sky Flow acceptance round from an existing
 ## Self-Review
 
 - Classification：每个旧验收项是否已分类，尤其是未提及项。
-- Grouping：每个下一轮问题 / 需求 是否都有紧随其后的验收步骤和验收结论（人类填）。
+- Grouping：是否使用 `## 验收组 <N>：<简短主题>` 分组，且组内三级标题包含问题 / 需求、验收步骤和验收结论（人类填）。
 - Brief：下一轮问题 / 需求 是否用几句话说清楚，没有复制长上下文。
 - Steps：失败、未提及、争议和证据不足的项是否被整理成可执行、可观察的验收步骤。
 - Evidence：下一轮完成声明需要的证据是否明确。

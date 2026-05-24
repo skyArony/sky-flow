@@ -1,6 +1,6 @@
 ---
 name: to-acceptance
-description: 'Create or update concise Sky Flow acceptance artifacts when work reaches a human acceptance gate, stage confirmation, sign-off, feedback checkpoint, or completion claim; group each problem or request with acceptance steps and a human-filled acceptance conclusion, record only necessary evidence, risks, confirmations, round state, and handoff to to-next-acceptance.'
+description: "Create or update concise Sky Flow acceptance artifacts when work reaches a human acceptance gate, stage confirmation, sign-off, feedback checkpoint, or completion claim; group each problem or request with acceptance steps and a human-filled acceptance conclusion, record only necessary evidence, risks, confirmations, round state, and handoff to to-next-acceptance."
 ---
 
 # to-acceptance
@@ -53,38 +53,40 @@ round: 1
 
 ## Acceptance Body
 
-正文必须简洁扼要，最多写到二级标题。固定核心单元是验收组，每组必须按顺序成组出现：「问题 / 需求」→「验收步骤」→「验收结论（人类填）」。一个问题 / 需求 就是一组；多个问题重复整组三段。其他 section 按实际验收价值保留，不强制填写。
+正文必须简洁扼要，最多写到三级标题。二级标题用于区分验收组，格式为 `## 验收组 <N>：<简短主题>`；组内用三级标题，并必须按顺序成组出现：「问题 / 需求」→「验收步骤」→「验收结论（人类填）」。一个问题 / 需求 就是一组；多个问题重复整个验收组，不要在文档顶层反复写一串 `## 问题 / 需求`。其他 section 按实际验收价值保留，不强制填写。
 
 ```markdown
 # <Acceptance Title>
 
 最后更新：<YYYY-MM-DD>
 
-## 问题 / 需求
+## 验收组 1：<简短主题>
+
+### 问题 / 需求
 
 <用 2-4 句话说明要验收的问题、需求或阶段成果；只写人类判断需要知道的背景。>
 
-## 验收步骤
+### 验收步骤
 
 1. <先做什么操作、打开什么页面、运行什么命令或查看什么 artifact。>
 2. <再做什么操作或切到哪个状态。>
 3. 观察 <预期看到的行为、结果、字段、页面状态或验收口径。>
 
-## 验收结论（人类填）
+### 验收结论（人类填）
 
 - 结论：
 - 反馈：
 
-## 关联
+### 关联
 
 - Task: <能明确关联到本验收组的 task artifact id / 路径；不能可靠关联时省略>
 - Commit: <能明确关联到本验收组的 commit hash 和简短 subject；不能可靠关联时省略>
 
-## 证据
+### 证据
 
 - <验证命令、检查结果、报告路径、产物路径或观察结论；无必要证据时省略。>
 
-## 待确认
+### 待确认
 
 <用 1-2 句话说明为什么需要人工确认；没有人工确认项时省略。>
 
@@ -92,11 +94,11 @@ round: 1
 2. <再对比什么口径、反馈或预期结果。>
 3. 确认 <需要人类给出的明确结论，例如通过、驳回、补充证据或调整范围。>
 
-## 待补充
+### 待补充
 
 - <缺少但需要补齐的背景、证据、artifact 链接或验收材料；没有明确补充项时省略。>
 
-## 残余风险
+### 残余风险
 
 - <已知风险、限制或未覆盖范围；无高价值风险时省略>
 
@@ -115,13 +117,14 @@ round: 1
 
 ## Conciseness Rules
 
-- 每个问题 / 需求 必须形成一组，且同组内必须连续出现「问题 / 需求」「验收步骤」「验收结论（人类填）」。
+- 每个问题 / 需求 必须形成一组，使用 `## 验收组 <N>：<简短主题>` 作为该组二级标题；组内用三级标题连续出现「问题 / 需求」「验收步骤」「验收结论（人类填）」。
+- 不要把每组的「问题 / 需求」「验收步骤」「验收结论（人类填）」都写成二级标题；它们是验收组内部结构，必须用三级标题。
 - 问题 / 需求必须用几句话说清楚；不要复述 plan / task 的长背景、实现过程或完整聊天摘要。
 - 验收步骤默认 3 步左右：第一步做什么，第二步做什么，最后一步观察什么。
 - 验收结论留给人类填写；除非来源里已有明确人工反馈，否则 Agent 不替人类写通过、失败或放弃结论。
 - 除每组固定三段外，其他 section 都不是强制必填；不要为了模板填 `无`、`暂无`、`不涉及` 等低效占位。
 - 能明确关联到某个验收组的 task artifact 或 commit，写入该组的 `关联` section；不能可靠关联时不要猜，也不要写占位。
-- 与某个验收组相关的关联、证据、待确认、待补充或风险，放在该组验收结论之后、下一组问题 / 需求之前；文档级 `Next Round` / `Archive` 可放在全文末尾。
+- 与某个验收组相关的关联、证据、待确认、待补充或风险，放在该组验收结论之后、下一组验收组之前，并使用三级标题；文档级 `Next Round` / `Archive` 可放在全文末尾并使用二级标题。
 - `关联` 只写可追溯引用：task artifact id / 路径、commit hash 和简短 subject；不要粘贴完整 commit diff 或长日志。
 - 每个步骤都必须是人类能执行或判断的动作 / 观察点；不要写 mock、私有 helper、调用顺序或内部实现偏好。
 - 待确认也使用类似组织方式：先说明为什么要确认，再列确认步骤，最后写清需要人类给出的结论。
@@ -143,7 +146,7 @@ round: 1
 - 当前轮只保留下一次人类需要判断的信息；已关闭内容压缩到 `Archive`，保留结论、处理结果和关键证据。
 - 未被人类提及的验收项不能默认通过，必须继续保留到下一轮，直到明确通过、明确失败、明确放弃或转入 `backlog`。
 - 大段日志、输出、报告或样本不要堆在当前轮；正文只保留来源、关键字段、结论和可追溯路径。
-- 下一轮也必须延续简洁分组格式，优先给出新的「问题 / 需求 → 验收步骤 → 验收结论（人类填）」三段，不恢复成完整测试报告。
+- 下一轮也必须延续简洁分组格式，优先给出新的 `## 验收组 <N>：<简短主题>`，组内包含「问题 / 需求 → 验收步骤 → 验收结论（人类填）」三段，不恢复成完整测试报告。
 
 ## Handoff To to-next-acceptance
 
@@ -164,7 +167,7 @@ round: 1
 ## Self-Review
 
 - Source：frontmatter 是否能追溯来源 artifact 或当前会话上下文。
-- Grouping：每个问题 / 需求 是否都有紧随其后的验收步骤和验收结论（人类填）。
+- Grouping：是否使用 `## 验收组 <N>：<简短主题>` 分组，且组内三级标题包含问题 / 需求、验收步骤和验收结论（人类填）。
 - Brief：问题 / 需求 是否用几句话说清楚，没有复述长背景。
 - Steps：验收步骤是否明确说明做什么、做什么、观察什么。
 - Evidence：完成声明是否有证据，证据是否可追溯。
