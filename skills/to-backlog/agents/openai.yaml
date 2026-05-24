@@ -1,0 +1,4 @@
+interface:
+  display_name: "To Backlog"
+  short_description: "沉淀 Sky Flow 阻塞项、依赖条件与恢复时机"
+  default_prompt: "使用 $to-backlog 创建或更新 Sky Flow backlog，记录阻塞原因、依赖和恢复时机。"
