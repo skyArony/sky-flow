@@ -46,7 +46,7 @@ description: 'Create or update Sky Flow plan artifacts from a ready spec, issue,
 
 ## Goal Contract
 
-`goal` 字段只保存目标正文，不包含 `/goal` 前缀。它必须写清：
+`goal` 字段只保存目标正文，不包含 `/goal` 前缀。它用于生成续跑提示，并必须写清：
 
 - 期望终态。
 - 验证证据或验收入口。

@@ -1,4 +1,4 @@
 interface:
   display_name: "Pick Plan"
   short_description: "推荐下一步 Sky Flow plan 并生成续跑提示"
-  default_prompt: "使用 $pick-plan 从 Sky Flow plan 中挑选下一步并生成 /goal 续跑提示。"
+  default_prompt: "使用 $pick-plan 从 Sky Flow plan 中挑选下一步并生成完整续跑提示。"

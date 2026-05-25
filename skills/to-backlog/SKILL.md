@@ -90,7 +90,7 @@ recommended_resume: after-dependency-ready
 
 - `Decision Log`：存在人类协商、放弃依据或重要取舍时。
 - `Attempted Work`：已经做过探索、实现、验证或 fan-in，且后续恢复需要避免重复时。
-- `Recovery Prompt`：需要给后续 Codex /goal 或新会话一段明确续跑提示时。
+- `Recovery Prompt`：需要给后续 Codex 或新会话一段明确续跑提示时。
 - `Acceptance Link`：从验收轮次转入 backlog，且后续需要回到 acceptance 时。
 
 ## Source Rules

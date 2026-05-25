@@ -58,7 +58,7 @@ node .agents/skills/sky-flow/scripts/validate_flow.ts [paths...]
 脚本通过后，LLM 只处理脚本不能可靠判断的语义问题：
 
 - dependency / parallel 关系是否符合任务语义。
-- `plan.goal` 是否足以作为 Codex `/goal` 续跑契约。
+- `plan.goal` 是否足以作为 Codex 续跑契约。
 - fan-in 后 plan / task / acceptance 状态是否与实际阶段产物、验证证据和剩余工作一致。
 - `acceptance` 是否说清来源、轮次、验证证据和未提及项处理。
 - `backlog` 是否讲清主题、阻塞原因、依赖条件和推荐恢复时机。
