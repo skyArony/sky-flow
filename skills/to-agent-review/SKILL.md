@@ -17,7 +17,7 @@ description: 'Review agent decision-making inside Sky Flow by analyzing visible 
 4. 建立证据地图：按时间线整理目标、关键决策、工具调用、失败 / 重试、等待、子代理派发、fan-in、验证、runtime plan 更新和 artifact 写回。
 5. 按分析维度归类问题，区分必要等待、人类决策等待、基础设施等待、工具延迟和 Agent 低效。
 6. 填写固定量化信号清单；没有证据的项写 `unknown`，不要估算成事实。
-7. 输出或更新 `${SKY_FLOW_ROOT}/backlog/agent-reivew/<yyyy-mm-dd>-<scope>.md`，包含结论、发现卡片、行动清单和证据索引；每条建议必须有 ROI、落点和 non-goal。
+7. 输出或更新 `${SKY_FLOW_ROOT}/backlog/agent-reivew/<yyyy-mm-dd>-<scope>.md`，默认采用 brief-first 结构：先给决策摘要和行动清单，再给发现卡片、指标快照和证据附录；每条建议必须有 ROI、落点、done-when 和 non-goal。
 8. 需要改变长期 workflow 规则、计划或任务时，转入对应 Sky Flow 子能力：`to-spec`、`to-plan` 或 `to-task`。
 
 ## Evidence Rules
@@ -45,7 +45,7 @@ description: 'Review agent decision-making inside Sky Flow by analyzing visible 
 
 ## Quantitative Signals
 
-复盘必须固定收集下面信号。只使用可见 transcript、工具结果、runtime plan、子代理输出或 artifact 记录；不可见就写 `unknown`。
+复盘必须固定收集下面信号，但默认报告不逐项展开完整表。只使用可见 transcript、工具结果、runtime plan、子代理输出或 artifact 记录；不可见就写 `unknown`。默认只在 `Metrics Snapshot` 输出影响判断的 3-6 个指标，完整信号表只有在用户要求 full evidence mode、诊断分歧或后续自动化需要结构化输入时才展开到附录。
 
 | Signal | Required Observation |
 | --- | --- |
@@ -78,65 +78,63 @@ description: 'Review agent decision-making inside Sky Flow by analyzing visible 
 - `agent-review-report`：只沉淀到 `${SKY_FLOW_ROOT}/backlog/agent-reivew/`，暂不转入正式 workflow artifact。
 - `none`：明确不落地，并写明原因。
 
+每条建议还必须给出 `Done when`：
+
+- 说明完成条件或可观察验收信号，例如“模板不再生成冲突参数”“runner 写入 resolved path”“日报把 expected no-match 排除出失败榜”。
+- 如果建议暂不落地，`Done when` 写“无需动作”，并在 non-goal 说明原因。
+
 不要为了自动化而自动化。脚本化建议必须说明预期收益、触发频率、维护成本和暂不扩大的边界。
+
+## Report Shape Rules
+
+- 默认报告必须让读者在第一屏看到：结论、最大风险、下一步动作和不应优化的方向。
+- `Actions` 必须放在 `Findings` 前面；不要让读者读完证据表才知道该做什么。
+- 不默认输出 `Signal Map`。需要保留信号映射时，把它放入 `Evidence Appendix`，不能位于主阅读路径。
+- `Metrics Snapshot` 最多 6 行，每行必须解释这个指标改变了什么判断；没有决策价值的固定信号只在附录或内部采集中保留。
+- 每条 finding 默认最多 5 个 bullet：`Impact`、`Cause`、`Fix`、`Evidence`、`Landing / Non-goal`。`Evidence` 最多 2 个锚点；长 UUID、完整路径和多段 line range 放到 `Evidence Appendix`。
+- `Decision Brief` 不复述完整数字表，只写最高影响结论和最高 ROI 改进。
 
 ## Output Template
 
 ```markdown
 # Agent Decision Review: <scope>
 
-## Executive Findings
+## Decision Brief
 
-- <最多 5 条，先写最高影响结论和最高 ROI 改进。>
+- Verdict: <一句话结论，说明这批会话最值得优化的决策问题。>
+- Top Risk: <最大成本 / 风险。>
+- Next Move: <下一步最该落地的动作。>
+- Do Not Optimize: <明确不应优化或不应误判的方向。>
 
-## Signal Map
+## Actions
 
-| Signal | Observation | Evidence | Interpretation |
-| --- | --- | --- | --- |
-|  |  |  |  |
-
-## Quantitative Signals
-
-| Signal | Value | Evidence | Notes |
-| --- | --- | --- | --- |
-| elapsed_time |  |  |  |
-| tool_call_count |  |  |  |
-| failed_or_retried_calls |  |  |  |
-| duplicate_context_reads |  |  |  |
-| context_load_size |  |  |  |
-| subagent_count |  |  |  |
-| parallelism_efficiency |  |  |  |
-| fan_in_rounds |  |  |  |
-| runtime_plan_updates |  |  |  |
-| artifact_writebacks |  |  |  |
-| validation_evidence |  |  |  |
-| blocker_and_question_count |  |  |  |
+| Priority | Action | Finding | Landing | Why now | Done when | Maintenance cost |
+| --- | --- | --- | --- | --- | --- | --- |
+|  |  |  |  |  |  |  |
 
 ## Findings
 
 ### F1. `High` <一句话问题>
 
-- Signal:
-- Evidence:
 - Impact:
-- Recommendation:
-- Landing:
-- Risk / Non-goal:
+- Cause:
+- Fix:
+- Evidence: <最多 2 个锚点；长路径和完整 line range 放附录。>
+- Landing / Non-goal:
 
 ### F2. `Medium` <一句话问题>
 
-- Signal:
-- Evidence:
 - Impact:
-- Recommendation:
-- Landing:
-- Risk / Non-goal:
+- Cause:
+- Fix:
+- Evidence:
+- Landing / Non-goal:
 
-## Action Candidates
+## Metrics Snapshot
 
-| Priority | Action | Finding | Landing | Expected gain | Maintenance cost |
-| --- | --- | --- | --- | --- | --- |
-|  |  |  |  |  |  |
+| Metric | Value | Meaning |
+| --- | --- | --- |
+|  |  |  |
 
 ## Not Worth Optimizing
 
@@ -144,7 +142,7 @@ description: 'Review agent decision-making inside Sky Flow by analyzing visible 
 | --- | --- |
 |  |  |
 
-## Evidence Index
+## Evidence Appendix
 
 | Source | Lines / Window | Used for |
 | --- | --- | --- |
