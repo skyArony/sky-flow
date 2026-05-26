@@ -17,14 +17,16 @@ description: 'Execute and maintain a prepared Sky Flow plan/task artifact or tas
 4. 检查 artifact 状态、scope、依赖和 blocker；不满足时停止，不猜。
 5. 选择下一批 executable tasks：依赖满足、状态可推进、写集不冲突、fan-in 成本可控。
 6. 决定 execution mode：主代理默认 coordinator，不直接写业务代码；实现型 task 默认派 worker。
-7. 派发或执行 task，收集输出。
-8. Fan-in：检查 changed files、task 要求、spec alignment、验证结果和 blocker。
-9. 必要时触发 `to-test`、`to-review`、`to-consolidation`、`to-acceptance`、`validate-flow`。
-10. 维护 runtime plan；Codex 中必须调用 `update_plan` 同步 task status、并行批次、fan-in 和 next action。
-11. 按执行事实更新 task status、plan progress / recovery / decision / blocker。
-12. 如果实现事实要求拆分 task、调整依赖 / 并行关系或补充验证 / 收敛 task，在已确认 scope 内按 `to-task` 规则更新 artifact 并运行 `validate-flow`。
-13. 到达人类验收、sign-off、争议确认或下一轮反馈节点时，调用 `to-acceptance` 创建或更新验收文档。
-14. 遇到关键歧义、验证反复失败、scope / contract / 数据口径变化或高风险操作时，停止并询问人类。
+7. 并行调度代码与文档：实现型 worker 推进代码 / 配置，文档 owner 同步更新 spec / plan / task / acceptance / handoff 等 artifact；主会话可以自己做文档 owner，也可以派 documentation worker。
+8. 派发或执行 task，收集输出。
+9. Fan-in：检查 changed files、task 要求、spec alignment、验证结果、artifact 更新和 blocker。
+10. 必要时触发 `to-test`、`to-review`、`to-consolidation`、`to-acceptance`、`validate-flow`。
+11. 维护 runtime plan；Codex 中必须调用 `update_plan` 同步 task status、并行批次、fan-in 和 next action。
+12. 按执行事实更新 task status、plan progress / recovery / decision / blocker。
+13. 如果实现事实要求拆分 task、调整依赖 / 并行关系或补充验证 / 收敛 task，在已确认 scope 内按 `to-task` 规则更新 artifact 并运行 `validate-flow`。
+14. 到达人类验收、sign-off、争议确认或下一轮反馈节点时，调用 `to-acceptance` 创建或更新验收文档。
+15. plan 到达完成态后，调用 `to-archive` 压缩 task / fan-in 执行记录，只把长期事实、关键决策和证据入口留在 completed plan。
+16. 遇到关键歧义、验证反复失败、scope / contract / 数据口径变化或高风险操作时，停止并询问人类。
 
 ## Execution Model
 
@@ -45,7 +47,8 @@ description: 'Execute and maintain a prepared Sky Flow plan/task artifact or tas
 - explorer / reviewer / docs researcher / verifier：优先最小上下文包。
 - 一个子代理通常对应一个 task，或一组明确同 owner、同写集边界的并行 task。
 - 只要并行时间收益、上下文隔离收益、专业化收益、质量 / review 收益任一成立，且 fan-in 成本可控，就应该派发子代理；其他明确正向收益也可以成立。
-- 子代理不直接修改 plan；主代理 fan-in 后回写进度、决策、阻塞和恢复入口。
+- 子代理不直接抢写 plan 状态；主会话显式指定 documentation worker 为某个 artifact 的 single writer 时，可以更新正文、证据或草稿状态，最终进度、决策、阻塞和恢复入口仍由主会话 fan-in 后确认。
+- 文档更新可以和代码实现并行：主会话可作为文档 owner 在代码 worker 运行时同步更新 artifact，也可派 documentation worker；同一 spec / plan / task / acceptance 文件必须有 single writer，最终状态由主会话 fan-in 确认。
 - 子代理状态至少能表达 `DONE`、`DONE_WITH_CONCERNS`、`NEEDS_CONTEXT`、`BLOCKED`。
 - 如果 runtime 支持二级子代理，承接 task 的子代理可以在 task write scope 和 delegation policy 内继续派发二级子代理；task owner 负责二级 fan-in，再向主代理汇报最终结果。
 - 如果某个 task 由主会话承接，主会话也可以继续为该 task 派发子代理；这不改变主会话对 plan 进度和 artifact 状态的最终维护责任。
@@ -92,6 +95,7 @@ description: 'Execute and maintain a prepared Sky Flow plan/task artifact or tas
 - 没有 blocking `[NEEDS CLARIFICATION: ...]`。
 - write scope 与同批 task 不冲突，或已有 single writer / gate。
 - verification intent 清楚。
+- 能由 Agent 独立执行并判断完成；如果核心完成条件依赖人类操作、真实设备 / 账号、未授权外部环境、审批或人工体验判断，不执行、不标记 completed，转 `to-acceptance` 并按 `to-task` 规则从 task DAG 中纠偏。
 
 parent plan 不直接执行；必须切换到当前可执行 child plan。没有 task 且不是 no-task execution 时，回到 `to-task`。
 
@@ -99,6 +103,9 @@ parent plan 不直接执行；必须切换到当前可执行 child plan。没有
 
 依赖满足、写集不冲突、上下文可隔离、fan-in 成本可控时，必须尽量并行派发 implementation task，以提高执行效率；不要无故串行化。
 
+- 代码改动与文档 / artifact 更新默认并行，而不是等代码全部完成后串行补文档。实现 worker 可以推进代码，documentation worker 或主会话同步维护 spec、plan、task、acceptance、handoff、README 或其他交付文档。
+- 并行文档更新必须遵守 single writer：同一个文件、同一个 frontmatter 状态字段、同一个 plan/task status 只能由一个 owner 写；其他代理只提交事实、证据或 patch 建议。
+- 父子代理可以并行：子代理执行代码 task 时，父代理可以并行更新 runtime plan、plan progress、decision log、validation evidence 和 acceptance 草稿；如果文档更新需要代码最终事实，先写稳定事实和待 fan-in 项，最终结论在 fan-in 后落地。
 - explorer / reviewer / verifier 的并行门槛可以低于 worker，但必须有明确 output contract。
 - coordination task 不派给普通子代理；默认由主代理承担。
 - 共享核心文件、公共 contract、数据库 schema、部署配置默认单 writer。
@@ -152,6 +159,7 @@ parent plan 不直接执行；必须切换到当前可执行 child plan。没有
 - review 输出存在 blocking finding：只输出阻塞问题、证据、影响和后续需要的人类决策或显式流程；不推荐、不自动转入 `to-review-loop`。`to-review-loop` 只能由用户显式触发。
 - 阶段产物完成、fan-in 后或 task 已显式安排收敛：推荐 `to-consolidation`。
 - 人类验收、sign-off、争议确认或反馈节点：推荐 `to-acceptance` / `to-next-acceptance`。
+- plan 完成后需要压缩 task / fan-in 执行记录：推荐 `to-archive`。
 - 创建或修改 workflow artifact：推荐 `validate-flow`。
 
 ## Acceptance Gates
@@ -181,8 +189,10 @@ parent plan 不直接执行；必须切换到当前可执行 child plan。没有
 - task 完成且验证通过：标记 completed。
 - task 产出有问题但可修：保持 in_progress，记录 blocker / next action。
 - task 阻塞：记录 blocked 信息；当前 schema 无 blocked status 时保持 in_progress 或 draft，并在正文写清 blocker。
+- task 本身无法由 Agent 完成：不要标记 completed；把人工 / 真实环境验收项转入 acceptance，并更新 plan/tasks 以移除或改写该不可执行 task。
 - plan 完成时，所有直属 task 必须 completed，并设置 `completed_at`。
 - plan 设置为 `status: completed` 后，必须从 `${SKY_FLOW_ROOT}/plan/` 移入 `${SKY_FLOW_ROOT}/plan/done/`，并同步本地 docs TOC / artifact 引用；完成 plan 仍保留原 `id` 和文件名。
+- completed plan 应进入 `to-archive`：默认把 task 事实、关键决策和验证证据压缩进 plan 正文，清空 `plan.tasks` 并删除该 plan 的 task 目录；如果存在审计、恢复或人类要求，保留 task 文件并在归档摘要写清原因。
 
 ## Dynamic Plan Maintenance
 

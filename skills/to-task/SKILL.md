@@ -9,15 +9,20 @@ description: 'Create or update Sky Flow task artifacts from a task-ready plan; d
 
 task 一般由子代理承接，也可以由当前主会话或新会话主代理承接；owner 是执行时选择，不是 task 的固定身份。`to-task` 不执行 task、不派发子代理、不做 fan-in；它负责把能并行的 task 尽量定义为并行，把必须串行的 task 写清依赖，让 `to-implement` 可以高效执行。
 
+task 是执行期调度和恢复结构，不默认作为永久历史。plan 完成后由 `to-archive` 把 task 中值得长期保留的事实、关键决策和证据入口压缩回 completed plan；除非审计、恢复、争议或人类明确要求，完整 task 文件可被清理。
+
+拆 task 时要把代码产出和文档 / artifact 更新作为可并行 lane 优先建模。只要写集不冲突，implementation task、documentation task、verification evidence 写回和 acceptance 草稿不应被无故串行化；如果同一个 artifact 需要写入，必须指定 single writer，其余代理只回报事实或 patch 建议。
+
 ## Quick Path
 
 1. 确定 runtime 配置：`SKY_FLOW_ROOT` 默认 `docs`，`SKY_FLOW_LANG` 默认跟随用户语言；不读取额外项目配置文件。
 2. 读取输入 plan；如果是 parent plan，切换到当前可执行 child plan。parent plan 不直接拆 task。
 3. 确认 plan 是 `planning_depth: task_ready`；如果还是 outline，回到 `to-plan` 先细化。
 4. 读取关联 spec / issue / existing tasks，建立 task 边界、依赖、并行候选、串行 gate 和验证意图。
-5. 创建或更新 `tasks/<plan-id>/<task-id>.md`；维护 plan frontmatter 的 `tasks` 列表，并在 plan 正文保留 task topology 摘要。
-6. 自检 task DAG：依赖、反向依赖、并行关系、single writer、no-touch、delegation policy 和 execution handoff。
-7. 创建或修改 artifact 后运行 `validate-flow`，处理结构错误后再交付。
+5. 先过 Agent-Executable Gate：只有 Agent 可以独立执行、判断完成并回传证据的工作才创建 task；真实设备、真实账号、外部环境、人工审批、人工体验判断或缺少权限的验证项转入 `to-acceptance`，不要创建 task。
+6. 创建或更新 `tasks/<plan-id>/<task-id>.md`；维护 plan frontmatter 的 `tasks` 列表，并在 plan 正文保留 task topology 摘要。
+7. 自检 task DAG：依赖、反向依赖、并行关系、single writer、no-touch、delegation policy、execution handoff 和 Agent 可完成性。
+8. 创建或修改 artifact 后运行 `validate-flow`，处理结构错误后再交付。
 
 ## Task Boundaries
 
@@ -26,10 +31,29 @@ task 应是不大不小的执行单元：
 - 小到能由一个 owner 独立理解、执行、验证和汇报。
 - 大到不是 2-5 分钟的微步骤；微步骤只在 task 内部作为 optional `Steps`。
 - 每个 task 有明确产物、验证意图和完成条件。
+- 每个 task 必须能由 Agent 独立完成并判断完成；如果完成条件依赖人类操作、真实设备、真实账号、外部网络 / 环境、审批结论或人工体验判断，不创建 task，改为创建或更新 acceptance。
 - 每个 task 一般优先评估 worker / explorer / reviewer / verifier 等子代理承接；如果 task 由当前主会话或新会话主代理承接，也必须写清 owner、scope、verification 和 fan-in 责任。
 - 每个 task 只能有一个 write owner；共享核心文件、公共契约、DB schema、部署配置默认 single writer。
 
 如果 milestone 仍然包含多个独立子系统，不要硬拆 task；回到 `to-plan` 拆 child plan 或多个 plan。
+
+## Agent-Executable Gate
+
+`to-task` 只生成 Agent 可完成的执行单元。一个候选 task 必须同时满足：
+
+- Agent 拿到当前仓库、允许的工具和必要上下文后，可以自己执行主要动作。
+- Agent 可以判断 pass / fail，而不是等待人类、客户、Boss、真实设备或外部账号给结论。
+- 完成证据可以由 Agent 产生或读取，例如 changed files、测试结果、构建结果、静态检查、日志 / metrics 查询结果、review finding 或已授权环境证据。
+- Stop condition 是 Agent 可观测的，不是“等待人工操作完成”。
+
+下面内容不创建 task，直接转 `to-acceptance` 或更新既有 acceptance：
+
+- 真实手机、浏览器 profile、员工客户端、客户账号、外部平台、权限系统或人工体验判断。
+- 需要人类批准的 push / deploy / rollout / 生产或测试环境操作。
+- Agent 没有权限、入口或凭据的端到端环境验证。
+- 需要人类提供截图、操作结果、业务口径、验收结论或 sign-off 的阶段 gate。
+
+Agent 可以完成的预检、证据整理或验收文档草稿不要伪装成人工验证 task。它们应优先并入前置 implementation / verification task 的 `Validation Evidence`，或写入 acceptance 的证据区；只有预检本身足够独立、可由 Agent 完成且有明确产物时，才创建 Agent-executable task。
 
 ## Task Metadata
 
@@ -99,6 +123,8 @@ DAG/status 校验属于 `validate-flow`；pending diff 熵值收敛属于 `to-co
 
 真实事故回归的测试化 task 应推荐 `to-bdd-regression`，并复用 `to-debug` 的 reproduction、evidence、incorrect path 和 correct path。
 
+如果 verification 的核心完成条件是人工或真实环境门控，例如“员工手机实际访问 gz-test 私有入口并确认体验 / 权限 / 账号结果”，不要创建 verification task。应创建或更新 plan 级 acceptance，把 Agent 已完成的预检证据作为支撑，把真实环境步骤和验收结论留给人类填写。
+
 ## Body Template
 
 正文保持轻量。固定的是核心必要信息，不是完整标题清单；标题可以按任务形态调整，但必须能承载下面这些内容。
@@ -163,6 +189,7 @@ DAG/status 校验属于 `validate-flow`；pending diff 熵值收敛属于 `to-co
 - `depends_on` 和 `depended_by` 必须互相一致。
 - `parallel_with` 只用于同一 plan 下可并行的 task；并行必须满足依赖已满足、写集不冲突、fan-in 方式清楚。
 - 能并行的 task 应尽量并行表达；只有真实依赖、共享写集、明确 fan-in gate 或风险控制需要时才串行。
+- 代码任务与文档任务默认并行表达：实现 worker 写代码时，documentation worker 或主会话可以同步更新 spec / plan / task / acceptance / handoff；最终状态和完成结论由主会话 fan-in 对齐。
 - 外部 plan 依赖写入 `external_depends_on`，并说明依赖 artifact 和恢复条件。
 - 不把看起来独立但会碰同一共享核心文件的 task 并行。
 - coordination task 默认由主代理承担，不派给普通子代理。
@@ -202,6 +229,7 @@ DAG/status 校验属于 `validate-flow`；pending diff 熵值收敛属于 `to-co
 task DAG ready 的条件：
 
 - 每个 task 有类型、owner 建议、write scope、no-touch、verification intent 和 output contract。
+- 每个 task 都通过 Agent-Executable Gate；人工 / 真实环境门控已转入 acceptance，而不是留在 task DAG 中阻塞完成。
 - 依赖、反向依赖和并行关系一致；没有把可并行任务无故串行化。
 - single writer / shared scope 风险已表达。
 - nested delegation 是否允许已写清。
@@ -214,9 +242,9 @@ ready 后推荐进入 `to-implement` 执行。
 
 - Coverage：plan milestones 是否都映射到 task 或明确不拆。
 - DAG：depends_on / depended_by / parallel_with 是否一致且无循环。
-- Parallelism：是否尽量表达安全并行；串行关系是否都有真实依赖或 gate。
+- Parallelism：是否尽量表达安全并行；代码产出和文档 / artifact 更新是否被建模为可并行 lane；串行关系是否都有真实依赖或 gate。
 - Scope：每个 implementation task 是否有 allowed write scope 和 no-touch。
 - Ownership：是否避免多 writer 触碰共享核心文件。
 - Delegation：task owner 和 nested delegation policy 是否清楚。
-- Verification：每个 task 是否有可观察完成条件。
+- Verification：每个 task 是否有 Agent 可观察、可判断的完成条件；无法由 Agent 完成的验收是否已转入 acceptance。
 - Boundary：是否提前写入 implementation code、命令清单或 commit 粒度。

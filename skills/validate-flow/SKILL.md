@@ -60,6 +60,8 @@ node .agents/skills/sky-flow/scripts/validate_flow.ts [paths...]
 - dependency / parallel 关系是否符合任务语义。
 - `plan.goal` 是否足以作为 Codex 续跑契约。
 - fan-in 后 plan / task / acceptance 状态是否与实际阶段产物、验证证据和剩余工作一致。
+- task 是否都能由 Agent 独立完成；如果 task 的核心完成条件是人工操作、真实设备 / 账号、外部环境、审批或人工体验判断，应建议转入 acceptance。
+- completed plan 若已清空 `tasks` 或声称 summary-only 归档，归档摘要是否保留必要事实、关键决策、证据入口和 follow-up。
 - `acceptance` 是否说清来源、轮次、验证证据和未提及项处理。
 - `backlog` 是否讲清主题、阻塞原因、依赖条件和推荐恢复时机。
 - `handoff` 是否保留可执行恢复状态，而不是聊天摘要。
@@ -82,6 +84,7 @@ LLM 不应重新做脚本已经确定的机械校验。
 - `spec` 语义、requirements、acceptance scenarios 或设计边界不一致：推荐 `to-spec`。
 - `plan` goal、scope、milestone、progress、parent / child plan 或 recovery 不一致：推荐 `to-plan`。
 - `task` DAG、depends_on / depended_by / parallel_with、write scope 或 verification intent 不一致：推荐 `to-task`。
+- completed plan 的 task 压缩、归档摘要或 retention 策略不清：推荐 `to-archive`。
 - `acceptance` 来源、轮次、证据或未提及项处理不清：推荐 `to-acceptance` 或 `to-next-acceptance`。
 - `backlog` 来源、阻塞原因、依赖或恢复时机不清：推荐 `to-backlog`。
 - `handoff` 恢复状态不足：推荐 `to-handoff`。

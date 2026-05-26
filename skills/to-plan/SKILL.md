@@ -111,6 +111,7 @@ description: 'Create or update Sky Flow plan artifacts from a ready spec, issue,
 - `Decision Log`：有多个会影响后续维护的取舍时。
 - `Validation Evidence`：已有验证结果需要长期保留时。
 - `Parent / Child Plan Notes`：只有 parent / child plan 才需要。
+- `Archive Summary` / `Facts` / `Evidence`：只有 completed plan 经 `to-archive` 压缩后才需要；plan 草稿和执行期不要提前写归档。
 
 ## Handoff Rules
 
@@ -147,7 +148,8 @@ description: 'Create or update Sky Flow plan artifacts from a ready spec, issue,
 - Spec coverage：spec 的关键 requirements / acceptance scenarios 是否至少映射到一个 milestone、task handoff 或 verification intent。
 - Placeholder scan：不得出现无意义的 `TBD`、`TODO`、`handle edge cases`、`add appropriate validation` 等空泛计划语言；允许 `[NEEDS CLARIFICATION: ...]`，但必须标明是否 blocking。
 - Scope check：输入是否仍适合单个 standalone plan；如已覆盖多个独立子系统，应拆分或升级 parent / child plan。
-- Parallelism check：是否把可并行阶段和 lane 表达清楚；不要把无真实依赖的工作串行化。
+- Parallelism check：是否把可并行阶段和 lane 表达清楚；代码产出和文档 / artifact 更新是否默认并行，而不是无真实依赖地串行化。
 - Handoff check：`Ready for to-task` / `Ready for to-implement` 是否与 tasks、milestones、blockers 一致。
 - Recovery check：下一轮能否只读本 plan 恢复 current phase、next action、blockers 和 last validated state。
+- Archive check：如果 plan 已 completed 且 task 已压缩，是否只保留事实、决策、证据和必要 follow-up。
 - Boundary check：是否提前写入 task DAG、implementation details、命令清单、dispatch packet 或 commit 粒度。

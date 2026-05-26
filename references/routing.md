@@ -5,7 +5,7 @@
 ## 触发顺序
 
 1. 显式点名优先：用户提到 `to-spec`、`to-plan`、`validate-flow` 等子能力时，直接进入对应能力。
-2. 自动场景必须触发：debug、infra 查询 / 操作、BDD 回归固化、testing、review、commit、consolidation、acceptance、validate-flow、Sky Flow plan / task execution 命中时，不等待用户再次点名。
+2. 自动场景必须触发：debug、infra 查询 / 操作、BDD 回归固化、testing、review、commit、consolidation、acceptance、completed plan 归档压缩、validate-flow、Sky Flow plan / task execution 命中时，不等待用户再次点名。
 3. Artifact 操作前先确定 runtime 配置：任何读取、创建或修改 Sky Flow artifact 的任务，都先确定 `SKY_FLOW_ROOT` 和 `SKY_FLOW_LANG`，没有环境变量时使用默认值。
 4. 简单任务快速退出：不需要 workflow artifact、不需要跨会话状态、不命中自动场景时，直接使用 runtime。
 
@@ -28,6 +28,7 @@
 | `pick-plan`          | 显式     | 从未完成 plan 和近期完成 plan 中挑选下一步推荐项。                                                     | 输出推荐 plan 和可复制续跑提示。                    |
 | `to-acceptance`      | 自动     | 出现需要人类验收的点，或人类补充验收点 / 验收要求。                                                    | 完成声明前必须有验证证据。                          |
 | `to-next-acceptance` | 显式     | 处理已有 acceptance 的人类反馈并推进下一轮；作为 `to-acceptance` 的子能力维护。                         | 未提及项不默认通过。                                |
+| `to-archive`         | 自动     | plan 完成后需要压缩 task / fan-in 执行记录，或用户要求归档、压缩、清理 completed plan。                 | 默认 summary-only；删除 task 文件前必须满足当前 runtime 审批规则。 |
 | `to-backlog`         | 显式     | 当前阶段无法推进、被阻塞、延期或需要回收。                                                             | 说明阻塞原因、依赖和建议恢复时机。                  |
 | `to-handoff`         | 显式     | 跨会话继续、换 Agent、保存可执行恢复状态。                                                             | 不写聊天摘要式 handoff。                            |
 | `to-commit`          | 自动     | 用户要求 stage、commit、commit message 或拆分提交。                                                    | 遵守项目本地提交规范和验证要求；staged diff 含 workflow artifact 时先推荐 `validate-flow`。 |

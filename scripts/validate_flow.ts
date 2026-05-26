@@ -1033,6 +1033,14 @@ function validateRelationships(
         projectRoot,
       );
     }
+    if (plan.status === 'completed') {
+      llmHints.push({
+        artifact_id: plan.id,
+        check: 'completed_plan_archive',
+        reason:
+          'LLM should verify completed plan archive summary preserves durable facts, decisions, evidence pointers, follow-ups, and task retention rationale when tasks are compressed.',
+      });
+    }
     if (plan.status === 'not_started') {
       const startedTasks = actualTasks.filter((task) => isActiveStatus(task.status));
       if (startedTasks.length) {
@@ -1223,6 +1231,14 @@ function validateRelationships(
         check: 'status_alignment',
         reason:
           'Script can flag obvious drift, but LLM should compare plan/task/acceptance status with stage evidence and remaining work.',
+      });
+    }
+    if (actualTasks.length) {
+      llmHints.push({
+        artifact_id: plan.id,
+        check: 'task_agent_executability',
+        reason:
+          'LLM should verify each task can be independently completed by an agent; human, real-device, external-account, approval, or inaccessible environment gates should be represented as acceptance instead of task nodes.',
       });
     }
     if (planRole === 'parent' || planRole === 'child') {
