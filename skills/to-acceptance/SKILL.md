@@ -1,26 +1,30 @@
 ---
 name: to-acceptance
-description: "Create or update concise Sky Flow acceptance artifacts when work reaches a human acceptance gate, stage confirmation, sign-off, feedback checkpoint, or completion claim; group each problem or request with acceptance steps and a human-filled acceptance conclusion, record only necessary evidence, risks, confirmations, round state, and handoff to to-next-acceptance."
+description: "Create or update concise Sky Flow acceptance artifacts only when work reaches a real human acceptance gate: something the agent cannot self-verify, a significant decision humans must know or approve, missing information humans must provide, or a feedback/sign-off checkpoint. Filter out agent-verifiable checks, reference them only as supporting evidence, and hand off feedback rounds to to-next-acceptance."
 ---
 
 # to-acceptance
 
-`to-acceptance` 创建或更新 Sky Flow `acceptance` artifact。它把已经完成、阶段性完成、只读调查完成或需要人工判断的工作，整理成可反馈的验收文档。
+`to-acceptance` 创建或更新 Sky Flow `acceptance` artifact。它只把已经到达人类验收门的工作整理成可反馈文档，例如 Agent 无法自行验证的真实环境行为、重大口径 / 范围决策、需要人类补齐的信息、需要人类知晓并确认的风险或阶段 sign-off。
 
-验收文档不是测试报告的替代品，也不替代 `plan` / `task` 状态。它记录人类验收视角下的范围、证据、行为场景、残余风险、待确认问题、反馈结论和下一轮动作。
+验收文档不是测试报告、验证清单或完成证明的替代品，也不替代 `plan` / `task` 状态。Agent 可以通过代码阅读、命令、测试、模板渲染、lint、类型检查或本地页面自行验证的事项，不应单独包装成验收组；这些内容最多作为支撑人类判断的简短证据出现。
 
 ## Quick Path
 
 1. 确定 runtime 配置：`SKY_FLOW_ROOT` 默认 `docs`，`SKY_FLOW_LANG` 默认跟随用户语言；不读取额外项目配置文件。
 2. 读取来源：优先使用用户指定的 `plan` / `task` / `spec` / existing `acceptance`；否则从当前会话提取验收主题、交付范围和证据。
-3. 判断创建还是更新：
+3. 先做人类验收价值过滤：
+   - 保留：Agent 无法自行验证的真实环境 / 用户体验 / 权限 / 账号 / 设备 / 线上数据事项；重大产品、业务、运维、范围、兼容性或风险决策；需要人类补充的材料、口径、凭据或反馈；需要人类明确 sign-off 的阶段 gate。
+   - 剔除：Agent 可自行完成的文件检查、命令验证、测试 / lint / build / Helm template 结果、静态 diff 审核、实现细节核对、mock / 私有 helper / 调用顺序验证。
+   - 如果候选项全都可由 Agent 自行验证，默认不要创建或扩写 acceptance；在交付说明里报告验证结果，必要时写回 `plan` / `task` / `handoff`，而不是制造验收文档。
+4. 判断创建还是更新：
    - 已有 `acceptance` 时，先读取现有轮次、反馈和未关闭项，追加或整理，不覆盖人工结论。
    - 来源是 `plan` 且该 plan 已绑定 `acceptance` 时，更新绑定文档。
    - 未指定文档时，根据来源生成 stable id，并写入 `${SKY_FLOW_ROOT}/acceptance/<acceptance-id>.md`。
-4. 选择 `acceptance_type`：需要人类反馈默认 `interactive`；只读总结用 `report`；HTML 只在信息结构或媒体展示明显更清晰时使用。
-5. 写入或更新 frontmatter、当前轮次，以及一组或多组「问题 / 需求 → 验收步骤 → 验收结论（人类填）」。
-6. 自检：每个问题 / 需求 是否都有成组的验收步骤和验收结论，且步骤明确说明先做什么、再做什么、最后观察什么。
-7. 创建或修改 artifact 后运行 `validate-flow`，处理结构错误后再交付。
+5. 选择 `acceptance_type`：需要人类反馈默认 `interactive`；只读 `report` 只用于人类需要知晓的重大结论、风险或决策记录；HTML 只在信息结构或媒体展示明显更清晰时使用。
+6. 写入或更新 frontmatter、当前轮次，以及一组或多组「问题 / 需求 → 验收步骤 → 验收结论（人类填）」。
+7. 自检：每个验收组是否真的需要人类参与，且步骤明确说明人类先看什么、再对比什么、最后需要给出什么判断。
+8. 创建或修改 artifact 后运行 `validate-flow`，处理结构错误后再交付。
 
 ## Source And Naming
 
@@ -51,6 +55,27 @@ round: 1
 - `completed`：所有验收项都有明确通过、放弃或转入其他 artifact 的结论。
 - `abandoned`：必须有人工协商依据，并建议转入 `backlog`。
 
+## Human Gate Filter
+
+创建或更新验收文档前，先把来源里的候选内容按“是否需要人类参与”分类。验收组只承载人类门控项；Agent 自证项不应凑数。
+
+应该进入 acceptance 的内容：
+
+- Agent 无法自行验证的行为：真实设备、真实账号、浏览器 profile、外部平台、生产 / 测试环境、权限、网络、人工操作体验、客户反馈或线上数据口径。
+- 需要人类拍板的决策：产品口径、业务规则、运维取舍、部署时机、风险接受、兼容性范围、是否继续推进下一阶段。
+- 需要人类知晓的重大变化：架构路径变化、对外入口变化、默认行为变化、安全 / 合规 / 成本 / 可用性风险、需要后续团队配合的事项。
+- 需要人类补全的信息：缺少的验收材料、业务定义、账号 / 权限、真实环境操作结果、截图、反馈、审批结论。
+
+不应该单独进入 acceptance 的内容：
+
+- Agent 可以直接运行并判断的验证：单元测试、类型检查、lint、build、schema 校验、Helm template、静态搜索、文件存在性或 diff 核对。
+- 纯实现细节：mock、私有 helper、调用顺序、内部变量名、日志文案、低价值格式偏好；除非它本身是公开契约、安全边界或人类明确要求验收的内容。
+- 已经由 `to-test`、测试报告、CI、commit 记录或 `plan` / `task` 状态清楚覆盖的完成证明。
+
+Agent 自行验证的结果如果能支撑人类判断，可以压缩到对应验收组的 `证据` section，例如“Agent 已通过 `helm template ...` 确认模板可渲染”。不要把这些结果扩写成独立验收组，也不要要求人类重复跑 Agent 已能完成的机械检查。
+
+如果已有 acceptance 里混入了 Agent 自证项，更新时优先把它们合并为相关人类门控项下的证据、压缩到 `Archive`，或在不覆盖人工结论的前提下移除低价值占位；保留真正需要人类判断、知晓、补信息或决策的内容。
+
 ## Acceptance Body
 
 正文必须简洁扼要，最多写到三级标题。二级标题用于区分验收组，格式为 `## 验收组 <N>：<简短主题>`；组内用三级标题，并必须按顺序成组出现：「问题 / 需求」→「验收步骤」→「验收结论（人类填）」。一个问题 / 需求 就是一组；多个问题重复整个验收组，不要在文档顶层反复写一串 `## 问题 / 需求`。其他 section 按实际验收价值保留，不强制填写。
@@ -64,13 +89,13 @@ round: 1
 
 ### 问题 / 需求
 
-<用 2-4 句话说明要验收的问题、需求或阶段成果；只写人类判断需要知道的背景。>
+<用 2-4 句话说明为什么这个事项需要人类验收、知晓、补信息或决策；只写人类判断需要知道的背景。>
 
 ### 验收步骤
 
-1. <先做什么操作、打开什么页面、运行什么命令或查看什么 artifact。>
-2. <再做什么操作或切到哪个状态。>
-3. 观察 <预期看到的行为、结果、字段、页面状态或验收口径。>
+1. <先查看什么页面、真实环境、artifact、证据或背景。>
+2. <再对比什么业务口径、用户体验、风险说明、反馈或决策选项。>
+3. 确认 <需要人类给出的明确结论，例如通过、驳回、补充材料、接受风险或调整范围。>
 
 ### 验收结论（人类填）
 
@@ -84,7 +109,7 @@ round: 1
 
 ### 证据
 
-- <验证命令、检查结果、报告路径、产物路径或观察结论；无必要证据时省略。>
+- <Agent 已完成的验证命令、检查结果、报告路径、产物路径或观察结论；只写支撑人类判断的关键证据，无必要证据时省略。>
 
 ### 待确认
 
@@ -118,9 +143,10 @@ round: 1
 ## Conciseness Rules
 
 - 每个问题 / 需求 必须形成一组，使用 `## 验收组 <N>：<简短主题>` 作为该组二级标题；组内用三级标题连续出现「问题 / 需求」「验收步骤」「验收结论（人类填）」。
+- 每个验收组都必须能回答“为什么这件事需要人类参与”；答不出来就不要写成验收组。
 - 不要把每组的「问题 / 需求」「验收步骤」「验收结论（人类填）」都写成二级标题；它们是验收组内部结构，必须用三级标题。
 - 问题 / 需求必须用几句话说清楚；不要复述 plan / task 的长背景、实现过程或完整聊天摘要。
-- 验收步骤默认 3 步左右：第一步做什么，第二步做什么，最后一步观察什么。
+- 验收步骤默认 3 步左右：第一步让人类看什么，第二步对比什么，最后一步给出什么结论。
 - 验收结论留给人类填写；除非来源里已有明确人工反馈，否则 Agent 不替人类写通过、失败或放弃结论。
 - 除每组固定三段外，其他 section 都不是强制必填；不要为了模板填 `无`、`暂无`、`不涉及` 等低效占位。
 - 能明确关联到某个验收组的 task artifact 或 commit，写入该组的 `关联` section；不能可靠关联时不要猜，也不要写占位。
@@ -130,21 +156,24 @@ round: 1
 - 待确认也使用类似组织方式：先说明为什么要确认，再列确认步骤，最后写清需要人类给出的结论。
 - 待补充只记录明确缺口，例如缺少的验收材料、证据路径、业务口径或人工反馈；没有明确补充项时省略。
 - 证据、待确认、待补充、风险、下一轮只写会影响验收判断的信息；没有高价值内容时直接省略。
+- Agent 可自行验证的命令结果只写在 `证据`，且必须支撑某个人类门控项；不要把命令结果、文件检查或模板渲染拆成独立验收组。
 - 长日志、长输出、完整报告、抓包样本只放路径和关键结论，不粘贴全文。
 
 ## Item Rules
 
 - 验收步骤必须描述可观察结果：用户可见行为、业务不变量、artifact 契约、外部接口、交付边界或阶段 gate。
+- 验收项必须指向 Agent 无法自行完成的判断、需要人类知晓的重大变化、需要人类补信息的缺口，或需要人类拍板的决策。
+- 对 Agent 可自行验证的完成项，先执行验证并在交付说明或证据中记录；不要把它包装成等待人类验收的事项。
 - 不写 mock、私有 helper、调用顺序、内部实现偏好等低价值细节，除非它本身就是公开契约或安全边界。
 - `scenario`、`evidence`、`expected feedback` 只在它们能让验收更清楚时写入，不要机械展开成子项。
 - 人类需要确认的项必须有可判定结论，不写泛泛总结；复杂确认按步骤组织，避免散列问题清单。
-- 声明完成前必须有验证证据；没有证据时写入 `待确认` / `Confirm With Human` 或 `Next Round`，不要包装成已完成。
+- 声明完成前必须有 Agent 自证材料或明确的人类确认需求；Agent 能验证但尚未验证的内容，先补验证，不要转嫁到 acceptance。
 
 ## Round Rules
 
 - `round` 从 1 开始递增。新文档默认第 1 轮；处理反馈进入下一轮时交给 `to-next-acceptance`。
 - 当前轮只保留下一次人类需要判断的信息；已关闭内容压缩到 `Archive`，保留结论、处理结果和关键证据。
-- 未被人类提及的验收项不能默认通过，必须继续保留到下一轮，直到明确通过、明确失败、明确放弃或转入 `backlog`。
+- 未被人类提及的验收项不能默认通过；只有仍需要人类验收、知晓、补信息或决策的项才继续保留到下一轮，直到明确通过、明确失败、明确放弃、转入 `backlog`，或被确认只是 Agent 自证项。
 - 大段日志、输出、报告或样本不要堆在当前轮；正文只保留来源、关键字段、结论和可追溯路径。
 - 下一轮也必须延续简洁分组格式，优先给出新的 `## 验收组 <N>：<简短主题>`，组内包含「问题 / 需求 → 验收步骤 → 验收结论（人类填）」三段，不恢复成完整测试报告。
 
@@ -167,9 +196,10 @@ round: 1
 ## Self-Review
 
 - Source：frontmatter 是否能追溯来源 artifact 或当前会话上下文。
+- Human gate：每个验收组是否都需要人类验收、知晓、补信息或决策；Agent 可自行验证的事项是否已被剔除或压缩为证据。
 - Grouping：是否使用 `## 验收组 <N>：<简短主题>` 分组，且组内三级标题包含问题 / 需求、验收步骤和验收结论（人类填）。
 - Brief：问题 / 需求 是否用几句话说清楚，没有复述长背景。
-- Steps：验收步骤是否明确说明做什么、做什么、观察什么。
+- Steps：验收步骤是否明确说明人类看什么、对比什么、给出什么结论。
 - Evidence：完成声明是否有证据，证据是否可追溯。
 - Links：能关联到验收组的 task artifact / commit 是否已放在对应组内，且没有猜测性引用。
 - Optional sections：非核心 section 是否都承载有效信息，没有低效占位。
