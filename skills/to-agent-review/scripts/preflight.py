@@ -135,10 +135,15 @@ def parse_args() -> argparse.Namespace:
         help="Print aggregate plus top sessions instead of the full sessions array.",
     )
     parser.add_argument(
+        "--compact",
+        action="store_true",
+        help="With --summary-only, print a compact daily digest instead of full nested session signals.",
+    )
+    parser.add_argument(
         "--top",
         type=int,
-        default=10,
-        help="Number of top sessions to include in summary output. Defaults to 10.",
+        default=None,
+        help="Number of top sessions to include in summary output. Defaults to 3 with --compact, otherwise 10.",
     )
     parser.add_argument(
         "--top-days",
@@ -567,8 +572,9 @@ def classify_output_attempt(output: Any) -> str | None:
     text = compact_text(output, 600).lower()
     if not text:
         return None
-    if re.search(r"(?:process exited with code|exit code:) [1-9]\d*", text):
-        return "failure"
+    exit_code = extract_exit_code(output)
+    if exit_code is not None:
+        return "success" if exit_code == 0 else "failure"
     if any(
         marker in text
         for marker in (
@@ -584,8 +590,6 @@ def classify_output_attempt(output: Any) -> str | None:
         )
     ):
         return "failure"
-    if re.search(r"(?:process exited with code|exit code:) 0", text):
-        return "success"
     if any(marker in text for marker in ("success.", '"agent_id"', '"status": "completed"', '"status":"completed"')):
         return "success"
     return None
@@ -2307,6 +2311,203 @@ def aggregate_sessions(
     return result
 
 
+def compact_top_records(records: list[dict[str, Any]], limit: int) -> list[str]:
+    """压缩 Top 记录，避免日报 summary 展开完整嵌套 signal。"""
+    compacted: list[str] = []
+    for item in records[: max(0, limit)]:
+        if not isinstance(item, dict):
+            continue
+        parts: list[str] = []
+        for key in ("session_id", "tool_name", "intent"):
+            value = item.get(key)
+            if value:
+                parts.append(f"{key}[{value}]")
+        for key in ("tokens", "chars", "score", "seconds", "line", "exit_code"):
+            value = item.get(key)
+            if value is not None and value != "":
+                parts.append(f"{key}[{value}]")
+        if item.get("lines"):
+            parts.append(f"lines[{item['lines']}]")
+        if item.get("key"):
+            parts.append(f"key[{compact_text(item['key'], 120)}]")
+        if parts:
+            compacted.append(" ".join(parts))
+    return compacted
+
+
+def compact_decision_signals(signals: Any, *, signal_limit: int) -> dict[str, Any]:
+    """保留日报判断需要的 signal，丢弃大段 session 级嵌套细节。"""
+    if not isinstance(signals, dict):
+        return {}
+    record_limit = min(max(0, signal_limit), 3)
+    latency = signals.get("tool_latency") if isinstance(signals.get("tool_latency"), dict) else {}
+    tool_output = signals.get("tool_output") if isinstance(signals.get("tool_output"), dict) else {}
+    failure = signals.get("tool_failure") if isinstance(signals.get("tool_failure"), dict) else {}
+    validation = signals.get("validation_poll_wait") if isinstance(signals.get("validation_poll_wait"), dict) else {}
+    wait = signals.get("wait_latency") if isinstance(signals.get("wait_latency"), dict) else {}
+    token = signals.get("token_cost") if isinstance(signals.get("token_cost"), dict) else {}
+    return {
+        "tool_latency": {
+            "top_slow_exec": compact_top_records(latency.get("top_slow_exec", []), record_limit),
+            "top_slow_roundtrip": compact_top_records(latency.get("top_slow_roundtrip", []), record_limit),
+        },
+        "tool_output": {
+            "high_output_context_read_count": int(tool_output.get("high_output_context_read_count") or 0),
+            "top_high_output_context_read": compact_top_records(
+                tool_output.get("top_high_output_context_read", []),
+                record_limit,
+            ),
+            "high_output_search_count": int(tool_output.get("high_output_search_count") or 0),
+        },
+        "validation_poll_wait": validation,
+        "wait_latency": wait,
+        "tool_failure": {
+            "failure_count": int(failure.get("failure_count") or 0),
+            "attempt_count": int(failure.get("attempt_count") or 0),
+            "failure_rate_percent": failure.get("failure_rate_percent", 0.0),
+            "top_failed_actions": failure.get("top_failed_actions", {}),
+            "failure_kind_counts": failure.get("failure_kind_counts", {}),
+            "top_subagent_param_conflict_actions": failure.get("top_subagent_param_conflict_actions", {}),
+            "top_resource_exhaustion_actions": failure.get("top_resource_exhaustion_actions", {}),
+        },
+        "token_cost": {
+            "usage_event_count": int(token.get("usage_event_count") or 0),
+            "total_usage": token.get("total_usage", {}),
+            "max_rate_limits": token.get("max_rate_limits", {}),
+            "max_context_window": token.get("max_context_window", 0),
+        },
+        "subagent_runtime": signals.get("subagent_runtime", {}),
+        "interaction_interrupts": signals.get("interaction_interrupts", {}),
+    }
+
+
+def compact_aggregate_summary(aggregate: dict[str, Any], *, signal_limit: int) -> dict[str, Any]:
+    """生成 automation 日报默认消费的聚合摘要。"""
+    result: dict[str, Any] = {
+        "session_count": aggregate.get("session_count", 0),
+        "runtime_counts": aggregate.get("runtime_counts", {}),
+        "tool_call_count": aggregate.get("tool_call_count", 0),
+        "subagent_count": aggregate.get("subagent_count", 0),
+        "retry_success_path_count": aggregate.get("retry_success_path_count", 0),
+        "top_retry_success_categories": aggregate.get("top_retry_success_categories", {}),
+        "top_retry_success_paths": aggregate.get("top_retry_success_paths", {}),
+        "top_tool_names": aggregate.get("top_tool_names", {}),
+        "bottleneck_type_counts": aggregate.get("bottleneck_type_counts", {}),
+        "decision_signals": compact_decision_signals(
+            aggregate.get("decision_signals"),
+            signal_limit=signal_limit,
+        ),
+    }
+    deduplicated = aggregate.get("deduplicated") if isinstance(aggregate.get("deduplicated"), dict) else None
+    if deduplicated:
+        result["deduplicated"] = {
+            "session_count": deduplicated.get("session_count", 0),
+            "duplicate_group_count": deduplicated.get("duplicate_group_count", 0),
+            "duplicate_groups": deduplicated.get("duplicate_groups", [])[: max(0, signal_limit)],
+        }
+    return result
+
+
+def compact_session_decision_signals(signals: Any) -> dict[str, Any]:
+    """Top session 只保留计数，Top evidence 统一放在 aggregate。"""
+    if not isinstance(signals, dict):
+        return {}
+    tool_output = signals.get("tool_output") if isinstance(signals.get("tool_output"), dict) else {}
+    failure = signals.get("tool_failure") if isinstance(signals.get("tool_failure"), dict) else {}
+    validation = signals.get("validation_poll_wait") if isinstance(signals.get("validation_poll_wait"), dict) else {}
+    wait = signals.get("wait_latency") if isinstance(signals.get("wait_latency"), dict) else {}
+    token = signals.get("token_cost") if isinstance(signals.get("token_cost"), dict) else {}
+    validation_summary = validation.get("roundtrip_seconds") if isinstance(validation.get("roundtrip_seconds"), dict) else {}
+    human_summary = wait.get("human_decision_wait_seconds") if isinstance(wait.get("human_decision_wait_seconds"), dict) else {}
+    infra_summary = wait.get("infra_wait_seconds") if isinstance(wait.get("infra_wait_seconds"), dict) else {}
+    total_usage = token.get("total_usage") if isinstance(token.get("total_usage"), dict) else {}
+    return {
+        "tool_output": {
+            "high_output_context_read_count": int(tool_output.get("high_output_context_read_count") or 0),
+            "high_output_search_count": int(tool_output.get("high_output_search_count") or 0),
+        },
+        "validation_poll_wait": {
+            "roundtrip_count": int(
+                validation.get("roundtrip_count")
+                or validation_summary.get("count")
+                or 0
+            ),
+        },
+        "wait_latency": {
+            "human_decision_wait_count": int(
+                wait.get("human_decision_wait_count")
+                or human_summary.get("count")
+                or 0
+            ),
+            "infra_wait_count": int(
+                wait.get("infra_wait_count")
+                or infra_summary.get("count")
+                or 0
+            ),
+        },
+        "tool_failure": {
+            "failure_count": int(failure.get("failure_count") or 0),
+            "attempt_count": int(failure.get("attempt_count") or 0),
+            "failure_kind_counts": failure.get("failure_kind_counts", {}),
+        },
+        "token_cost": {
+            "usage_event_count": int(token.get("usage_event_count") or 0),
+            "total_tokens": int(total_usage.get("total_tokens") or 0),
+            "max_context_window": token.get("max_context_window", 0),
+        },
+    }
+
+
+def compact_session_summary(session: dict[str, Any], *, signal_limit: int) -> dict[str, Any]:
+    time_range = session.get("time_range") if isinstance(session.get("time_range"), dict) else {}
+    item_limit = min(max(0, signal_limit), 5)
+    bottlenecks = []
+    for item in (session.get("candidate_bottlenecks") or [])[:item_limit]:
+        if isinstance(item, dict):
+            bottlenecks.append(f"{item.get('type', 'unknown')}:{item.get('severity', 'unknown')}")
+    suggested = []
+    for item in (session.get("suggested_read_lines") or [])[:item_limit]:
+        if isinstance(item, dict):
+            suggested.append(f"{item.get('start')}-{item.get('end')} {item.get('reason', '')}")
+    tool_counts = session.get("tool_call_counts") if isinstance(session.get("tool_call_counts"), dict) else {}
+    tool_call_counts = ", ".join(f"{key}[{value}]" for key, value in tool_counts.items())
+    return {
+        "runtime": session.get("runtime"),
+        "session_id": session.get("session_id"),
+        "title": session.get("title"),
+        "file": session.get("file"),
+        "time_range": f"{time_range.get('start')}..{time_range.get('end')}",
+        "line_count": session.get("line_count"),
+        "tool_call_count": session.get("tool_call_count"),
+        "search_like_tool_calls": session.get("search_like_tool_calls"),
+        "validation_like_tool_calls": session.get("validation_like_tool_calls"),
+        "edit_like_tool_calls": session.get("edit_like_tool_calls"),
+        "subagent_count": session.get("subagent_count"),
+        "retry_success_path_count": session.get("retry_success_path_count"),
+        "tool_call_counts": tool_call_counts,
+        "candidate_bottlenecks": bottlenecks,
+        "suggested_read_lines": suggested,
+        "decision_signals": compact_session_decision_signals(session.get("decision_signals")),
+    }
+
+
+def compact_top_session_summaries(
+    sessions: list[dict[str, Any]],
+    limit: int,
+    *,
+    signal_limit: int,
+) -> list[dict[str, Any]]:
+    ranked = sorted(
+        sessions,
+        key=lambda item: int(item.get("tool_call_count") or 0),
+        reverse=True,
+    )
+    return [
+        compact_session_summary(session, signal_limit=signal_limit)
+        for session in ranked[: max(0, limit)]
+    ]
+
+
 def session_summary(session: dict[str, Any]) -> dict[str, Any]:
     return {
         "runtime": session.get("runtime"),
@@ -2783,7 +2984,20 @@ def main() -> int:
         "aggregate": aggregate_sessions(sessions, signal_limit=args.signal_limit),
     }
     if args.summary_only:
-        result["top_sessions"] = top_session_summaries(sessions, args.top)
+        top_limit = args.top if args.top is not None else (3 if args.compact else 10)
+        if args.compact:
+            result["compact"] = True
+            result["aggregate"] = compact_aggregate_summary(
+                result["aggregate"],
+                signal_limit=args.signal_limit,
+            )
+            result["top_sessions"] = compact_top_session_summaries(
+                sessions,
+                top_limit,
+                signal_limit=args.signal_limit,
+            )
+        else:
+            result["top_sessions"] = top_session_summaries(sessions, top_limit)
     else:
         result["sessions"] = sessions
 

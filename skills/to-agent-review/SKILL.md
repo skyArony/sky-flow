@@ -13,8 +13,8 @@ description: 'Review agent decision-making inside Sky Flow by analyzing visible 
 
 1. 确定 runtime 配置：`SKY_FLOW_ROOT` 默认 `docs`，`SKY_FLOW_LANG` 默认跟随用户语言；不读取额外项目配置文件。
 2. 如果输入是 Codex / Claude Code 原生 JSONL、agent-decision-log、昨日 / 指定日期日志或 automation 日报，先运行本目录 `scripts/preflight.py` 生成 compact manifest；不要默认手工扫全量 JSONL。
-3. 默认命令：`python3 <to-agent-review-dir>/scripts/preflight.py --runtime auto --date <YYYY-MM-DD> --cwd <project-root> --summary-only`。`--cwd` 必须指向当前项目根目录；只有用户明确要求跨项目 / 全局复盘时才加 `--all-cwd`。
-4. 先读 preflight 输出里的 `codex_cwd_filter`、`aggregate.decision_signals`、Top session `decision_signals`、`candidate_bottlenecks` 和 `suggested_read_lines`，再决定需要精读哪些证据。
+3. 默认命令：`python3 <to-agent-review-dir>/scripts/preflight.py --runtime auto --date <YYYY-MM-DD> --cwd <project-root> --summary-only --compact --top 3`。`--cwd` 必须指向当前项目根目录；只有用户明确要求跨项目 / 全局复盘时才加 `--all-cwd`。
+4. 先读 compact preflight 输出里的 `codex_cwd_filter`、`aggregate.decision_signals`、Top session 摘要、`candidate_bottlenecks` 和 `suggested_read_lines`，再决定需要精读哪些证据；只有诊断分歧或需要完整结构化输入时才去掉 `--compact`。
 5. 精读 JSONL 行窗时优先用 `scripts/preflight.py --summarize-lines START-END[,START-END] <jsonl>`；该摘要会遮蔽 hidden fields，并保留 `exit_code`、`original_token_count`、输出字符数和截断片段。
 6. 确认输入范围：用户指定的 transcript、执行记录、日志片段、工具调用摘要、plan / task / handoff artifact、子代理输出或当前会话上下文；如果 preflight 后仍不足以复盘关键问题，先请求最小补充材料。
 7. 建立证据地图：按时间线整理目标、关键决策、工具调用、失败 / 重试、等待、子代理派发、fan-in、验证、runtime plan 更新和 artifact 写回。
@@ -28,6 +28,7 @@ description: 'Review agent decision-making inside Sky Flow by analyzing visible 
 - `scripts/preflight.py` 是原生日志复盘的默认入口，用来在进入人工分析前完成项目归属过滤、成本聚合、失败 / 等待分类和安全行窗摘要。
 - `--cwd` 默认过滤 Codex `session_meta.cwd`，防止把其他项目 session 写入当前项目日报；manifest 会保留 `excluded_by_cwd_count` 和 `excluded_by_cwd_top` 供跨项目判断。
 - `--all-cwd` 只用于用户明确要求跨项目 / 全局 Agent 复盘的场景；这种报告必须在 Decision Brief 里说明跨项目范围。
+- `--compact` 是 automation 日报默认输出，保留聚合判断和 Top evidence，但不展开完整 session 级嵌套 signal；需要完整机器输入时再去掉。
 - `tool_output.high_output_context_read_count` / `top_high_output_context_read` 记录大输出上下文读取，按 `intent` 区分 `search`、`process`、`diff`、`helm`、`sqlite`、`transcript` 和 `other`；旧 `high_output_search_count` 只作为 search 子集兼容信号。
 - `--summarize-lines` 只输出结构化摘要，不输出完整 hidden reasoning / encrypted / thinking 字段；精读大型 transcript 时优先用它替代 `sed` / `nl` 展开 raw JSONL。
 

@@ -27,6 +27,7 @@ Sky Flow 是通用工作流 Skill 套件，覆盖 `spec`、`issue`、`plan`、`t
    - 自动场景直接触发：debug、infra 查询 / 操作、BDD 回归固化、testing、review、commit、consolidation、acceptance、completed plan 归档压缩、validate-flow、Sky Flow plan / task execution。
    - 没有明确子能力或需要完整清单时，读取 `references/routing.md`，它是子能力和触发规则的完整来源。
    - 执行已落地的子能力细节时，读取对应 `SKILL.md`；顶层子能力通常在 `skills/<name>/SKILL.md`，嵌套子能力可位于所属能力目录下。
+   - 标注为 `project-provided adapter` 或项目级实现的子能力（例如 `to-infra`），必须优先使用当前会话 Skills 列表给出的路径，或项目 `.claude/skills/<name>/SKILL.md`；不要按 Sky Flow core 的 `skills/<name>/SKILL.md` 拼路径。
 4. 维护 artifact 纪律：
    - 重要状态必须落到 artifact，不只留在聊天里。
    - 在 `SKY_FLOW_ROOT` 下创建、删除或移动 docs artifact 时，如果 `${SKY_FLOW_ROOT}/AGENTS.md` 或 `${SKY_FLOW_ROOT}/CLAUDE.md` 定义了 Table Of Content 维护规则，必须按本地规则同步 TOC。

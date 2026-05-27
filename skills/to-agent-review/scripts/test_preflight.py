@@ -7,6 +7,8 @@ from preflight import (
     analyze_claude_file,
     analyze_codex_file,
     aggregate_sessions,
+    compact_aggregate_summary,
+    compact_top_session_summaries,
     filter_codex_files_by_cwd,
     parse_line_ranges,
     summarize_transcript_lines,
@@ -437,6 +439,145 @@ class PreflightLatencyTest(unittest.TestCase):
         self.assertEqual(tool_output["top_high_output_context_read"][0]["intent"], "helm")
         self.assertEqual(tool_output["top_high_output_context_read"][0]["tokens"], 28861)
         self.assertEqual(tool_output["high_output_search_count"], 0)
+
+    def test_compact_summary_keeps_daily_signals_without_full_session_payload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            tmp_path = Path(directory)
+            transcript = tmp_path / "rollout-2026-05-25T13-34-25-session-compact.jsonl"
+            write_jsonl(
+                transcript,
+                [
+                    {
+                        "timestamp": "2026-05-25T13:34:25.646Z",
+                        "type": "response_item",
+                        "payload": {
+                            "type": "function_call",
+                            "name": "exec_command",
+                            "arguments": json.dumps({"cmd": "rg -n error docs apps"}),
+                            "call_id": "call-search",
+                        },
+                    },
+                    {
+                        "timestamp": "2026-05-25T13:34:26.646Z",
+                        "type": "response_item",
+                        "payload": {
+                            "type": "function_call_output",
+                            "call_id": "call-search",
+                            "output": (
+                                "Chunk ID: search\n"
+                                "Process exited with code 0\n"
+                                "Original token count: 9000\n"
+                                "Output:\n"
+                                "docs/example.md:1:error"
+                            ),
+                        },
+                    },
+                ],
+            )
+
+            session = analyze_codex_file(
+                transcript,
+                target_date="2026-05-25",
+                index={},
+                signal_limit=10,
+            )
+
+        self.assertIsNotNone(session)
+        aggregate = aggregate_sessions([session], signal_limit=10)
+        compact_aggregate = compact_aggregate_summary(aggregate, signal_limit=2)
+        compact_sessions = compact_top_session_summaries([session], 1, signal_limit=2)
+
+        self.assertEqual(compact_aggregate["session_count"], 1)
+        self.assertEqual(
+            compact_aggregate["decision_signals"]["tool_output"]["high_output_context_read_count"],
+            1,
+        )
+        self.assertNotIn("aggregate", compact_aggregate.get("deduplicated", {}))
+        self.assertEqual(len(compact_sessions), 1)
+        self.assertNotIn("retry_success_paths", compact_sessions[0])
+        self.assertIn(
+            "tokens[9000]",
+            compact_aggregate["decision_signals"]["tool_output"]["top_high_output_context_read"][0],
+        )
+        self.assertEqual(
+            compact_sessions[0]["decision_signals"]["tool_output"]["high_output_context_read_count"],
+            1,
+        )
+        self.assertNotIn(
+            "top_high_output_context_read",
+            compact_sessions[0]["decision_signals"]["tool_output"],
+        )
+
+    def test_codex_validation_exit_zero_with_error_logs_is_success(self):
+        with tempfile.TemporaryDirectory() as directory:
+            tmp_path = Path(directory)
+            transcript = tmp_path / "rollout-2026-05-26T15-00-21-session-validation-log.jsonl"
+            write_jsonl(
+                transcript,
+                [
+                    {
+                        "timestamp": "2026-05-26T15:03:00.000Z",
+                        "type": "response_item",
+                        "payload": {
+                            "type": "function_call",
+                            "name": "exec_command",
+                            "arguments": json.dumps(
+                                {"cmd": "pnpm --filter @fg/server test -- payout.handler.spec.ts"}
+                            ),
+                            "call_id": "call-test",
+                        },
+                    },
+                    {
+                        "timestamp": "2026-05-26T15:03:01.000Z",
+                        "type": "response_item",
+                        "payload": {
+                            "type": "function_call_output",
+                            "call_id": "call-test",
+                            "output": "Process running with session ID 12345\nOutput:\njest running",
+                        },
+                    },
+                    {
+                        "timestamp": "2026-05-26T15:03:02.000Z",
+                        "type": "response_item",
+                        "payload": {
+                            "type": "function_call",
+                            "name": "write_stdin",
+                            "arguments": json.dumps({"session_id": 12345, "chars": ""}),
+                            "call_id": "call-poll",
+                        },
+                    },
+                    {
+                        "timestamp": "2026-05-26T15:03:03.000Z",
+                        "type": "response_item",
+                        "payload": {
+                            "type": "function_call_output",
+                            "call_id": "call-poll",
+                            "output": (
+                                "Process exited with code 0\n"
+                                "Output:\n"
+                                "ERROR [YXNewPayoutHandler] expected failure branch\n"
+                                "Test Suites: 1 passed, 1 total"
+                            ),
+                        },
+                    },
+                ],
+            )
+
+            session = analyze_codex_file(
+                transcript,
+                target_date="2026-05-26",
+                index={},
+                signal_limit=10,
+            )
+
+        self.assertIsNotNone(session)
+        failure = session["decision_signals"]["tool_failure"]
+        validation_poll = session["decision_signals"]["validation_poll_wait"]
+
+        self.assertEqual(failure["failure_count"], 0)
+        self.assertEqual(failure["attempt_count"], 1)
+        self.assertEqual(failure["top_failed_actions"], {})
+        self.assertEqual(validation_poll["roundtrip_seconds"]["count"], 1)
 
     def test_codex_validation_poll_waits_are_not_tool_latency(self):
         with tempfile.TemporaryDirectory() as directory:
