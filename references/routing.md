@@ -5,7 +5,7 @@
 ## 触发顺序
 
 1. 显式点名优先：用户提到 `to-spec`、`to-plan`、`validate-flow` 等子能力时，直接进入对应能力。
-2. 自动场景必须触发：debug、infra 查询 / 操作、BDD 回归固化、testing、review、commit、consolidation、acceptance、completed plan 归档压缩、validate-flow、Sky Flow plan / task execution 命中时，不等待用户再次点名。
+2. 自动场景必须触发：debug、infra 查询 / 操作、BDD 回归固化、testing、review、commit、consolidation、acceptance、通用技术知识沉淀、completed plan 归档压缩、validate-flow、Sky Flow plan / task execution 命中时，不等待用户再次点名。
 3. Artifact 操作前先确定 runtime 配置：任何读取、创建或修改 Sky Flow artifact 的任务，都先确定 `SKY_FLOW_ROOT` 和 `SKY_FLOW_LANG`，没有环境变量时使用默认值。
 4. 简单任务快速退出：不需要 workflow artifact、不需要跨会话状态、不命中自动场景时，直接使用 runtime。
 
@@ -19,6 +19,7 @@
 | `to-infra`           | 自动     | 查询或操作基础设施、环境、日志、数据库、缓存、Metrics、Grafana、AlertManager、部署或外部系统。           | Project-provided adapter；Sky Flow core 不实现具体环境细节。 |
 | `to-bdd-regression`  | 自动     | 线上 bug、客户反馈、日志 / 数据异常、时序或状态机问题需要固化为 BDD-style 回归。                         | `to-debug` 子能力；复用已有诊断信息，不重复取证。   |
 | `to-test`            | 自动     | 新增 / 修改测试、写 Given / When / Then、判断测试 ROI、选择 stable seam、决定 Red / Green / Refactor 或替代验证。 | 不替代 `to-debug`；真实事故回归转 `to-bdd-regression`；项目命令由本地规则决定。 |
+| `to-knowledge`       | 自动     | 调研、排障、实现或 review 中发现业务无关、项目无关、可跨项目复用的基础设施、组件、库、工具、架构模式、踩坑或技术选型知识。 | 默认写普通 knowledge note，不是 workflow artifact；可旁路子代理用足够低成本模型沉淀，有可靠证据且低成本时自动执行，否则只推荐。 |
 | `to-plan`            | 显式     | 从 spec、issue 或当前会话生成实施计划；承载目标、范围、阶段、进度、恢复入口和 handoff。                  | 普通 / 中等任务保持单 Plan；task DAG 和执行模型分别交给 `to-task` / `to-implement`。 |
 | `to-task`            | 显式     | 从 plan 拆出 task、依赖、并行关系、owner、write scope、no-touch 和可选 step。                           | 必须以 task-ready plan 作为输入；不执行 task。      |
 | `to-implement`       | 自动     | 执行和维护指定 Sky Flow plan / task artifact / task DAG，协调主代理、子代理、验证、fan-in、runtime plan、动态 task 调整和 artifact 状态回写。 | 日常任务不用；仅显式指定，或执行已制定 Sky Flow plan / task 时触发。 |

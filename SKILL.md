@@ -1,11 +1,11 @@
 ---
 name: sky-flow
-description: 'Sky Flow workflow suite for artifact-based collaboration across spec, issue, plan, task execution, testing, acceptance, backlog, handoff, and completed-plan archive compression. Use when the user mentions Sky Flow, a to-* child workflow, pick-plan, validate-flow, workflow artifacts, skill migration, or asks to create, validate, progress, resume, execute a Sky Flow plan/task, test, accept, backlog, hand off, archive, review, consolidate, or commit a file-backed workflow.'
+description: 'Sky Flow workflow suite for artifact-based collaboration across spec, issue, plan, task execution, testing, acceptance, backlog, handoff, knowledge notes, and completed-plan archive compression. Use when the user mentions Sky Flow, a to-* child workflow, pick-plan, validate-flow, workflow artifacts, skill migration, or asks to create, validate, progress, resume, execute a Sky Flow plan/task, test, accept, backlog, hand off, archive, review, consolidate, commit a file-backed workflow, or capture reusable technical knowledge.'
 ---
 
 # Sky Flow
 
-Sky Flow 是通用工作流 Skill 套件，覆盖 `spec`、`issue`、`plan`、`task`、`acceptance`、`backlog`、`handoff` 等 artifact 的创建、推进、校验、归档压缩与衔接，用来把设计澄清、问题记录、实施编排、并行 fan-in、人类验收和跨会话交接沉淀成可恢复的工作流状态。
+Sky Flow 是通用工作流 Skill 套件，覆盖 `spec`、`issue`、`plan`、`task`、`acceptance`、`backlog`、`handoff` 等 artifact 的创建、推进、校验、归档压缩与衔接，也提供通用技术知识沉淀入口。它用来把设计澄清、问题记录、实施编排、并行 fan-in、人类验收、跨会话交接和可复用开发知识沉淀成可恢复、可检索的状态。
 
 它不是所有任务的默认入口，也不是单个巨型流程。简单任务直接使用 runtime；复杂或需要留痕的任务才进入 Sky Flow。入口 Skill 只负责判断是否进入套件、选择子能力、维护 artifact 纪律并触发校验；artifact 路径和输出语言可通过 `SKY_FLOW_*` 环境变量覆盖，项目提交规范和验证命令由本地规则承担。
 
@@ -15,7 +15,7 @@ Sky Flow 是通用工作流 Skill 套件，覆盖 `spec`、`issue`、`plan`、`t
 
 1. 先判断是否进入 Sky Flow：
    - 用户显式提到 Sky Flow、子能力名或 workflow artifact：进入。
-   - 任务需要跨会话留痕、计划编排、验收、handoff 或 backlog 回收：进入。
+   - 任务需要跨会话留痕、计划编排、验收、handoff、backlog 回收或通用技术知识沉淀：进入。
    - 只是简单代码修改、查询、解释或一次性命令，且不涉及 Sky Flow artifact：直接使用 runtime。
 2. 一旦进入且需要读取、创建或修改 artifact，先确定 runtime 配置：
    - `SKY_FLOW_ROOT` 来自 runtime env；不存在则默认 `docs`。
@@ -24,7 +24,7 @@ Sky Flow 是通用工作流 Skill 套件，覆盖 `spec`、`issue`、`plan`、`t
    - 默认值满足项目需求时不需要配置；如需覆盖，在项目 `.codex/config.toml` 的 `[shell_environment_policy.set]` 中设置 `SKY_FLOW_ROOT` / `SKY_FLOW_LANG`。
 3. 选择子能力：
    - 用户显式点名子能力时，优先使用该能力。
-   - 自动场景直接触发：debug、infra 查询 / 操作、BDD 回归固化、testing、review、commit、consolidation、acceptance、completed plan 归档压缩、validate-flow、Sky Flow plan / task execution。
+   - 自动场景直接触发：debug、infra 查询 / 操作、BDD 回归固化、testing、review、commit、consolidation、acceptance、通用技术知识沉淀、completed plan 归档压缩、validate-flow、Sky Flow plan / task execution。
    - 没有明确子能力或需要完整清单时，读取 `references/routing.md`，它是子能力和触发规则的完整来源。
    - 执行已落地的子能力细节时，读取对应 `SKILL.md`；顶层子能力通常在 `skills/<name>/SKILL.md`，嵌套子能力可位于所属能力目录下。
    - 标注为 `project-provided adapter` 或项目级实现的子能力（例如 `to-infra`），必须优先使用当前会话 Skills 列表给出的路径，或项目 `.claude/skills/<name>/SKILL.md`；不要按 Sky Flow core 的 `skills/<name>/SKILL.md` 拼路径。
@@ -42,6 +42,7 @@ Sky Flow 是通用工作流 Skill 套件，覆盖 `spec`、`issue`、`plan`、`t
 - `to-test`：只判断测试策略、行为场景、测试 ROI、stable seam、Red / Green / Refactor 和替代验证。它不替代 debug 诊断或真实事故回归固化。
 - `to-review`：只检查实现风险、行为回归、设计对齐、测试缺口和安全 / 可靠性问题。它可以读取 artifact 作为背景，但不修 artifact 状态，也不整理 diff。
 - `to-consolidation`：只收敛目标 diff 中的补丁式实现、临时代码、重复逻辑、旧注释、debug 残留和 fan-in 半成品。它不判断 artifact/status 是否正确，也不替代 review。
+- `to-knowledge`：只沉淀业务无关、项目无关、可跨项目复用的通用技术知识。它不替代 spec / issue / plan / backlog / handoff。
 - `to-implement`：执行和维护已准备好的 Sky Flow plan / task DAG，协调主代理、子代理、runtime plan、验证、fan-in、动态 task 调整和状态回写。它不重做设计，也不替代 review / consolidation / acceptance / validate-flow。
 - `to-archive`：只压缩已完成 plan 的执行期记录，把长期事实、关键决策和证据入口写回 completed plan；它不新增 archive artifact，也不替代 backlog / handoff / acceptance。
 
@@ -58,6 +59,7 @@ Sky Flow 是通用工作流 Skill 套件，覆盖 `spec`、`issue`、`plan`、`t
 | 排障、复现、root cause               | `to-debug` / `to-bdd-regression`                  |
 | 基础设施查询 / 操作、日志 / 数据源取证 | `to-infra`（project-provided adapter）             |
 | 测试策略、测试 ROI、BDD/TDD、替代验证 | `to-test`                                         |
+| 通用技术知识、踩坑、库 / 工具选型笔记 | `to-knowledge`                                    |
 | 实施计划、任务拆分、执行编排         | `to-plan` / `to-task` / `to-implement`             |
 | 完成后归档压缩                     | `to-archive`                                       |
 | 下一步 plan 选择和续跑提示           | `pick-plan`                                        |
@@ -92,5 +94,7 @@ Sky Flow 是通用工作流 Skill 套件，覆盖 `spec`、`issue`、`plan`、`t
 - `references/dependencies.md`：脚本运行、setup 和外部 Skill 依赖；只有安装、运行环境或依赖问题时读取。
 - `skills/<name>/SKILL.md` 或嵌套子能力 `SKILL.md`：可独立发现的子能力执行细节；只有进入对应子能力时读取。
 - Artifact 结构规则：设计真相源在 `${SKY_FLOW_ROOT}/spec/tooling/sky-flow.md`；机器可执行约束在 `scripts/schema.ts` 和 `scripts/validate_flow.ts`。
+
+`to-knowledge` 默认写入普通 knowledge note，不属于 workflow artifact；只有创建或修改真正的 Sky Flow artifact 时才按 artifact 规则运行 `validate-flow`。
 
 项目提交规范、验证命令和环境限制由项目本地规则决定；Sky Flow core 不写死项目业务规则。

@@ -1,0 +1,4 @@
+interface:
+  display_name: "To Knowledge"
+  short_description: "沉淀通用技术知识、踩坑经验、选型对比和长期开发笔记"
+  default_prompt: "使用 $to-knowledge 沉淀通用技术知识、注意点、踩坑或技术选型对比。"

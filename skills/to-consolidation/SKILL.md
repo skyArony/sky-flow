@@ -1,6 +1,6 @@
 ---
 name: to-consolidation
-description: 'Consolidate completed stage code or concrete output changes by checking the target scope for patchy implementation, temporary code, duplicate logic, dead leftovers, and fan-in residue. Use after a verifiable stage, multi-agent fan-in, when a plan/task inserts a consolidation task, or when the user asks to consolidate pending work.'
+description: 'Consolidate completed stage code or concrete output changes by checking the target scope for patchy implementation, temporary code, duplicate logic, dead leftovers, and fan-in residue. Use after a verifiable stage, multi-agent fan-in, when a plan/task inserts a consolidation task, or when the user asks to consolidate pending work. If this body is already loaded in the visible context and the scope is a simple repeated check, reuse it and run concrete diff/status checks instead of rereading the full SKILL.md; reread after compaction, rule uncertainty, or complex fan-in.'
 ---
 
 # to-consolidation
@@ -16,6 +16,21 @@ description: 'Consolidate completed stage code or concrete output changes by che
 默认范围是当前工作区 pending diff，明确包括 unstaged diff、staged diff 和 untracked files。用户指定路径、模块、文件、提交或提交区间时，只检查指定范围对应的代码 / 产物 diff；用户指定 plan / task artifact 时，只把它作为定位代码范围的上下文，不检查 artifact 状态。
 
 `to-consolidation` 不作为 `to-commit` 的固定前置步骤。它应像 review 一样，由 `to-task` 根据阶段风险、fan-in 复杂度、产物形态和 diff 熵值灵活插入为阶段性 task，或由用户显式触发。
+
+## 重复使用策略
+
+第一次使用、上下文压缩后恢复、规则不确定、复杂 fan-in、跨模块大 diff 或用户明确要求时，必须读取本文件必要部分。
+
+如果本文件正文已经在当前可见上下文中读过，且只是简单交付前检查或同会话重复检查，不要为了形式再次读取全文。直接执行实际收敛检查：
+
+```bash
+git status --short
+git diff --check -- <target-paths>
+git diff -- <target-paths>
+git ls-files --others --exclude-standard
+```
+
+然后按本 Skill 已加载的规则判断是否有临时代码、无关 diff、重复实现、debug 残留或需要人类确认的问题。复用规则只减少重复读文档，不减少 diff / status 检查。
 
 ## Workflow
 

@@ -20,7 +20,7 @@ description: 'Review agent decision-making inside Sky Flow by analyzing visible 
 7. 建立证据地图：按时间线整理目标、关键决策、工具调用、失败 / 重试、等待、子代理派发、fan-in、验证、runtime plan 更新和 artifact 写回。
 8. 按分析维度归类问题，区分必要等待、人类决策等待、基础设施等待、工具延迟和 Agent 低效；不要把 `expected no-match`、存在性探测、`git diff --no-index` 或轮询等待直接当作低效。
 9. 填写固定量化信号清单；没有证据的项写 `unknown`，不要估算成事实。
-10. 输出或更新 `${SKY_FLOW_ROOT}/backlog/agent-reivew/<yyyy-mm-dd>-<scope>.md`，默认采用 brief-first 结构：先给决策摘要和行动清单，再给发现卡片、指标快照和证据附录；每条建议必须有 ROI、落点、done-when 和 non-goal。
+10. 输出或更新 `${SKY_FLOW_ROOT}/backlog/agent-reivew/<yyyy-mm-dd>-<scope>.md`，默认采用 plain-language brief-first 结构：先用人话解释“问题是什么、为什么重要、下一步做什么”，再给指标和证据；每条建议必须有 ROI、落点、done-when 和 non-goal。
 11. 需要改变长期 workflow 规则、计划或任务时，转入对应 Sky Flow 子能力：`to-spec`、`to-plan` 或 `to-task`。
 
 ## Preflight Helper
@@ -99,64 +99,68 @@ description: 'Review agent decision-making inside Sky Flow by analyzing visible 
 
 ## Report Shape Rules
 
-- 默认报告必须让读者在第一屏看到：结论、最大风险、下一步动作和不应优化的方向。
-- `Actions` 必须放在 `Findings` 前面；不要让读者读完证据表才知道该做什么。
-- 不默认输出 `Signal Map`。需要保留信号映射时，把它放入 `Evidence Appendix`，不能位于主阅读路径。
-- `Metrics Snapshot` 最多 6 行，每行必须解释这个指标改变了什么判断；没有决策价值的固定信号只在附录或内部采集中保留。
-- 每条 finding 默认最多 5 个 bullet：`Impact`、`Cause`、`Fix`、`Evidence`、`Landing / Non-goal`。`Evidence` 最多 2 个锚点；长 UUID、完整路径和多段 line range 放到 `Evidence Appendix`。
-- `Decision Brief` 不复述完整数字表，只写最高影响结论和最高 ROI 改进。
+- 默认报告是给人做决策用的，不是给机器读的审计表。第一屏必须回答：昨天最值得关注什么、为什么重要、现在要做什么、什么不要误判。
+- 用用户语言写主阅读路径；用户用中文时，主标题和字段名优先中文。避免只有 `F1` / `High` / `Impact` 这类内部标签而没有人话解释。
+- `行动清单` 必须放在 `发现` 前面；不要让读者读完证据表才知道该做什么。
+- `行动清单` 默认最多 3 条，表格最多 4 列：`优先级`、`做什么`、`何时算完成`、`落点`。复杂维护成本、ROI 细节放到发现卡片里，不要撑宽主表。
+- 每条发现标题必须是可独立理解的短句，例如“远端诊断先读全量输出，挤占了上下文”，不要写成“F1. `High` high_output_context_read”。
+- 每条发现第一行必须有 `一句话`，用非术语解释给没看过 transcript 的人听；如果这句话不能直接回答“这到底是什么意思”，重写。
+- 不默认输出 `Signal Map`。需要保留信号映射时，把它放入 `证据附录`，不能位于主阅读路径。
+- `指标依据` 最多 5 行，每行必须解释这个指标改变了什么判断；没有决策价值的固定信号只在附录或内部采集中保留。
+- 每条发现默认最多 5 个 bullet：`一句话`、`为什么重要`、`怎么改`、`证据`、`落点 / 不做什么`。`证据` 最多 2 个锚点；长 UUID、完整路径和多段 line range 放到 `证据附录`。
+- 写完报告后做一次通俗化自检：如果某个发现需要聊天里再解释一次才能懂，说明报告写得不够清楚，必须先改报告。
 
 ## Output Template
 
 ```markdown
 # Agent Decision Review: <scope>
 
-## Decision Brief
+## 结论先说
 
-- Verdict: <一句话结论，说明这批会话最值得优化的决策问题。>
-- Top Risk: <最大成本 / 风险。>
-- Next Move: <下一步最该落地的动作。>
-- Do Not Optimize: <明确不应优化或不应误判的方向。>
+- 一句话结论：<用人话说明这批会话最值得优化的问题。>
+- 最大风险：<最大成本 / 风险，不堆指标名。>
+- 下一步：<下一步最该落地的动作。>
+- 不要误判：<明确不应优化或不应误判的方向。>
 
-## Actions
+## 行动清单
 
-| Priority | Action | Finding | Landing | Why now | Done when | Maintenance cost |
-| --- | --- | --- | --- | --- | --- | --- |
-|  |  |  |  |  |  |  |
+| 优先级 | 做什么 | 何时算完成 | 落点 |
+| --- | --- | --- | --- |
+|  |  |  |  |
 
-## Findings
+## 发现
 
-### F1. `High` <一句话问题>
+### F1. <可独立理解的短句>
 
-- Impact:
-- Cause:
-- Fix:
-- Evidence: <最多 2 个锚点；长路径和完整 line range 放附录。>
-- Landing / Non-goal:
+- 一句话：<不用术语解释这是什么意思。>
+- 为什么重要：<影响成本、风险或返工。>
+- 怎么改：<具体改法。>
+- 证据：<最多 2 个锚点；长路径和完整 line range 放附录。>
+- 落点 / 不做什么：<ROI、落点、non-goal。>
 
-### F2. `Medium` <一句话问题>
+### F2. <可独立理解的短句>
 
-- Impact:
-- Cause:
-- Fix:
-- Evidence:
-- Landing / Non-goal:
+- 一句话：
+- 为什么重要：
+- 怎么改：
+- 证据：
+- 落点 / 不做什么：
 
-## Metrics Snapshot
+## 指标依据
 
-| Metric | Value | Meaning |
+| 指标 | 值 | 说明了什么 |
 | --- | --- | --- |
 |  |  |  |
 
-## Not Worth Optimizing
+## 不值得优化
 
-| Item | Reason |
+| 项目 | 原因 |
 | --- | --- |
 |  |  |
 
-## Evidence Appendix
+## 证据附录
 
-| Source | Lines / Window | Used for |
+| 来源 | 行窗 | 用途 |
 | --- | --- | --- |
 |  |  |  |
 ```
@@ -186,4 +190,5 @@ description: 'Review agent decision-making inside Sky Flow by analyzing visible 
 - Classification：是否区分必要等待、人类等待、基础设施等待、工具延迟和 Agent 低效。
 - ROI：每条建议是否有优先级、预期收益、维护成本和落点。
 - Sky Flow alignment：改进是否按性质进入 agent-review-report / spec / plan / task / none，而不是私有项目流程。
+- Readability：第一屏是否不用解释就能看懂；每个 finding 是否有“这到底是什么意思”的人话版本。
 - Brevity：是否合并重复问题，避免长篇粘贴 transcript。
