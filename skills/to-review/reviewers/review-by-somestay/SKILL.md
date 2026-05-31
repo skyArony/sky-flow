@@ -35,7 +35,7 @@ description: 'Internal medium-depth reviewer profile delegated only by to-review
 - 父级传入标准化范围时直接沿用；只能为验证边界读取必要相邻文件。
 - `requirements_or_plan` 若是 `intent inferred from diff/artifact`，只能按推断表达，不要写成已确认需求。
 - 对已声明的偏离先判断是否合理、是否需要人类确认、是否产生真实风险。
-- 每条 finding 必须说明触发场景、影响面、修复成本和 confidence。
+- 每条 finding 必须说明触发场景、影响面、真实 bug 风险、修复成本和 confidence。
 - 真实高影响路径用 `P0 / P1 / P2`；理论风险、低概率高复杂度保护建议降级为 `P3 / Suggestion` 或 `residual_risks`。
 - 修复建议优先保持小：几行 guard、补验证、补注释、修正 artifact 边界或移除 scope creep。
 - 不把审美偏好、日志措辞、mock 调用次数或私有实现路径当阻塞项。
@@ -62,6 +62,8 @@ description: 'Internal medium-depth reviewer profile delegated only by to-review
 - `severity: P0|P1|P2|P3|Suggestion|Nit`
 - `confidence: high|medium|low`
 - `status: new|strengthened|downgraded|dismissed`
+- `real_bug_risk: high|medium|low`
+- `fix_cost: low|medium|high`
 - 文件 / 行或 artifact section 定位
 - evidence、impact、recommendation
 

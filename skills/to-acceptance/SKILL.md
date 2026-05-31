@@ -69,6 +69,7 @@ round: 1
 不应该单独进入 acceptance 的内容：
 
 - Agent 可以直接运行并判断的验证：单元测试、类型检查、lint、build、schema 校验、Helm template、静态搜索、文件存在性或 diff 核对。
+- 普通静态 diff review、AI review finding triage、修复后 verifier closure 或 Agent 自己能判断的 finding 核对；这些应直接在对话、review 报告或 `to-review-loop` 输出中处理，不写成 acceptance 验收组。
 - 纯实现细节：mock、私有 helper、调用顺序、内部变量名、日志文案、低价值格式偏好；除非它本身是公开契约、安全边界或人类明确要求验收的内容。
 - 已经由 `to-test`、测试报告、CI、commit 记录或 `plan` / `task` 状态清楚覆盖的完成证明。
 

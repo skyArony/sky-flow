@@ -37,6 +37,7 @@ description: 'Internal deep-review profile delegated only by to-review after med
 
 ## ROI Discipline
 
+- 每条 final finding 都要回答两个 ROI 问题：这个问题在实际场景下会出 bug 吗？修它的代价是什么？
 - 只有真实高影响路径、已发生事故、明确外部契约破坏，或几行代码即可保护的问题，才建议阻塞修复。
 - 缺少证据的系统性担忧应进入 `unverified_areas` 或 `residual_risks`。
 - 不为了“更稳”建议复杂状态机、双轨兼容、重复校验或额外抽象，除非收益明显高于复杂度。
@@ -51,6 +52,8 @@ description: 'Internal deep-review profile delegated only by to-review after med
 - `severity: P0|P1|P2|P3|Suggestion|Nit`
 - `confidence: high|medium|low`
 - `status: new|strengthened|downgraded|dismissed`
+- `real_bug_risk: high|medium|low`
+- `fix_cost: low|medium|high`
 - 文件 / 行或 artifact section 定位
 - evidence、impact、recommendation
 

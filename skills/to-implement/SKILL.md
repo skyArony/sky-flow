@@ -128,10 +128,11 @@ parent plan 不直接执行；必须切换到当前可执行 child plan。没有
 1. Spec compliance review。
 2. 需要测试策略、测试 ROI、BDD/TDD 或替代验证时，触发 `to-test`。
 3. Code / artifact quality review。
-4. 必要验证。
-5. 必要 `to-consolidation`。
-6. 必要 `to-acceptance` 生成或更新验收文档。
-7. `validate-flow` 检查 artifact/status。
+4. 如果当前阶段是在关闭已选 review findings，触发 `to-review` verifier stage，并要求至少两个不同模型 verifier；只有一个供应商时使用最新模型和次新模型。
+5. 必要验证。
+6. 必要 `to-consolidation`。
+7. 必要 `to-acceptance` 生成或更新验收文档。
+8. `validate-flow` 检查 artifact/status。
 
 不接受 “close enough” 的 spec 偏差。
 
@@ -157,6 +158,7 @@ parent plan 不直接执行；必须切换到当前可执行 child plan。没有
 - 真实事故回归固化：推荐 `to-bdd-regression`。
 - 普通 code / artifact review：推荐 `to-review`。
 - review 输出存在 blocking finding：只输出阻塞问题、证据、影响和后续需要的人类决策或显式流程；不推荐、不自动转入 `to-review-loop`。`to-review-loop` 只能由用户显式触发。
+- review synthesize 后需要人类决定修哪些 finding、延后哪些 finding 或接受哪些风险：直接在对话或 review 报告中输出 triage 清单，不创建 `acceptance` artifact。
 - 阶段产物完成、fan-in 后或 task 已显式安排收敛：推荐 `to-consolidation`。
 - 人类验收、sign-off、争议确认或反馈节点：推荐 `to-acceptance` / `to-next-acceptance`。
 - plan 完成后需要压缩 task / fan-in 执行记录：推荐 `to-archive`。

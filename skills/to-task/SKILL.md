@@ -85,7 +85,7 @@ external_depends_on: []
 
 `to-task` 负责把 plan 变成可执行 DAG，也负责在 task 中写清执行时推荐的专门 skill；这些推荐是 advisory，不是强制跳转：
 
-- `task_type: review`：推荐执行时使用 `to-review`；如果发现 blocking finding，只输出问题和后续动作，不推荐进入 `to-review-loop`。
+- `task_type: review`：推荐执行时使用 `to-review`；高风险 review task 可要求 multi-review / synthesize；如果发现 blocking finding，只输出问题和后续动作，不推荐进入 `to-review-loop`。
 - `task_type: consolidation`：推荐执行时使用 `to-consolidation`；该 task 应放在阶段产物完成、fan-in 后或 diff 熵值风险较高的位置，不作为 `to-commit` 固定前置。
 - `task_type: verification`，或涉及测试策略、ROI、BDD/TDD、stable seam、替代验证：推荐 `to-test`。
 - 真实事故回归测试化：推荐 `to-bdd-regression`，并要求复用 `to-debug` 的 reproduction、evidence、incorrect path 和 correct path。
@@ -102,8 +102,8 @@ review task 至少写清：
 - Review target：diff、artifact、plan/task fan-in 结果或具体文件范围。
 - Review focus：实现风险、spec alignment、行为回归、测试缺口、安全 / 可靠性、artifact 表达问题中的哪些。
 - Evidence input：需要读取的 spec / plan / task / validation evidence。
-- Output contract：findings-first、严重度、文件 / 行号、影响、建议修复方向；没有问题也要说明剩余风险。
-- Escalation hint：何时需要深度 reviewer、`to-consolidation` 或 `validate-flow`。
+- Output contract：findings-first、严重度、文件 / 行号、真实 bug 风险、修复成本、影响、建议修复方向；multi-review 时要求 reviewer agreement 和 synthesize 清单；没有问题也要说明剩余风险。
+- Escalation hint：何时需要 multi-review、深度 reviewer、verifier stage、`to-consolidation` 或 `validate-flow`。
 
 不要把 review task 写成修复 task。修复属于后续 implementation task，或在用户显式要求时进入 `to-review-loop`；artifact frontmatter /
 DAG/status 校验属于 `validate-flow`；pending diff 熵值收敛属于 `to-consolidation`。
