@@ -147,45 +147,56 @@ Verifier stage 用于验收已选 review findings 是否被修复，不用于发
 
 ## Output Contract
 
-输出应保持 findings-first。单 reviewer 可以使用简版；`multi-review` 或 verifier stage 必须使用扩展结构。
+输出应保持 findings-first。用户可见标题和字段 label 默认使用中文，必要术语、枚举值、模型名、finding id 和 mode 保留英文。字段 label 用 `**加粗**`，主要区块用二级标题，单个 finding 用三级标题。每个 finding 最前面必须放 `#### 决策核心`，用显眼的加粗问题句回答“这个问题在实际场景下会出 Bug 吗？”和“修它的代价是什么？”。单 reviewer 可以省略不适用字段；`multi-review` 或 verifier stage 必须使用扩展结构。
 
-```text
-Findings To Triage
-1. [ ] RV-001 [P1] <title> - <file:line 或 artifact section>
-   reviewer_agreement: <1/3|2/3|3/3> (<reviewer ids>)
-   real_bug_risk: high|medium|low - <实际触发场景是否会出 bug>
-   fix_cost: low|medium|high - <预计修复范围 / 风险>
-   Evidence: <触发路径 / 证据>
-   Impact: <影响面>
-   Recommendation: <小而具体的修复>
-   Suggested decision: fix-now|ask-human-in-dialogue|needs-evidence|defer|reject-false-positive
-   Confidence: high|medium|low
-   Source findings: <reviewer ids / finding ids>
+```markdown
+## 待决策问题
 
-Verifier Results
-- dual_verifier: complete|unavailable|not-applicable
-- verifier_models: <model A>, <model B>
-- RV-001: cleared|not-cleared|disputed|not-checked
-- Evidence: <测试、命令、diff 检查或 artifact 证据>
+### RV-001 [P1] <标题> - <file:line 或 artifact section>
 
-Checked Areas
+#### 决策核心
+
+> **这个问题在实际场景下会出 Bug 吗？** high|medium|low - <实际触发场景和判断依据>
+>
+> **修它的代价是什么？** low|medium|high - <预计修复范围 / 风险>
+
+- **Reviewer 共识**：<1/3|2/3|3/3>（<reviewer ids>）
+- **证据**：<触发路径 / 证据>
+- **影响**：<影响面>
+- **建议修复**：<小而具体的修复>
+- **建议决策**：fix-now|ask-human-in-dialogue|needs-evidence|defer|reject-false-positive
+- **信心**：high|medium|low
+- **来源 finding**：<reviewer ids / finding ids>
+
+## Verifier 结果
+
+- **双 Verifier 状态**：complete|unavailable|not-applicable
+- **Verifier 模型**：<model A>, <model B>
+- **RV-001**：cleared|not-cleared|disputed|not-checked
+- **证据**：<测试、命令、diff 检查或 artifact 证据>
+
+## 已检查范围
+
 - <已检查范围>
 
-Unverified Areas
+## 未验证范围
+
 - <未验证或证据不足范围>
 
-Residual Risks
+## 残余风险
+
 - <低 ROI 或需后续确认风险>
 
-Outcome
-- review_depth: fast|medium|deep
-- review_lane: single-review|multi-review|verifier
-- review_focus: spec-compliance|code-quality|general
-- reviewer_count: <n>
-- model_diversity: full|limited|unknown
-- deep_review_state: not-requested|recommended-but-disabled|in-progress|completed
-- suggested_outcome: pass|no-change|blocked|failed|scope-violation
-- no file changes
+## 结论
+
+- **Review 深度**：fast|medium|deep
+- **Review 模式**：single-review|multi-review|verifier
+- **Review 重点**：spec-compliance|code-quality|general
+- **Reviewer 数量**：<n>
+- **模型多样性**：full|limited|unknown
+- **Deep review 状态**：not-requested|recommended-but-disabled|in-progress|completed
+- **建议结果**：pass|no-change|blocked|failed|scope-violation
+- **文件改动**：no file changes
 ```
 
-无 findings 时第一行写 `No findings.`，并列出 checked / unverified / residual risk。不要把 “看起来没问题” 当作替代证据。
+无 findings 时第一行写 `No findings.`，并用中文标题列出 `已检查范围`、`未验证范围`、`残余风险` 和 `结论`。不要把 “看起来没问题” 当作替代证据。
