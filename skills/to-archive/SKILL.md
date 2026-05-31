@@ -1,6 +1,6 @@
 ---
 name: to-archive
-description: 'Compress completed Sky Flow plan/task/acceptance artifacts after a plan is done; preserve durable design facts, implementation facts, acceptance conclusions, evidence pointers, and follow-up references while clearing or retaining task files by policy.'
+description: "Compress completed Sky Flow plan/task/acceptance artifacts after a plan is done; preserve durable design facts, implementation facts, acceptance conclusions, evidence pointers, and follow-up references while clearing or retaining task files by policy."
 ---
 
 # to-archive
@@ -19,7 +19,7 @@ description: 'Compress completed Sky Flow plan/task/acceptance artifacts after a
 5. 更新 completed plan：保留短 `Summary`、`Archive Summary`、`Facts`、`Decision Log`、`Evidence` 和必要 follow-up；删除执行流水、过期 recovery、重复 fan-in 细节和微步骤。
 6. 压缩全部验收通过的 acceptance：保留 artifact 和 frontmatter，把长步骤、逐项执行流水和中间排查压成 `结论`、`验收结果`、`证据入口`、`残余风险 / Follow-up`；未通过、部分通过、仍有 open feedback 或争议的 acceptance 不压缩为通过结论。
 7. 选择 task retention：
-   - 默认 `summary-only`：清空 plan frontmatter 的 `tasks: []`，删除 `${SKY_FLOW_ROOT}/tasks/<plan-id>/`。
+   - 默认 `summary-only`：清空 plan frontmatter 的 `tasks: []`，删除 `${SKY_FLOW_ROOT}/task/<plan-id>/`。
    - `retain-task-files`：保留 task 文件和 `plan.tasks`，并在 `Archive Summary` 说明保留原因。
 8. 如果需要删除 task 文件，遵守当前 runtime 的删除审批规则；不能静默绕过 destructive command 审批。
 9. 如果 plan 已完成但还在 `${SKY_FLOW_ROOT}/plan/`，移入 `${SKY_FLOW_ROOT}/plan/done/`；同步本地 TOC / artifact 引用。

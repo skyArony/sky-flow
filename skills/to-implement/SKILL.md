@@ -1,6 +1,6 @@
 ---
 name: to-implement
-description: 'Execute and maintain a prepared Sky Flow plan/task artifact or task DAG only when explicitly requested or when continuing Sky Flow plan/task execution; coordinate main-agent and subagent work, context policy, verification, review, consolidation, fan-in, runtime plan updates, dynamic task adjustments, and artifact status writeback.'
+description: "Execute and maintain a prepared Sky Flow plan/task artifact or task DAG only when explicitly requested or when continuing Sky Flow plan/task execution; coordinate main-agent and subagent work, context policy, verification, review, consolidation, fan-in, runtime plan updates, dynamic task adjustments, and artifact status writeback."
 ---
 
 # to-implement
@@ -189,7 +189,7 @@ parent plan 不直接执行；必须切换到当前可执行 child plan。没有
 - task 完成且验证通过：标记 completed。
 - task 产出有问题但可修：保持 in_progress，记录 blocker / next action。
 - task 阻塞：记录 blocked 信息；当前 schema 无 blocked status 时保持 in_progress 或 draft，并在正文写清 blocker。
-- task 本身无法由 Agent 完成：不要标记 completed；把人工 / 真实环境验收项转入 acceptance，并更新 plan/tasks 以移除或改写该不可执行 task。
+- task 本身无法由 Agent 完成：不要标记 completed；把人工 / 真实环境验收项转入 acceptance，并更新 plan/task 以移除或改写该不可执行 task。
 - plan 完成时，所有直属 task 必须 completed，并设置 `completed_at`。
 - plan 设置为 `status: completed` 后，必须从 `${SKY_FLOW_ROOT}/plan/` 移入 `${SKY_FLOW_ROOT}/plan/done/`，并同步本地 docs TOC / artifact 引用；完成 plan 仍保留原 `id` 和文件名。
 - completed plan 应进入 `to-archive`：默认把 task 事实、关键决策和验证证据压缩进 plan 正文，清空 `plan.tasks` 并删除该 plan 的 task 目录；如果存在审计、恢复或人类要求，保留 task 文件并在归档摘要写清原因。

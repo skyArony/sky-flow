@@ -673,7 +673,7 @@ task 文件的默认定位是执行期脚手架，而不是永久真相源。pla
 
 - completed plan 保留 `Archive Summary`、`Facts`、`Decision Log`、`Evidence` 和必要 follow-up。
 - plan frontmatter 的 `tasks` 清空为 `[]`。
-- `${SKY_FLOW_ROOT}/tasks/<plan-id>/` 可以删除；删除前必须确认当前 runtime 的 destructive command 审批规则。
+- `${SKY_FLOW_ROOT}/task/<plan-id>/` 可以删除；删除前必须确认当前 runtime 的 destructive command 审批规则。
 - 若本地 docs TOC 或 artifact 引用包含 task 路径，必须同步更新。
 
 只有存在下列情况时才保留完整 task 文件：
