@@ -15,7 +15,7 @@ description: 'Capture concise, source-backed, project-agnostic developer knowled
 2. 判断是否值得沉淀：只记录业务无关、项目无关、跨项目可复用、后续搜索成本明显高于记录成本的知识。
 3. 确认证据：优先官方文档、标准、源码仓库、release notes、厂商公告或维护者文档；会随时间变化的信息必须查最新来源。
 4. 读取本地 docs 入口规则：如果 `${SKY_FLOW_ROOT}/AGENTS.md` 或 `${SKY_FLOW_ROOT}/CLAUDE.md` 对 `knowledge/` 有目录或 TOC 规则，必须遵守。
-5. 搜索已有笔记：先用 `rg` 在 `${SKY_FLOW_ROOT}/knowledge/` 查同主题，优先更新已有笔记，避免重复文件。
+5. 搜索已有笔记：先在 `${SKY_FLOW_ROOT}/knowledge/` 查同主题，优先更新已有笔记，避免重复文件。
 6. 选择路径：`${SKY_FLOW_ROOT}/knowledge/<category>/<slug>.md`，slug 使用短横线英文；目录不存在时创建。
 7. 写入干练笔记：记录结论、适用场景、注意点、来源链接和检查日期；不要大段复述原文。
 8. 自检边界：确认没有项目 / 业务 / 客户 / 密钥 / 内部 URL，没有未经验证的事实，没有把当前任务计划写成知识。
