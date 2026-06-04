@@ -23,12 +23,7 @@ description: 'Consolidate completed stage code or concrete output changes by che
 
 如果本文件正文已经在当前可见上下文中读过，且只是简单交付前检查或同会话重复检查，不要为了形式再次读取全文。直接执行实际收敛检查：
 
-```bash
-git status --short
-git diff --check -- <target-paths>
-git diff -- <target-paths>
-git ls-files --others --exclude-standard
-```
+检查工作区状态、空白错误、目标 diff 和未跟踪文件。
 
 然后按本 Skill 已加载的规则判断是否有临时代码、无关 diff、重复实现、debug 残留或需要人类确认的问题。复用规则只减少重复读文档，不减少 diff / status 检查。
 
