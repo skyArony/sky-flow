@@ -1058,6 +1058,15 @@ def codex_fork_duplicate_signature(session: dict[str, Any]) -> tuple[Any, ...] |
     )
 
 
+def codex_replayed_parent_call_ids(session: dict[str, Any], parent: dict[str, Any]) -> set[str]:
+    """返回 fork session 中已经由 parent session 记录过的工具调用 ID。"""
+    child_ids = {str(value) for value in session.get("tool_call_ids") or [] if value}
+    parent_ids = {str(value) for value in parent.get("tool_call_ids") or [] if value}
+    if not child_ids or not parent_ids:
+        return set()
+    return child_ids & parent_ids
+
+
 def representative_session(sessions: list[dict[str, Any]]) -> dict[str, Any]:
     return max(
         sessions,
@@ -1100,6 +1109,46 @@ def deduplicate_codex_fork_rollouts(
                 "dropped_session_count": len(grouped_sessions) - 1,
                 "raw_tool_call_count": sum(int(item.get("tool_call_count") or 0) for item in grouped_sessions),
                 "deduped_tool_call_count": int(representative.get("tool_call_count") or 0),
+            }
+        )
+
+    sessions_by_id = {session_identity(session): session for session in sessions}
+    for session in sessions:
+        if session.get("runtime") != "codex":
+            continue
+        identity = session_identity(session)
+        if identity in dropped_ids:
+            continue
+        forked_from_id = str(session.get("forked_from_id") or "")
+        if not forked_from_id:
+            continue
+        parent = sessions_by_id.get(forked_from_id)
+        if not parent:
+            continue
+
+        child_ids = {str(value) for value in session.get("tool_call_ids") or [] if value}
+        if not child_ids:
+            continue
+        replayed_ids = codex_replayed_parent_call_ids(session, parent)
+        replay_ratio = len(replayed_ids) / len(child_ids)
+        if replay_ratio < 0.90:
+            continue
+
+        dropped_ids.add(identity)
+        duplicate_groups.append(
+            {
+                "reason": "forked_parent_replayed_tool_call_ids",
+                "forked_from_id": forked_from_id,
+                "cwd": str(session.get("cwd") or parent.get("cwd") or ""),
+                "representative_session_id": session_identity(parent),
+                "session_ids": [session_identity(parent), identity],
+                "raw_session_count": 2,
+                "dropped_session_count": 1,
+                "raw_tool_call_count": int(parent.get("tool_call_count") or 0)
+                + int(session.get("tool_call_count") or 0),
+                "deduped_tool_call_count": int(parent.get("tool_call_count") or 0),
+                "duplicate_call_id_count": len(replayed_ids),
+                "duplicate_call_id_ratio_percent": percent(len(replayed_ids), len(child_ids)),
             }
         )
 
@@ -1268,6 +1317,7 @@ def analyze_codex_file(
     long_gaps: list[dict[str, Any]] = []
     retry_attempts: dict[str, list[dict[str, Any]]] = {}
     codex_tool_calls: dict[str, dict[str, Any]] = {}
+    tool_call_ids: set[str] = set()
     exec_durations: list[float] = []
     tool_roundtrips: list[float] = []
     slow_execs: list[dict[str, Any]] = []
@@ -1396,6 +1446,7 @@ def analyze_codex_file(
                 subagent_action = is_subagent_action(tool_name)
                 call_id = str(payload.get("call_id") or "")
                 if call_id:
+                    tool_call_ids.add(call_id)
                     codex_tool_calls[call_id] = {
                         "key": tool_action_key(tool_name, raw_details),
                         "tool_name": tool_name,
@@ -1692,6 +1743,7 @@ def analyze_codex_file(
         "tool_call_count": tool_call_count,
         "tool_result_count": tool_result_count,
         "tool_call_counts": top_counter(tool_names),
+        "tool_call_ids": sorted(tool_call_ids),
         "event_counts": top_counter(payload_types),
         "hidden_event_counts": top_counter(hidden_events),
         "search_like_tool_calls": search_count,
@@ -2383,25 +2435,33 @@ def compact_decision_signals(signals: Any, *, signal_limit: int) -> dict[str, An
 
 def compact_aggregate_summary(aggregate: dict[str, Any], *, signal_limit: int) -> dict[str, Any]:
     """生成 automation 日报默认消费的聚合摘要。"""
+    source = aggregate
+    deduplicated = aggregate.get("deduplicated") if isinstance(aggregate.get("deduplicated"), dict) else None
+    if deduplicated and int(deduplicated.get("duplicate_group_count") or 0) > 0:
+        deduped_aggregate = deduplicated.get("aggregate")
+        if isinstance(deduped_aggregate, dict):
+            source = deduped_aggregate
+
     result: dict[str, Any] = {
-        "session_count": aggregate.get("session_count", 0),
-        "runtime_counts": aggregate.get("runtime_counts", {}),
-        "tool_call_count": aggregate.get("tool_call_count", 0),
-        "subagent_count": aggregate.get("subagent_count", 0),
-        "retry_success_path_count": aggregate.get("retry_success_path_count", 0),
-        "top_retry_success_categories": aggregate.get("top_retry_success_categories", {}),
-        "top_retry_success_paths": aggregate.get("top_retry_success_paths", {}),
-        "top_tool_names": aggregate.get("top_tool_names", {}),
-        "bottleneck_type_counts": aggregate.get("bottleneck_type_counts", {}),
+        "session_count": source.get("session_count", 0),
+        "runtime_counts": source.get("runtime_counts", {}),
+        "tool_call_count": source.get("tool_call_count", 0),
+        "subagent_count": source.get("subagent_count", 0),
+        "retry_success_path_count": source.get("retry_success_path_count", 0),
+        "top_retry_success_categories": source.get("top_retry_success_categories", {}),
+        "top_retry_success_paths": source.get("top_retry_success_paths", {}),
+        "top_tool_names": source.get("top_tool_names", {}),
+        "bottleneck_type_counts": source.get("bottleneck_type_counts", {}),
         "decision_signals": compact_decision_signals(
-            aggregate.get("decision_signals"),
+            source.get("decision_signals"),
             signal_limit=signal_limit,
         ),
     }
-    deduplicated = aggregate.get("deduplicated") if isinstance(aggregate.get("deduplicated"), dict) else None
     if deduplicated:
         result["deduplicated"] = {
             "session_count": deduplicated.get("session_count", 0),
+            "raw_session_count": aggregate.get("session_count", 0),
+            "raw_tool_call_count": aggregate.get("tool_call_count", 0),
             "duplicate_group_count": deduplicated.get("duplicate_group_count", 0),
             "duplicate_groups": deduplicated.get("duplicate_groups", [])[: max(0, signal_limit)],
         }
@@ -2986,13 +3046,17 @@ def main() -> int:
     if args.summary_only:
         top_limit = args.top if args.top is not None else (3 if args.compact else 10)
         if args.compact:
+            summary_sessions, _ = deduplicate_codex_fork_rollouts(
+                sessions,
+                signal_limit=args.signal_limit,
+            )
             result["compact"] = True
             result["aggregate"] = compact_aggregate_summary(
                 result["aggregate"],
                 signal_limit=args.signal_limit,
             )
             result["top_sessions"] = compact_top_session_summaries(
-                sessions,
+                summary_sessions,
                 top_limit,
                 signal_limit=args.signal_limit,
             )

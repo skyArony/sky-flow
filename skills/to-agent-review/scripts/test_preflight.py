@@ -9,6 +9,7 @@ from preflight import (
     aggregate_sessions,
     compact_aggregate_summary,
     compact_top_session_summaries,
+    deduplicate_codex_fork_rollouts,
     filter_codex_files_by_cwd,
     parse_line_ranges,
     summarize_transcript_lines,
@@ -204,6 +205,76 @@ class PreflightLatencyTest(unittest.TestCase):
         self.assertEqual(deduped_aggregate["session_count"], 1)
         self.assertEqual(deduped_aggregate["tool_call_count"], 2)
         self.assertEqual(deduped_aggregate["retry_success_path_count"], 1)
+
+        compact = compact_aggregate_summary(aggregate, signal_limit=10)
+        self.assertEqual(compact["session_count"], 1)
+        self.assertEqual(compact["tool_call_count"], 2)
+        self.assertEqual(compact["deduplicated"]["raw_session_count"], 2)
+        self.assertEqual(compact["deduplicated"]["raw_tool_call_count"], 4)
+
+    def test_codex_fork_parent_replay_is_deduplicated_by_call_ids(self):
+        with tempfile.TemporaryDirectory() as directory:
+            tmp_path = Path(directory)
+            cwd = tmp_path / "FakeGame"
+            parent_id = "11111111-1111-1111-1111-111111111111"
+            child_id = "22222222-2222-2222-2222-222222222222"
+            parent_file = tmp_path / f"rollout-2026-05-21T00-00-00-{parent_id}.jsonl"
+            child_file = tmp_path / f"rollout-2026-05-21T01-00-00-{child_id}.jsonl"
+            replayed_events = [
+                codex_spawn_attempt("call-agent", "2026-05-21T00:00:01.000Z"),
+                codex_tool_output(
+                    "call-agent",
+                    "2026-05-21T00:00:02.000Z",
+                    "collab spawn failed: agent thread limit reached",
+                ),
+                codex_spawn_attempt("call-agent-retry", "2026-05-21T00:00:03.000Z"),
+                codex_tool_output(
+                    "call-agent-retry",
+                    "2026-05-21T00:00:04.000Z",
+                    '{"agent_id":"agent-ok","nickname":"reviewer"}',
+                ),
+            ]
+            write_jsonl(
+                parent_file,
+                [
+                    codex_session_meta(parent_id, "2026-05-21T00:00:00.000Z", str(cwd)),
+                    *replayed_events,
+                ],
+            )
+            write_jsonl(
+                child_file,
+                [
+                    codex_session_meta(
+                        child_id,
+                        "2026-05-21T01:00:00.000Z",
+                        str(cwd),
+                        forked_from_id=parent_id,
+                    ),
+                    codex_session_meta(parent_id, "2026-05-21T01:00:00.000Z", str(cwd)),
+                    *replayed_events,
+                    {
+                        "timestamp": "2026-05-21T01:00:05.000Z",
+                        "type": "response_item",
+                        "payload": {"type": "context_compacted"},
+                    },
+                ],
+            )
+
+            parent = analyze_codex_file(parent_file, target_date="2026-05-21", index={}, signal_limit=10)
+            child = analyze_codex_file(child_file, target_date="2026-05-21", index={}, signal_limit=10)
+
+        sessions = [parent, child]
+        self.assertTrue(all(session is not None for session in sessions))
+        aggregate = aggregate_sessions(sessions, signal_limit=10)
+        deduplicated = aggregate["deduplicated"]
+        deduped_sessions, groups = deduplicate_codex_fork_rollouts(sessions, signal_limit=10)
+
+        self.assertEqual(deduplicated["session_count"], 1)
+        self.assertEqual(deduplicated["duplicate_group_count"], 1)
+        self.assertEqual(deduplicated["duplicate_groups"][0]["reason"], "forked_parent_replayed_tool_call_ids")
+        self.assertEqual(deduplicated["duplicate_groups"][0]["duplicate_call_id_ratio_percent"], 100.0)
+        self.assertEqual([session["session_id"] for session in deduped_sessions], [parent_id])
+        self.assertEqual(groups[0]["representative_session_id"], parent_id)
 
     def test_claude_human_decision_waits_are_not_tool_latency(self):
         with tempfile.TemporaryDirectory() as directory:
