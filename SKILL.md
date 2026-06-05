@@ -54,7 +54,7 @@ Sky Flow 是通用工作流 Skill 套件，覆盖 `spec`、`issue`、`plan`、`t
 
 | 场景                                 | 子能力                                             |
 | ------------------------------------ | -------------------------------------------------- |
-| 长期设计澄清或规格沉淀               | `to-spec`                                          |
+| 长期设计对齐、澄清或规格沉淀         | `to-spec`                                          |
 | 问题 / 线索记录，暂不修复            | `to-issue`                                         |
 | 排障、复现、root cause               | `to-debug` / `to-bdd-regression`                  |
 | 基础设施查询 / 操作、日志 / 数据源取证 | `to-infra`（project-provided adapter）             |

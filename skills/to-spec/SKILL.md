@@ -1,25 +1,46 @@
 ---
 name: to-spec
-description: 'Create or update Sky Flow spec artifacts for durable design clarification. Use when the user asks for to-spec, wants to generate or refine a long-lived design/spec, needs systematic requirement clarification before planning, wants to turn current discussion into a spec, or a plan needs a missing or incomplete spec before to-plan.'
+description: 'Run Sky Flow spec alignment and, when approved, create or update durable spec artifacts. Use when the user asks for to-spec, wants to brainstorm/refine a long-lived design/spec, needs systematic requirement clarification before planning, wants to turn current discussion into a spec, or a plan needs a missing/incomplete spec before to-plan.'
 ---
 
 # to-spec
 
-`to-spec` 生成或更新 Sky Flow `spec` artifact。它把当前讨论、仓库事实、术语口径、设计取舍和行为要求沉淀为长期设计真相源，为后续 `to-plan` 提供稳定输入。
+`to-spec` 先做人类对齐，再在确认后生成或更新 Sky Flow `spec` artifact。它把当前讨论、仓库事实、术语口径、设计取舍和行为要求沉淀为长期设计真相源，为后续 `to-plan` 提供稳定输入。
 
-核心顺序：先校准仓库事实，再收敛设计选择，最后写出高效扼要、可验证、可交给 `to-plan` 的 spec。
+核心顺序：先校准仓库事实，再追问真实意图和成功标准，然后提出可比较的设计选择、获得人类确认，最后才写出高效扼要、可验证、可交给 `to-plan` 的 spec。
 
 ## Quick Path
 
 1. 确定 runtime 配置：`SKY_FLOW_ROOT` 默认 `docs`，`SKY_FLOW_LANG` 默认跟随用户语言；不读取额外项目配置文件。
-2. 判断创建还是更新：
-   - 用户指定现有 spec 时，读取并更新该 spec。
-   - 未指定时，根据主题生成稳定 slug，写入 `${SKY_FLOW_ROOT}/spec/<slug>.md`。
+2. 判断当前是 `alignment-only` 还是 `artifact-write`：
+   - 用户只是在探索、brainstorm、澄清需求或问“怎么看 / 如何优化”时，先停留在对话对齐，不急着写文件。
+   - 用户指定现有 spec 时，读取该 spec，但只有确认后的设计变化才写回。
+   - 用户明确要求创建 / 更新 spec，且输入已经足够稳定时，可以进入写入；否则先完成对齐门禁。
 3. 只读探索相关 docs、代码、schema、历史 spec / issue / plan / design / recent commits。
-4. 运行澄清循环，直到事实、术语、范围、关键行为、隐含模糊点和设计决策足够稳定。
-5. 写入或更新 spec artifact，只保留长期设计信息。
-6. 自检 spec；如果不 ready，停在 `Open Questions` 和下一个高价值问题。
-7. 创建或修改 artifact 后运行 `validate-flow`，处理结构错误后再交付。
+4. 运行人类对齐循环，直到事实、术语、真实目标、范围、成功标准、关键行为、隐含模糊点和设计决策足够稳定。
+5. 对真实设计分叉提出 `2-3` 个互斥方案、取舍和推荐项；把推荐设计按复杂度分段展示并获得确认。
+6. 确认后写入或更新 spec artifact，只保留长期设计信息；未确认时不要用 artifact 代替对齐。
+7. 自检 spec；如果不 ready，停在 `Open Questions` 和下一个高价值问题。
+8. 创建或修改 artifact 后运行 `validate-flow`，处理结构错误后请用户 review 写好的 spec；不要自动进入 `to-plan`。
+
+## Alignment Contract
+
+`to-spec` 的首要交付物是共享理解，不是文件。spec artifact 只是把已经对齐的设计结论长期留存。
+
+- 不把模板填充当作澄清；先确认“为什么要做、为谁做、什么算成功、什么不做、哪些行为必须被保护”。
+- 不为了显得有进展而把未决问题写成完整 spec；阻塞问题继续问，非阻塞问题进入 `Open Questions`。
+- 不把用户初始表述直接规格化为结论；要主动寻找隐藏前提、反例、边界和真正的设计分叉。
+- 对话还在 brainstorm 时，输出当前理解、候选方向和下一个最高价值问题；只有用户要求或确认写入时才创建 / 更新 artifact。
+- 复杂设计必须先展示设计摘要并获得确认。简单、机械的现有 spec 更新可以把确认视为用户的明确修改请求，但写完后仍需 review gate。
+
+对齐门禁：
+
+1. Context Gate：仓库事实、历史 artifact 和用户目标没有明显未解释冲突。
+2. Intent Gate：problem、outcome、audience、success criteria 和非目标足够清楚。
+3. Option Gate：真实分叉已用 `2-3` 个互斥方案比较，并给出推荐项。
+4. Design Gate：推荐设计的 scope、关键行为、边界场景、契约 / 数据影响和风险已经展示并被用户接受，或未接受部分已回到澄清循环。
+5. Artifact Gate：只有通过 Design Gate，或用户明确要求记录一个仍带 blocking questions 的 draft，才写入 spec。
+6. Review Gate：写入后请用户 review spec；用户要求修改时更新 artifact 并重新自检 / validate。
 
 ## Clarification Loop
 
@@ -39,13 +60,25 @@ description: 'Create or update Sky Flow spec artifacts for durable design clarif
 - 不猜测关键协议、数据口径、外部契约或业务行为；缺口用 `[NEEDS CLARIFICATION: ...]` 标出。
 - 如果任务大到包含多个独立子系统，先要求拆分 spec；不要在一个 spec 中继续细化全部细节。
 
-### 2. Tighten Language
+### 2. Root The Intent
+
+像 brainstorm 一样追到设计根部，而不是只收集字段：
+
+- 目的：用户到底想改变什么现状，为什么现在要做。
+- 成功：什么可观察结果表示这件事做对了，什么结果表示失败。
+- 受众：谁会读这个 spec，谁会使用 / 维护 / 验收结果。
+- 约束：时间、兼容、数据、权限、外部契约、运维和组织边界。
+- 非目标：哪些诱人的扩展现在不做，避免 scope creep。
+
+如果用户只给了解法，反问它要解决的问题；如果用户只给了问题，追问可接受的结果和边界；如果两者都有，检查它们是否匹配。
+
+### 3. Tighten Language
 
 - 用户使用模糊词时，提出 precise canonical term，并说明候选含义。
 - 术语冲突会影响理解或后续维护时，必须澄清；稳定后写入 `Context`，必要时新增 `Glossary`。
 - 不把术语写成实现细节；只记录领域专家、维护者或后续规划者需要共享的语言。
 
-### 3. Ask One High-Value Question
+### 4. Ask One High-Value Question
 
 只问会改变方案、边界、验证方式或后续 plan 的问题。一次只问一个，等待反馈后再继续。
 
@@ -61,7 +94,7 @@ description: 'Create or update Sky Flow spec artifacts for durable design clarif
 
 不要提供明显无效或只是凑数的选项。无法形成高质量选项时，先继续只读探索；探索后仍无法形成选项，再问一个开放但具体的问题。
 
-### 4. Pressure-Test With Scenarios
+### 5. Pressure-Test With Scenarios
 
 用具体场景检验概念边界和需求行为：
 
@@ -71,7 +104,7 @@ description: 'Create or update Sky Flow spec artifacts for durable design clarif
 
 这些场景用于澄清和保护行为，最终可沉淀为 `Acceptance Scenarios`。不要把 mock、私有方法、调用顺序或文件路径写成场景重点。
 
-### 5. Pressure Pass Before Convergence
+### 6. Pressure Pass Before Convergence
 
 进入方案收敛前，必须主动发掘用户未显式说出、但会影响 scope、行为、契约、验证或计划拆分的隐含问题。不要只处理用户已经意识到的歧义。
 
@@ -91,19 +124,28 @@ description: 'Create or update Sky Flow spec artifacts for durable design clarif
 - non-blocking：写入 `Open Questions`，标明影响。
 - low-value：明确不展开，不阻塞收敛。
 
-### 6. Converge Decisions
+### 7. Converge Decisions
 
-对真实设计分叉给出 2-3 个互斥方案、取舍和推荐项。方案稳定后写入 `Decisions`：
+对真实设计分叉给出 2-3 个互斥方案、取舍和推荐项。先展示推荐项和理由，再展示其他可行路径，不要只给一个看似确定的答案。
+
+设计展示按复杂度缩放：
+
+- 简单事项：一个简洁设计摘要即可。
+- 中等事项：分段展示 problem / outcome、scope、关键行为、acceptance scenarios、decisions、risks。
+- 复杂事项：每个主要 section 后询问是否符合预期；用户不同意时回到对应事实、术语、场景或方案分支。
+
+方案稳定并通过 Design Gate 后，写入 `Decisions`：
 
 - `Decision`：最终选择。
 - `Why`：为什么适合当前目标和约束。
 - `Alternatives`：被放弃方案和原因。
 
-先展示关键设计结论并获得确认，再写最终 spec。用户不同意时，回到对应事实、术语、场景或方案分支继续收敛。
+没有通过 Design Gate 时，不写最终 spec；只输出当前设计摘要、剩余问题和下一个最高价值问题。
 
 ## Writing Rules
 
 - spec 是长期设计真相源，不是 PRD、实现计划、task 列表或命令清单。
+- 写 artifact 是对齐后的记录动作，不是澄清的替代动作。
 - spec 阶段禁止写 implementation details、文件级修改步骤、私有 helper、具体函数拆分、测试 mock 形状或执行命令。
 - requirements 必须可测试、无歧义；做不到时使用 `[NEEDS CLARIFICATION: ...]`，不要用模糊句子掩盖缺口。
 - acceptance scenarios 必须保护用户可见行为、业务不变量、系统边界或外部契约。
@@ -243,6 +285,16 @@ plans: []
 
 能直接修的就修；涉及设计取舍或事实缺口时，不猜测，回到澄清循环。
 
+## User Review Gate
+
+写入或更新 spec 后，必须请用户 review artifact，再推荐后续 `to-plan`。推荐表述保持简洁：
+
+```text
+Spec 已写入 `<path>`。请 review 设计口径；如果需要调整，我会更新 spec 并重新自检 / validate。确认后再进入 `to-plan`。
+```
+
+如果用户要求修改，更新 spec、重新 Self-Review、重新运行 `validate-flow`。只有用户确认或明确要求继续时，才推荐进入 `to-plan`。
+
 ## Plan Handoff Gate
 
 `Ready for to-plan` 表示 `to-plan` 只需要拆实施路径、阶段、任务和验证证据，不需要替 spec 决定“到底要什么”。只有满足下面条件时，才把 spec 标记为可进入 `to-plan`：
@@ -250,6 +302,7 @@ plans: []
 - Intent 稳定：问题、期望结果和主要读者明确。
 - Scope 稳定：`In Scope` / `Out of Scope` 足以支持拆阶段。
 - Pressure pass 已完成：发现的隐含问题已被确认、降级为 non-blocking、记录为 blocking，或明确判断为 low-value。
+- Design Gate 已通过：关键设计结论已经展示并被接受，或用户明确要求记录为仍需确认的 draft。
 - Blocking questions 清零：没有会影响架构方向、业务行为、数据口径、外部契约、验收标准或计划拆分的 `[NEEDS CLARIFICATION: ...]`。
 - Requirements 可测试、无歧义。
 - Acceptance scenarios 能保护关键成功路径、核心边界和不变量。
