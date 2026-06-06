@@ -21,7 +21,7 @@ node .agents/skills/sky-flow/skills/pick-plan/scripts/collect_plans.ts --root .
 
 4. 对候选按继续推进价值排序；脚本只提供事实清单，最终排序由 Agent 结合 plan 语义判断。
 5. 推荐一个 plan，并输出背景、目标、进度、下一步、限制和验证方式。
-6. 输出一个可复制代码块，代码块内放完整续跑提示词，不带 `/goal` 前缀。
+6. 输出一个可复制代码块，代码块内放完整续跑提示词，不带 `/goal` 前缀，并默认包含按需使用子代理的授权边界。
 
 ## Candidate Rules
 
@@ -63,17 +63,38 @@ node .agents/skills/sky-flow/skills/pick-plan/scripts/collect_plans.ts --root .
 - 简明上下文：背景、目标、进度、下一步、限制、验证方式、何时停下问人。
 - 一个完整的可复制代码块。
 
-代码块内必须包含目标契约和具体执行上下文，不带 `/goal` 前缀：
+代码块内必须包含目标契约和具体执行上下文，不带 `/goal` 前缀。排版使用清晰分段，每段只保留必要事实，避免长篇叙述：
 
 ```text
-目标: <由推荐 plan frontmatter goal 生成的目标契约>
-工作区: <absolute or repo path>
-Plan: <plan path>
-当前状态: <status and recovery summary>
-下一步: <one concrete next action>
-限制: <scope, no-touch, env, approval or blocker boundaries>
-验证方式: <from plan verification intent or local project rules>
-停下问人: <blocking ambiguity / failed validation / scope change conditions>
+目标:
+- <由推荐 plan frontmatter goal 生成的目标契约，说明完成后应当为真的状态>
+
+依据:
+- 工作区: <absolute or repo path>
+- Plan: <plan path>
+- 当前状态: <status and recovery summary>
+- 下一步: <one concrete next action>
+
+完成标准:
+- <auditable done condition>
+- <specific evidence that proves completion>
+
+约束与边界:
+- <scope, no-touch, env, approval or blocker boundaries>
+- 不扩大 plan 目标，不修改未授权 artifact 或代码区域。
+
+子代理:
+- 默认授权 Codex 按需使用子代理来并行探索、实现、测试或复核；每个子代理必须带明确任务、路径/边界和预期输出，继承当前 sandbox/approval 策略，并遵守同一 scope/no-touch。主代理等待结果后统一汇总和决策。
+
+迭代策略:
+- <how Codex should choose the next best action between attempts>
+- <what evidence to record after each meaningful attempt>
+
+验证方式:
+- <from plan verification intent or local project rules>
+
+停下问人:
+- <blocking ambiguity / failed validation / scope change conditions>
 ```
 
 代码块必须是一个完整提示词，用户复制后即可在新会话中使用。
@@ -82,8 +103,11 @@ Plan: <plan path>
 
 - 优先使用 `plan.frontmatter.goal` 原文；只做必要的代词、路径或状态补充，不改变目标范围。
 - 如果 goal 缺失或明显不足，不要假装已准备好；输出“需要先回到 `to-plan` 补 goal”，并可给一个临时草案供人类确认。
-- 续跑提示应包含期望终态、验证证据、约束、边界、迭代策略和阻塞停止条件。
+- 续跑提示应包含期望终态、验证证据、约束、边界、迭代策略和阻塞停止条件；这些字段对应 Codex Goals 的可审计完成契约，不要删减成只有任务说明。
+- 默认加入“子代理”段，授权按需派发子代理。该授权是允许而非强制：只有在并行探索、复核、测试或拆分实现能提高确定性时才使用；如果推荐 plan 明确禁止委派或当前环境没有子代理能力，写明“不授权/不可用”及原因。
+- 子代理授权不得扩大权限或 scope：子代理必须继承当前 sandbox/approval 策略，遵守相同 no-touch 和停下问人条件，不能自行请求生产操作、破坏性操作或计划外文件修改。
 - Codex Goals 官方参考保留为设计依据：https://developers.openai.com/cookbook/examples/codex/using_goals_in_codex
+- Codex Subagents 官方参考保留为授权和继承策略依据：https://developers.openai.com/codex/subagents
 
 ## Boundaries
 
