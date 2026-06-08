@@ -5,15 +5,17 @@ description: "Execute and maintain a prepared Sky Flow plan/task artifact or tas
 
 # to-implement
 
-`to-implement` 执行 Sky Flow `plan` / `task` DAG。它是执行协调器：读取已准备好的 Sky Flow plan / task artifact，选择下一批可执行 task，决定主代理和子代理分工，管理上下文、验证、review、consolidation、fan-in、runtime plan、artifact 状态回写和必要的执行期计划调整。
+`to-implement` 执行 Sky Flow `plan` / `task`。它是执行协调器：读取已准备好的 Sky Flow plan / task artifact，选择下一批可执行 task，决定主代理和子代理分工，管理上下文、验证、review、consolidation、fan-in、runtime plan、artifact 状态回写和必要的执行期计划调整。plan-scoped task 作为 plan DAG 节点执行；standalone task 可以作为单一可恢复任务直接执行。
 
 它不是日常任务默认入口。只有用户显式指定 `to-implement`，或要求执行 / 继续 / 推进某个已制定的 Sky Flow plan / task artifact，或当前会话已经进入文件化 Sky Flow plan / task 的执行阶段时才触发。
 
 ## Quick Path
 
 1. 确定 runtime 配置：`SKY_FLOW_ROOT` 默认 `docs`，`SKY_FLOW_LANG` 默认跟随用户语言；不读取额外项目配置文件。
-2. 读取 plan、task DAG、关联 spec / issue；如果缺 task 且 plan 不是 no-task execution，回到 `to-task`。
-3. 如果 runtime 是 Codex，按任务复杂度维护运行时任务清单；多 task、跨阶段、存在依赖 / fan-in / blocker 时使用内置 `update_plan`，单个直接 task 可用简短内部 checklist。
+2. 判断输入形态：
+   - plan 或 plan-scoped task：读取 plan、task DAG、关联 spec / issue；如果缺 task 且 plan 不是 no-task execution，回到 `to-task`。
+   - standalone task：读取该 task 的 goal、scope、handoff、verification intent、recovery 和外部依赖；不要求 plan。
+3. 如果 runtime 是 Codex，按任务复杂度维护运行时任务清单；多 task、跨阶段、存在依赖 / fan-in / blocker 时使用内置 `update_plan`，standalone task 可用一个运行时项加必要 checkpoint。
 4. 检查 artifact 状态、scope、依赖和 blocker；不满足时停止，不猜。
 5. 选择下一批 executable tasks：依赖满足、状态可推进、写集不冲突、fan-in 成本可控。
 6. 决定 execution mode：按 ROI 选择主代理直接执行还是派 worker。多 task、fan-in、上下文隔离或独立 review 收益明确时主代理偏 coordinator；单 owner、小 task、当前上下文最完整时主代理可以直接实现。
@@ -22,10 +24,10 @@ description: "Execute and maintain a prepared Sky Flow plan/task artifact or tas
 9. Fan-in：检查 changed files、task 要求、spec alignment、验证结果、artifact 更新和 blocker。
 10. 必要时触发 `to-test`、`to-review`、`to-consolidation`、`to-acceptance`、`validate-flow`。
 11. 维护 runtime plan；Codex 中对关键状态变化同步 task status、并行批次、fan-in、blocker 和 next action，避免为单 task 内微步骤过度打点。
-12. 按执行事实更新 task status、plan progress / recovery / decision / blocker。
+12. 按执行事实更新 task status；若有 plan，则更新 plan progress / recovery / decision / blocker；standalone task 则更新自身 Progress / Recovery / Decision / Validation Evidence。
 13. 如果实现事实要求拆分 task、调整依赖 / 并行关系或补充验证 / 收敛 task，在已确认 scope 内按 `to-task` 规则更新 artifact 并运行 `validate-flow`。
 14. 到达人类验收、sign-off、争议确认或下一轮反馈节点时，调用 `to-acceptance` 创建或更新验收文档。
-15. plan 到达完成态后，调用 `to-archive` 压缩 task / fan-in 执行记录，只把长期事实、关键决策和证据入口留在 completed plan。
+15. plan 到达完成态后，调用 `to-archive` 压缩 task / fan-in 执行记录，只把长期事实、关键决策和证据入口留在 completed plan；standalone task 完成后精简自身正文并移入 `tasks/standalone/done/`。
 16. 遇到关键歧义、验证反复失败、scope / contract / 数据口径变化或高风险操作时，停止并询问人类。
 
 ## Execution Model
@@ -86,6 +88,8 @@ description: "Execute and maintain a prepared Sky Flow plan/task artifact or tas
 不要把全量 plan 历史、写作者辩护或无关上下文塞给只读 reviewer / verifier。实现型 full fork 例外。
 
 ## Selecting Executable Tasks
+
+如果输入是 standalone task，它本身就是唯一 executable unit。开始前检查 `status`、`goal`、allowed write scope、no-touch、`external_depends_on`、verification intent 和 blocker；如果执行中需要拆 peer task、表达并行 / 依赖或新增长期验收 gate，停止并升级为 plan，而不是在 standalone task 内扩展 DAG。
 
 可执行 task 必须满足：
 
@@ -195,6 +199,7 @@ parent plan 不直接执行；必须切换到当前可执行 child plan。没有
 - plan 完成时，所有直属 task 必须 completed，并设置 `completed_at`。
 - plan 设置为 `status: completed` 后，必须从 `${SKY_FLOW_ROOT}/plan/` 移入 `${SKY_FLOW_ROOT}/plan/done/`，并同步本地 docs TOC / artifact 引用；完成 plan 仍保留原 `id` 和文件名。
 - completed plan 应进入 `to-archive`：默认把 task 事实、关键决策和验证证据压缩进 plan 正文，清空 `plan.tasks` 并删除该 plan 的 task 目录；如果存在审计、恢复或人类要求，保留 task 文件并在归档摘要写清原因。
+- standalone task 完成时，标记 `status: completed`，把事实、关键决策、验证证据和 follow-up 压缩进 task 自身，并从 `${SKY_FLOW_ROOT}/tasks/standalone/` 移入 `${SKY_FLOW_ROOT}/tasks/standalone/done/`；它不清空任何 plan `tasks`。
 
 ## Dynamic Plan Maintenance
 
@@ -202,6 +207,8 @@ parent plan 不直接执行；必须切换到当前可执行 child plan。没有
 
 - runtime plan：当前会话的执行投影，可以更细、更临时，用来追踪正在执行的 task、并行批次、fan-in 和验证 checkpoint；Codex runtime 必须使用内置 `update_plan` tool 维护。
 - file artifacts：长期真相源，只记录稳定进度、task status、依赖变化、关键决策、blocker、验证证据和恢复入口。
+
+standalone task 没有 parent plan；file artifact 写回只落在 task 自身，除非执行事实证明需要升级为 plan。升级时创建 plan，把 standalone task 记录为来源 / promoted-to-plan，不把多个 peer task 硬塞进 standalone task。
 
 下游动态调整不能和上游定义冲突。执行中发现计划和现实不匹配时，先分类再更新：
 

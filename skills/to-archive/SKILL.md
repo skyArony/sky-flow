@@ -5,7 +5,7 @@ description: "Compress completed Sky Flow plan/task/acceptance artifacts after a
 
 # to-archive
 
-`to-archive` 在 Sky Flow plan 完成后压缩执行期 artifact。它不新增长期 artifact 类型；归档摘要写回 completed plan 本身，task 文件默认视为执行脚手架，验收通过的 acceptance 默认压缩为长期验收凭证。归档后的 spec、plan、acceptance 三类文档应分别保留需求设计、实现事实和验收结论，避免信息散落或重复流水。
+`to-archive` 在 Sky Flow plan 完成后压缩执行期 artifact，也定义 standalone task 完成后的自压缩规则。它不新增长期 artifact 类型；plan 归档摘要写回 completed plan 本身，plan-scoped task 文件默认视为执行脚手架，验收通过的 acceptance 默认压缩为长期验收凭证。standalone task 没有 parent plan，完成后把事实和证据压缩回 task 自身并移动到 `tasks/standalone/done/`。
 
 ## Quick Path
 
@@ -24,6 +24,8 @@ description: "Compress completed Sky Flow plan/task/acceptance artifacts after a
 8. 如果需要删除 task 文件，遵守当前 runtime 的删除审批规则；不能静默绕过 destructive command 审批。
 9. 如果 plan 已完成但还在 `${SKY_FLOW_ROOT}/plan/`，移入 `${SKY_FLOW_ROOT}/plan/done/`；同步本地 TOC / artifact 引用。
 10. 创建、移动、删除或修改 artifact 后运行 `validate-flow`，处理结构错误后再交付。
+
+standalone task 不走 plan 归档路径：确认 task 已完成，把执行流水压成短 `Summary`、`Facts`、`Decision Log`、`Evidence`、`Follow-ups`，设置 `status: completed`，并移入 `${SKY_FLOW_ROOT}/tasks/standalone/done/`。如果执行中已经升级为 plan，standalone task 只记录 promoted-to-plan 和恢复入口，不复制 plan 执行流水。
 
 ## Retention Policy
 

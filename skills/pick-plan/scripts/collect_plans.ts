@@ -216,14 +216,19 @@ function main(): number {
   const skyFlowLang = skyFlowLangEnv || DEFAULT_SKY_FLOW_LANG;
   const planDir = path.join(skyFlowRoot, 'plan');
   const completedPlanDir = path.join(planDir, 'done');
+  const standaloneTaskDir = path.join(skyFlowRoot, 'tasks', 'standalone');
+  const completedStandaloneTaskDir = path.join(standaloneTaskDir, 'done');
+  const defaultInputPaths = [planDir];
+  if (fs.existsSync(standaloneTaskDir)) defaultInputPaths.push(standaloneTaskDir);
   const inputPaths = args.inputs.length
     ? args.inputs.map((input) => path.resolve(args.projectRoot, input))
-    : [planDir];
+    : defaultInputPaths;
   const { files, missing } = collectMarkdown(inputPaths);
   const nowMs = Date.now();
   const windowMs = args.completedWindowHours * 60 * 60 * 1000;
 
   const candidates: unknown[] = [];
+  const standalone_tasks: unknown[] = [];
   const legacy_plan_docs: unknown[] = [];
   const skipped: unknown[] = [];
 
@@ -236,6 +241,7 @@ function main(): number {
     const artifactType = asString(data?.artifact_type);
     const status = asString(data?.status) || 'unknown';
     const inCompletedPlanDir = isPathWithin(filePath, completedPlanDir);
+    const inCompletedStandaloneTaskDir = isPathWithin(filePath, completedStandaloneTaskDir);
     const common = {
       id: asString(data?.id) || stem,
       path: rel(filePath, args.projectRoot),
@@ -245,6 +251,60 @@ function main(): number {
       mtime: new Date(stat.mtimeMs).toISOString(),
       summary: preview(section(body, ['Summary', '背景', '目标']) || body),
     };
+
+    if (data && artifactType === 'task' && asString(data.task_role) === 'standalone') {
+      const record = {
+        ...common,
+        artifact_type: artifactType,
+        task_role: 'standalone',
+        task_type: asString(data.task_type),
+        goal: asString(data.goal),
+        external_depends_on: listValue(data.external_depends_on),
+        recovery: extractRecovery(body),
+      };
+
+      if (status !== 'completed' && inCompletedStandaloneTaskDir) {
+        skipped.push({
+          ...record,
+          reason:
+            'unfinished standalone task is under tasks/standalone/done; run validate-flow and move it back to tasks/standalone/',
+        });
+        continue;
+      }
+
+      if (status === 'abandoned') {
+        skipped.push({
+          ...record,
+          reason: 'abandoned standalone task requires explicit human recovery decision',
+        });
+      } else if (status === 'completed') {
+        if (!inCompletedStandaloneTaskDir) {
+          skipped.push({
+            ...record,
+            reason:
+              'completed standalone task must be moved under tasks/standalone/done before it is treated as completed',
+          });
+        } else if (isRecentCompleted(data, stat.mtimeMs, nowMs, windowMs)) {
+          standalone_tasks.push({
+            ...record,
+            candidate_group: 'recent_completed_standalone_task',
+            include_reason: `completed within ${args.completedWindowHours}h window`,
+          });
+        } else {
+          skipped.push({
+            ...record,
+            reason: `completed standalone task outside ${args.completedWindowHours}h window`,
+          });
+        }
+      } else {
+        standalone_tasks.push({
+          ...record,
+          candidate_group: status === 'in_progress' ? 'active_standalone_task' : 'unfinished_standalone_task',
+          include_reason: 'unfinished standalone task',
+        });
+      }
+      continue;
+    }
 
     if (!data || artifactType !== 'plan') {
       legacy_plan_docs.push({
@@ -329,6 +389,17 @@ function main(): number {
     if (timeDiff) return timeDiff;
     return leftRecord.id.localeCompare(rightRecord.id);
   });
+  standalone_tasks.sort((left, right) => {
+    const leftRecord = left as { status: string; mtime: string; id: string };
+    const rightRecord = right as { status: string; mtime: string; id: string };
+    const statusDiff =
+      (statusOrder[leftRecord.status] ?? statusOrder.unknown) -
+      (statusOrder[rightRecord.status] ?? statusOrder.unknown);
+    if (statusDiff) return statusDiff;
+    const timeDiff = Date.parse(rightRecord.mtime) - Date.parse(leftRecord.mtime);
+    if (timeDiff) return timeDiff;
+    return leftRecord.id.localeCompare(rightRecord.id);
+  });
 
   const report = {
     runtime_config: {
@@ -340,6 +411,8 @@ function main(): number {
       project_root: args.projectRoot,
       plan_dir: rel(planDir, args.projectRoot),
       completed_plan_dir: rel(completedPlanDir, args.projectRoot),
+      standalone_task_dir: rel(standaloneTaskDir, args.projectRoot),
+      completed_standalone_task_dir: rel(completedStandaloneTaskDir, args.projectRoot),
     },
     window: {
       completed_window_hours: args.completedWindowHours,
@@ -347,12 +420,14 @@ function main(): number {
     },
     counts: {
       candidates: candidates.length,
+      standalone_tasks: standalone_tasks.length,
       legacy_plan_docs: legacy_plan_docs.length,
       skipped: skipped.length,
       missing_inputs: missing.length,
     },
     missing_inputs: missing.map((item) => rel(item, args.projectRoot)),
     candidates,
+    standalone_tasks,
     legacy_plan_docs,
     skipped,
   };

@@ -21,12 +21,12 @@
 | `to-test`            | 自动     | 新增 / 修改测试、写 Given / When / Then、判断测试 ROI、选择 stable seam、决定 Red / Green / Refactor 或替代验证。 | 不替代 `to-debug`；真实事故回归转 `to-bdd-regression`；项目命令由本地规则决定。 |
 | `to-knowledge`       | 自动     | 调研、排障、实现或 review 中发现业务无关、项目无关、可跨项目复用的基础设施、组件、库、工具、架构模式、踩坑或技术选型知识。 | 默认写普通 knowledge note，不是 workflow artifact；可旁路子代理用足够低成本模型沉淀，有可靠证据且低成本时自动执行，否则只推荐。 |
 | `to-plan`            | 显式     | 从 spec、issue 或当前会话生成实施计划；承载目标、范围、阶段、进度、恢复入口和 handoff。                  | 普通 / 中等任务保持单 Plan；task DAG 和执行模型分别交给 `to-task` / `to-implement`。 |
-| `to-task`            | 显式     | 从 plan 拆出 task、依赖、并行关系、owner、write scope、no-touch 和可选 step。                           | 必须以 task-ready plan 作为输入；不执行 task。      |
+| `to-task`            | 显式     | 从 plan 拆出 task DAG，或为比日常对话复杂但不值得建 plan 的单一工作创建 standalone task。               | plan-scoped 必须以 task-ready plan 作为输入；standalone task 不建 peer DAG；不执行 task。 |
 | `to-implement`       | 自动     | 执行和维护指定 Sky Flow plan / task artifact / task DAG，协调主代理、子代理、验证、fan-in、runtime plan、动态 task 调整和 artifact 状态回写。 | 日常任务不用；仅显式指定，或执行已制定 Sky Flow plan / task 时触发。 |
 | `to-review`          | 自动     | 小型 review、明确 review 指令，或流程阶段需要复审。                                                    | 查代码风险，不做 artifact 校验或 diff 收敛；高风险时可 multi-review + synthesize。 |
 | `to-review-loop`     | 显式     | review-fix-review 循环。                                                                               | 成本较高，必须有明确意图；clean closure 需要双模型 verifier gate。 |
 | `to-agent-review`    | 显式     | Agent 决策链路、工具调用、子代理 ROI 和流程低效点复盘；常见自动场景是 runtime 自动化在固定时间点触发。 | 普通会话只在明确 Agent 复盘场景中自动触发；报告默认写入 `${SKY_FLOW_ROOT}/backlog/agent-reivew/`。 |
-| `pick-plan`          | 显式     | 从未完成 plan 和近期完成 plan 中挑选下一步推荐项。                                                     | 输出推荐 plan 和可复制续跑提示。                    |
+| `pick-plan`          | 显式     | 从未完成 plan、近期完成 plan 和 standalone task 清单中挑选下一步推荐项。                               | 输出推荐 plan 或 task 和可复制续跑提示。            |
 | `to-acceptance`      | 自动     | 出现需要人类验收的点，或人类补充验收点 / 验收要求。                                                    | 完成声明前必须有验证证据。                          |
 | `to-next-acceptance` | 显式     | 处理已有 acceptance 的人类反馈并推进下一轮；作为 `to-acceptance` 的子能力维护。                         | 未提及项不默认通过。                                |
 | `to-archive`         | 自动     | plan 完成后需要压缩 task / fan-in 执行记录，或用户要求归档、压缩、清理 completed plan。                 | 默认 summary-only；删除 task 文件前必须满足当前 runtime 审批规则。 |

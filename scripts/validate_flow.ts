@@ -14,9 +14,11 @@ import {
   PLAN_ROLES,
   RECOMMENDED_PLAN_FIELDS,
   REQUIRED_FIELDS,
+  STANDALONE_TASK_ID_PATTERN,
   STANDALONE_PLAN_ID_PATTERN,
   STATUSES,
   TASK_ID_PATTERN,
+  TASK_ROLES,
   TASK_TYPES,
   type ArtifactRecord,
   type ValidationIssue,
@@ -272,17 +274,34 @@ function validateEnums(
       );
     }
   }
-  if (type === 'task' && !TASK_TYPES.includes(String(artifact.task_type) as never)) {
-    addIssue(
-      errors,
-      'INVALID_TASK_TYPE',
-      'error',
-      artifact,
-      filePath,
-      'task_type',
-      `Invalid task_type: ${String(artifact.task_type)}`,
-      projectRoot,
-    );
+  if (type === 'task') {
+    if (!TASK_TYPES.includes(String(artifact.task_type) as never)) {
+      addIssue(
+        errors,
+        'INVALID_TASK_TYPE',
+        'error',
+        artifact,
+        filePath,
+        'task_type',
+        `Invalid task_type: ${String(artifact.task_type)}`,
+        projectRoot,
+      );
+    }
+    if (
+      hasValue(artifact.task_role) &&
+      !TASK_ROLES.includes(String(artifact.task_role) as never)
+    ) {
+      addIssue(
+        errors,
+        'INVALID_TASK_ROLE',
+        'error',
+        artifact,
+        filePath,
+        'task_role',
+        `Invalid task_role: ${String(artifact.task_role)}`,
+        projectRoot,
+      );
+    }
   }
   if (type === 'acceptance') {
     const acceptanceType = String(artifact.acceptance_type || '');
@@ -456,7 +475,9 @@ function validateNaming(
     }
   }
   if (type === 'task') {
-    if (!TASK_ID_PATTERN.test(stem)) {
+    const taskRole = effectiveTaskRole(artifact);
+    const declaredTaskRole = String(artifact.task_role || '');
+    if (taskRole === 'plan_scoped' && !TASK_ID_PATTERN.test(stem)) {
       addIssue(
         errors,
         'INVALID_TASK_ID_FORMAT',
@@ -464,22 +485,91 @@ function validateNaming(
         artifact,
         filePath,
         'id',
-        'task id must match 01-xxx-xxx',
+        'plan-scoped task id must match 01-xxx-xxx',
         projectRoot,
       );
     }
-    const expectedParent = path.join(skyFlowRoot, 'tasks', String(artifact.plan));
-    if (artifact.plan && path.resolve(path.dirname(filePath)) !== path.resolve(expectedParent)) {
+    if (taskRole === 'standalone' && !STANDALONE_TASK_ID_PATTERN.test(stem)) {
       addIssue(
         errors,
-        'TASK_PATH_PLAN_MISMATCH',
+        'INVALID_STANDALONE_TASK_ID_FORMAT',
         'error',
         artifact,
         filePath,
-        'plan',
-        `task must be stored under ${rel(expectedParent, projectRoot)}`,
+        'id',
+        'standalone task id must match t001-xxx-xxx',
         projectRoot,
       );
+    }
+    if (taskRole === 'plan_scoped') {
+      if (!hasValue(artifact.plan)) {
+        addIssue(
+          errors,
+          'TASK_PLAN_REQUIRED',
+          'error',
+          artifact,
+          filePath,
+          'plan',
+          'plan-scoped task must set plan',
+          projectRoot,
+        );
+      } else {
+        const expectedParent = path.join(skyFlowRoot, 'tasks', String(artifact.plan));
+        if (path.resolve(path.dirname(filePath)) !== path.resolve(expectedParent)) {
+          addIssue(
+            errors,
+            'TASK_PATH_PLAN_MISMATCH',
+            'error',
+            artifact,
+            filePath,
+            'plan',
+            `plan-scoped task must be stored under ${rel(expectedParent, projectRoot)}`,
+            projectRoot,
+          );
+        }
+      }
+    }
+    if (taskRole === 'standalone') {
+      if (declaredTaskRole !== 'standalone') {
+        addIssue(
+          errors,
+          'TASK_ROLE_REQUIRED_FOR_STANDALONE',
+          'error',
+          artifact,
+          filePath,
+          'task_role',
+          'standalone task must set task_role: standalone',
+          projectRoot,
+        );
+      }
+      if (hasValue(artifact.plan)) {
+        addIssue(
+          errors,
+          'STANDALONE_TASK_PLAN_NOT_ALLOWED',
+          'error',
+          artifact,
+          filePath,
+          'plan',
+          'standalone task must not set plan',
+          projectRoot,
+        );
+      }
+      const standaloneDir = path.join(skyFlowRoot, 'tasks', 'standalone');
+      const standaloneDoneDir = path.join(standaloneDir, 'done');
+      const expectedParent =
+        String(artifact.status || '') === 'completed' ? standaloneDoneDir : standaloneDir;
+      if (path.resolve(path.dirname(filePath)) !== path.resolve(expectedParent)) {
+        addIssue(
+          errors,
+          'STANDALONE_TASK_PATH_MISMATCH',
+          'error',
+          artifact,
+          filePath,
+          'path',
+          `standalone task must be stored under ${rel(expectedParent, projectRoot)}`,
+          projectRoot,
+        );
+      }
     }
   }
 }
@@ -556,6 +646,49 @@ function effectivePlanRole(plan: ArtifactRecord): 'standalone' | 'parent' | 'chi
   return 'standalone';
 }
 
+// 兼容既有 task 未显式声明 task_role 但有 plan 的情况；standalone task 必须显式声明。
+function effectiveTaskRole(task: ArtifactRecord | Frontmatter): 'plan_scoped' | 'standalone' {
+  const data = 'data' in task ? task.data : task;
+  const declared = String(data.task_role || '');
+  if (TASK_ROLES.includes(declared as never)) return declared as 'plan_scoped' | 'standalone';
+  if (hasValue(data.plan)) return 'plan_scoped';
+  return 'standalone';
+}
+
+function taskReference(task: ArtifactRecord): string {
+  if (effectiveTaskRole(task) === 'plan_scoped' && hasValue(task.data.plan)) {
+    return `${String(task.data.plan)}/${task.id}`;
+  }
+  return task.id;
+}
+
+function artifactRegistryKey(artifact: Frontmatter): string {
+  const type = String(artifact.artifact_type || '');
+  const id = String(artifact.id || '');
+  if (type === 'task') {
+    const role = effectiveTaskRole(artifact);
+    if (role === 'plan_scoped' && hasValue(artifact.plan)) return `${String(artifact.plan)}/${id}`;
+  }
+  return id;
+}
+
+function sourceMatches(artifact: ArtifactRecord, sourceId: string): boolean {
+  if (artifact.artifact_type === 'task') {
+    return artifact.id === sourceId || taskReference(artifact) === sourceId;
+  }
+  return artifact.id === sourceId;
+}
+
+function findSourceArtifacts(
+  registry: Map<string, ArtifactRecord>,
+  sourceType: string,
+  sourceId: string,
+): ArtifactRecord[] {
+  return [...registry.values()].filter(
+    (artifact) => artifact.artifact_type === sourceType && sourceMatches(artifact, sourceId),
+  );
+}
+
 // 关系校验覆盖相邻 artifact 双向绑定、task DAG、并行冲突和 abandoned 回收线索。
 function validateRelationships(
   registry: Map<string, ArtifactRecord>,
@@ -570,6 +703,8 @@ function validateRelationships(
   const issues = byType('issue');
   const plans = byType('plan');
   const tasks = byType('task');
+  const planScopedTasks = tasks.filter((task) => effectiveTaskRole(task) === 'plan_scoped');
+  const standaloneTasks = tasks.filter((task) => effectiveTaskRole(task) === 'standalone');
   const acceptances = byType('acceptance');
   const backlogs = byType('backlog');
   const handoffs = byType('handoff');
@@ -577,6 +712,7 @@ function validateRelationships(
   const specMap = new Map(specs.map((item) => [item.id, item]));
   const issueMap = new Map(issues.map((item) => [item.id, item]));
   const graphPlans: unknown[] = [];
+  const graphStandaloneTasks: unknown[] = [];
 
   // spec <-> plan 必须双向绑定，避免长期设计和实施计划漂移。
   for (const spec of specs) {
@@ -666,8 +802,9 @@ function validateRelationships(
       }
     }
 
-    const actualTasks = tasks.filter((task) => task.data.plan === plan.id);
+    const actualTasks = planScopedTasks.filter((task) => task.data.plan === plan.id);
     const actualTaskIds = new Set(actualTasks.map((task) => task.id));
+    const actualTaskMap = new Map(actualTasks.map((task) => [task.id, task]));
     const planTaskIds = asList(plan.data.tasks).map(String);
     const planRole = effectivePlanRole(plan);
     const declaredPlanRole = String(plan.data.plan_role || '');
@@ -892,7 +1029,7 @@ function validateRelationships(
       }
     }
     for (const taskId of planTaskIds) {
-      if (!registry.has(taskId)) {
+      if (!actualTaskIds.has(taskId)) {
         addIssue(
           errors,
           'PLAN_TASK_MISSING',
@@ -1083,7 +1220,7 @@ function validateRelationships(
         }
         edges.get(dependency)!.add(task.id);
         graphEdges.push({ from: dependency, to: task.id, type: 'depends_on' });
-        const reverse = registry.get(dependency)!;
+        const reverse = actualTaskMap.get(dependency)!;
         if (!asList(reverse.data.depended_by).map(String).includes(task.id)) {
           addIssue(
             errors,
@@ -1123,7 +1260,7 @@ function validateRelationships(
           );
           continue;
         }
-        const reverse = registry.get(dependant)!;
+        const reverse = actualTaskMap.get(dependant)!;
         if (!asList(reverse.data.depends_on).map(String).includes(task.id)) {
           addIssue(
             errors,
@@ -1151,7 +1288,7 @@ function validateRelationships(
           );
           continue;
         }
-        const reverse = registry.get(parallel)!;
+        const reverse = actualTaskMap.get(parallel)!;
         if (!asList(reverse.data.parallel_with).map(String).includes(task.id)) {
           addIssue(
             errors,
@@ -1259,12 +1396,79 @@ function validateRelationships(
     });
   }
 
+  for (const task of standaloneTasks) {
+    if (!hasValue(task.data.goal)) {
+      addIssue(
+        errors,
+        'STANDALONE_TASK_GOAL_REQUIRED',
+        'error',
+        task.data,
+        task.path,
+        'goal',
+        'standalone task must set goal because it has no parent plan goal contract',
+        projectRoot,
+      );
+    }
+    for (const field of ['depends_on', 'depended_by', 'parallel_with'] as const) {
+      const values = asList(task.data[field]).map(String).filter(Boolean);
+      if (values.length) {
+        addIssue(
+          errors,
+          'STANDALONE_TASK_LOCAL_DAG_NOT_ALLOWED',
+          'error',
+          task.data,
+          task.path,
+          field,
+          `standalone task must not declare local task DAG field ${field}; upgrade to a plan if peer task dependencies are needed`,
+          projectRoot,
+        );
+      }
+    }
+    const externalEdges: unknown[] = [];
+    for (const external of asList(task.data.external_depends_on)) {
+      if (!external) continue;
+      if (typeof external === 'string' && external.includes('/'))
+        externalEdges.push({ from: external, to: task.id, type: 'external' });
+      else
+        addIssue(
+          warnings,
+          'EXTERNAL_DEPENDENCY_SHAPE_UNCHECKED',
+          'warning',
+          task.data,
+          task.path,
+          'external_depends_on',
+          'external_depends_on should identify external plan/task or artifact/task reference',
+          projectRoot,
+        );
+    }
+    llmHints.push({
+      artifact_id: task.id,
+      check: 'standalone_task_scope',
+      reason:
+        'LLM should verify this task is more than a daily chat item but not complex enough for a plan, and should recommend promotion to plan if it has milestones, peer tasks, or long-lived acceptance gates.',
+    });
+    llmHints.push({
+      artifact_id: task.id,
+      check: 'task_agent_executability',
+      reason:
+        'LLM should verify the standalone task can be independently completed by an agent; human, real-device, external-account, approval, or inaccessible environment gates should be represented as acceptance or a plan-level workflow instead.',
+    });
+    graphStandaloneTasks.push({
+      id: task.id,
+      ref: taskReference(task),
+      status: task.status,
+      external_edges: externalEdges,
+    });
+  }
+
   // backlog / handoff 的来源如果声明为 artifact，应能在当前 artifact registry 中找到。
   for (const artifact of [...backlogs, ...handoffs]) {
     const sourceType = String(artifact.data.source_type || '');
     const sourceId = String(artifact.data.source_id || '');
     if (!sourceId || sourceId === 'current-session' || sourceType === 'conversation') continue;
-    if (isArtifactSource(sourceType) && !registry.has(sourceId)) {
+    if (!isArtifactSource(sourceType)) continue;
+    const sourceMatches = findSourceArtifacts(registry, sourceType, sourceId);
+    if (!sourceMatches.length) {
       addIssue(
         warnings,
         'SOURCE_ARTIFACT_MISSING',
@@ -1275,6 +1479,17 @@ function validateRelationships(
         `${artifact.artifact_type} source ${sourceType}/${sourceId} is not present in checked artifacts`,
         projectRoot,
       );
+    } else if (sourceType === 'task' && sourceMatches.length > 1 && !sourceId.includes('/')) {
+      addIssue(
+        warnings,
+        'TASK_SOURCE_AMBIGUOUS',
+        'warning',
+        artifact.data,
+        artifact.path,
+        'source_id',
+        `task source_id ${sourceId} matches multiple task artifacts; use <plan-id>/<task-id> for plan-scoped tasks`,
+        projectRoot,
+      );
     }
   }
 
@@ -1283,8 +1498,8 @@ function validateRelationships(
     if (artifact.data.status !== 'abandoned') continue;
     const hasBacklog = backlogs.some(
       (backlog) =>
-        backlog.data.source_id === artifact.id &&
-        String(backlog.data.source_type || '') === artifact.artifact_type,
+        String(backlog.data.source_type || '') === artifact.artifact_type &&
+        sourceMatches(artifact, String(backlog.data.source_id || '')),
     );
     if (!hasBacklog) {
       addIssue(
@@ -1325,7 +1540,7 @@ function validateRelationships(
     });
   }
 
-  return { plans: graphPlans };
+  return { plans: graphPlans, standalone_tasks: graphStandaloneTasks };
 }
 
 // 主流程：解析参数 -> 收集 artifact -> 机器预检 -> 输出结构化报告。
@@ -1393,7 +1608,8 @@ function main(): number {
 
     const id = String(parsed.data.id || '');
     if (id) {
-      if (registry.has(id))
+      const registryKey = artifactRegistryKey(parsed.data);
+      if (registry.has(registryKey))
         addIssue(
           errors,
           'DUPLICATE_ARTIFACT_ID',
@@ -1401,10 +1617,10 @@ function main(): number {
           parsed.data,
           filePath,
           'id',
-          `Duplicate artifact id: ${id}`,
+          `Duplicate artifact id in scope: ${registryKey}`,
           projectRoot,
         );
-      registry.set(id, {
+      registry.set(registryKey, {
         id,
         artifact_type: String(parsed.data.artifact_type),
         status: String(parsed.data.status),
@@ -1412,11 +1628,14 @@ function main(): number {
         data: parsed.data,
       });
     }
+    const taskRole =
+      String(parsed.data.artifact_type || '') === 'task' ? effectiveTaskRole(parsed.data) : null;
     checkedArtifacts.push({
       id: parsed.data.id,
       artifact_type: parsed.data.artifact_type,
       path: rel(filePath, projectRoot),
       status: parsed.data.status,
+      ...(taskRole ? { task_role: taskRole, ref: artifactRegistryKey(parsed.data) } : {}),
     });
   }
 

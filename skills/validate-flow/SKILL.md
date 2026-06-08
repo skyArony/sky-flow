@@ -46,6 +46,8 @@ node .agents/skills/sky-flow/scripts/validate_flow.ts [paths...]
 - 父 Plan 的 `child_plans` 与子 Plan 的 `parent_plan` 是否缺失、类型错误或互相指错。
 - 父 Plan 是否直接绑定 task，或子 Plan 是否没有复用父 Plan 的三位数字前缀。
 - 后序子 Plan 是否在前序子 Plan 未完成时已经进入 `in_progress` / `completed`。
+- task 是否使用合法 `task_role`，plan-scoped task 是否位于 `tasks/<plan-id>/`，standalone task 是否位于 `tasks/standalone/` 或完成后的 `tasks/standalone/done/`。
+- standalone task 是否显式设置 `task_role: standalone` 和 `goal`，以及是否错误声明本地 `depends_on` / `depended_by` / `parallel_with`。
 - `backlog` / `handoff` 的 artifact 来源是否能找到。
 - `completed` plan 是否仍有未完成 task，或缺少 `completed_at`。
 - `completed_at` 是否和 plan 的 `completed` 状态不一致。
@@ -61,6 +63,7 @@ node .agents/skills/sky-flow/scripts/validate_flow.ts [paths...]
 - `plan.goal` 是否足以作为 Codex 续跑契约。
 - fan-in 后 plan / task / acceptance 状态是否与实际阶段产物、验证证据和剩余工作一致。
 - task 是否都能由 Agent 独立完成；如果 task 的核心完成条件是人工操作、真实设备 / 账号、外部环境、审批或人工体验判断，应建议转入 acceptance。
+- standalone task 是否仍然只是单一可恢复任务；如果出现多个 peer task、milestone、长期验收 gate 或 plan 级恢复需求，应建议升级为 plan。
 - completed plan 若已清空 `tasks` 或声称 summary-only 归档，归档摘要是否保留必要事实、关键决策、证据入口和 follow-up。
 - `acceptance` 是否说清来源、轮次、验证证据和未提及项处理。
 - `backlog` 是否讲清主题、阻塞原因、依赖条件和推荐恢复时机。

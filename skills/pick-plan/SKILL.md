@@ -5,12 +5,12 @@ description: 'Select the next Sky Flow plan worth continuing from unfinished pla
 
 # pick-plan
 
-`pick-plan` 从现有 Sky Flow `plan` artifact 中挑选下一步最值得继续推进的 plan，并输出一个可直接用于新会话续跑的完整提示词代码块。它只做只读选择和上下文整理，不修改 plan、task、handoff 或代码。
+`pick-plan` 从现有 Sky Flow `plan` artifact 和 standalone task 清单中挑选下一步最值得继续推进的工作，并输出一个可直接用于新会话续跑的完整提示词代码块。它只做只读选择和上下文整理，不修改 plan、task、handoff 或代码。
 
 ## Quick Path
 
 1. 确定 runtime 配置：`SKY_FLOW_ROOT` 默认 `docs`，`SKY_FLOW_LANG` 默认跟随用户语言；不读取额外项目配置文件。
-2. 读取 `${SKY_FLOW_ROOT}/plan/` 下未完成的 Sky Flow plan，以及 `${SKY_FLOW_ROOT}/plan/done/` 下 `completed_at` 或文件 mtime 在 24 小时以内的 completed plan。
+2. 读取 `${SKY_FLOW_ROOT}/plan/` 下未完成的 Sky Flow plan，`${SKY_FLOW_ROOT}/plan/done/` 下 `completed_at` 或文件 mtime 在 24 小时以内的 completed plan，以及 `${SKY_FLOW_ROOT}/tasks/standalone/` 下 active standalone task。
 3. 优先运行只读 inventory 脚本生成候选清单：
 
 ```bash
@@ -19,8 +19,8 @@ node .agents/skills/sky-flow/skills/pick-plan/scripts/collect_plans.ts --root .
 
 如果项目没有 `.agents` symlink，使用 `.claude/skills/sky-flow/skills/pick-plan/scripts/collect_plans.ts`。
 
-4. 对候选按继续推进价值排序；脚本只提供事实清单，最终排序由 Agent 结合 plan 语义判断。
-5. 推荐一个 plan，并输出背景、目标、进度、下一步、限制和验证方式。
+4. 对候选按继续推进价值排序；脚本只提供事实清单，最终排序由 Agent 结合 plan / task 语义判断。
+5. 推荐一个 plan 或 standalone task，并输出背景、目标、进度、下一步、限制和验证方式。
 6. 输出一个可复制代码块，代码块内放完整续跑提示词，不带 `/goal` 前缀，并默认包含按需使用子代理的授权边界。
 
 ## Candidate Rules
@@ -29,6 +29,8 @@ node .agents/skills/sky-flow/skills/pick-plan/scripts/collect_plans.ts --root .
 
 - `artifact_type: plan` 且 `status` 不是 `completed` / `abandoned`。
 - `status: completed` 且位于 `plan/done/`，并且 `completed_at` 或文件 mtime 距今不超过 24 小时，用来发现刚完成后可承接的后续 plan。
+- `artifact_type: task`、`task_role: standalone` 且 `status` 不是 `completed` / `abandoned`。
+- `status: completed` 且位于 `tasks/standalone/done/`，并且 `completed_at` 或文件 mtime 距今不超过 24 小时，用来发现刚完成后可承接的后续 task / plan。
 
 单独列出但默认不推荐：
 
@@ -58,8 +60,8 @@ node .agents/skills/sky-flow/skills/pick-plan/scripts/collect_plans.ts --root .
 
 输出必须包含：
 
-- 候选 plan list：按推荐优先级排列，说明状态、路径、推荐理由和风险。
-- 推荐 plan：只推荐一个，并说明为什么它比其他候选更值得继续。
+- 候选 plan list 和 standalone task list：按推荐优先级排列，说明状态、路径、推荐理由和风险。
+- 推荐 plan 或 standalone task：只推荐一个，并说明为什么它比其他候选更值得继续。
 - 简明上下文：背景、目标、进度、下一步、限制、验证方式、何时停下问人。
 - 一个完整的可复制代码块。
 

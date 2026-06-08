@@ -22,6 +22,9 @@ export const TASK_TYPES = [
   'consolidation',
 ] as const;
 
+// Task 角色：plan 下的 DAG 节点，或不值得升级为 plan 的轻量独立任务。
+export const TASK_ROLES = ['plan_scoped', 'standalone'] as const;
+
 export const ACCEPTANCE_TYPES = [
   'interactive',
   'report',
@@ -40,11 +43,12 @@ export const STANDALONE_PLAN_ID_PATTERN = /^\d{3}-[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export const CHILD_PLAN_ID_PATTERN = /^\d{3}[a-z]-[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export const PLAN_ID_PATTERN = /^(?:\d{3}|\d{3}[a-z])-[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export const TASK_ID_PATTERN = /^\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*$/;
+export const STANDALONE_TASK_ID_PATTERN = /^t\d{3}-[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 // 这里只放机器可确定的必填字段；语义充分性留给 LLM 收口。
 export const REQUIRED_FIELDS: Record<string, string[]> = {
   base: ['id', 'artifact_type', 'status'],
-  task: ['task_type', 'plan', 'depends_on', 'depended_by', 'parallel_with', 'external_depends_on'],
+  task: ['task_type', 'depends_on', 'depended_by', 'parallel_with', 'external_depends_on'],
   acceptance: ['acceptance_type', 'source_type', 'source_id', 'round'],
   backlog: ['source_type', 'source_id', 'depends_on', 'recommended_resume'],
   handoff: ['source_type', 'source_id', 'resume_from'],

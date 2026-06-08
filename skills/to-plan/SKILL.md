@@ -14,7 +14,7 @@ description: 'Create or update Sky Flow plan artifacts from a ready spec, issue,
 1. 确定 runtime 配置：`SKY_FLOW_ROOT` 默认 `docs`，`SKY_FLOW_LANG` 默认跟随用户语言；不读取额外项目配置文件。
 2. 读取输入来源：优先使用用户指定的 `spec` / `issue` / `plan`；否则从当前会话提取已确认目标、范围和约束。
 3. 如果来自 spec，确认 `Plan Handoff` 已 ready；不 ready 时回到 `to-spec`，不替 spec 做关键设计决策。
-4. 执行 Scope Check：多个独立子系统不要硬塞进一个 standalone plan；拆成多个 plan，或升级 parent / child plan。
+4. 执行 Scope Check：如果只是单一可恢复工作单元、无需 milestone / task DAG / 长期验收 gate，可推荐 `to-task` 创建 standalone task；多个独立子系统不要硬塞进一个 standalone plan，拆成多个 plan，或升级 parent / child plan。
 5. 选择 plan shape：默认 standalone；只有超大、多独立交付域或需要多轮反馈后再细化时，才 parent / child。
 6. 写入或更新 plan frontmatter、正文轻量模板和 `goal` 完成契约；未完成 plan 位于 `${SKY_FLOW_ROOT}/plan/`，已完成 plan 归档到 `${SKY_FLOW_ROOT}/plan/done/`。
 7. 自检 plan，确保能进入 `to-task` / `to-implement`，或明确停在 blocker。
@@ -125,6 +125,7 @@ description: 'Create or update Sky Flow plan artifacts from a ready spec, issue,
 `to-plan` 只做计划层，遇到相邻领域时写推荐，不强制跳转：
 
 - plan ready 且需要拆 task DAG：推荐 `to-task`。
+- 目标比日常对话复杂但仍是单一可恢复工作单元、不需要 plan：推荐 `to-task` 创建 standalone task。
 - plan 已有关联 task，下一批可执行任务清楚：推荐 `to-implement`。
 - 目标、scope、外部契约、数据口径、业务行为或 requirements 不稳定：推荐回 `to-spec`。
 - 当前阶段无法推进、等待外部依赖或人类决策：推荐 `to-backlog`。
