@@ -141,19 +141,20 @@ SKY_FLOW_LANG = "简体中文"
 ## Skill 套件目录
 
 Sky Flow 采用根 `SKILL.md` 加可独立发现的子能力 `SKILL.md`、内部说明文件和脚本的结构。
-当前 runtime 以“目录内存在 `SKILL.md`”作为 skill 发现单元，可以递归发现嵌套目录；
+仓库内部仍以“目录内存在 `SKILL.md`”作为 skill 单元组织；
 普通 `.md` 文件只作为引用文档，不会被发现为 callable skill。
+安装时需要额外考虑 runtime 差异：Claude 不会递归发现嵌套 skill，因此安装器会把根 skill 和每个 callable 子 skill 分别软链接到用户目录。
 
 ```text
-.agents/skills/sky-flow/
+<repo>/
+├── install.sh
 ├── SKILL.md
 ├── references/
 │   ├── dependencies.md
 │   └── routing.md
 ├── scripts/
-│   ├── install_external_skills.sh
+│   ├── skill_manager.py
 │   ├── schema.ts
-│   ├── setup.sh
 │   └── validate_flow.ts
 ├── skills/
 │   ├── pick-plan/
