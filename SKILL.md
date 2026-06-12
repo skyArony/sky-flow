@@ -75,8 +75,9 @@ Sky Flow 是通用工作流 Skill 套件，覆盖 `spec`、`issue`、`plan`、`t
 命名：
 
 - `spec`：文件名就是唯一 ID，不使用编号前缀。
+- `issue`：未完成 issue 位于 `issue/<issue-id>.md`；已修复且 `status: completed` 的 issue 位于 `issue/fixed/<issue-id>.md`；文件 stem 等于 `id`。
 - `plan`：standalone / parent 使用 `001-xxx-xxx.md`；child 使用 `001a-xxx-xxx.md`、`001b-xxx-xxx.md`，文件 stem 等于 `id`；未完成 plan 在 `plan/`，已完成 plan 在 `plan/done/`。
-- `task`：plan-scoped task 使用 `01-xxx-xxx.md`，位于 `tasks/<plan-id>/` 下；standalone task 使用 `t001-xxx-xxx.md`，未完成时位于 `tasks/standalone/`，完成后位于 `tasks/standalone/done/`；文件 stem 等于 `id`。
+- `task`：plan-scoped task 使用 `01-xxx-xxx.md`，始终位于 `tasks/<plan-id>/` 下，完成时只改 `status`；standalone task 使用 `t001-xxx-xxx.md`，未完成时位于 `tasks/standalone/`，完成后位于 `tasks/standalone/done/`；文件 stem 等于 `id`。
 - 其他 artifact 要求文件 stem 与 `id` 一致。
 
 关系：
@@ -85,6 +86,8 @@ Sky Flow 是通用工作流 Skill 套件，覆盖 `spec`、`issue`、`plan`、`t
 - `issue.plans <-> plan.issues`
 - `plan.tasks <-> task.plan` 只适用于 `task_role: plan_scoped`，表示当前保留的展开 task DAG；completed plan 若已压缩为 summary-only，可为空。
 - `task_role: standalone` 不绑定 plan，不出现在 `plan.tasks`，用于比日常对话复杂但尚不值得建 plan 的单一可恢复任务；一旦需要多个 peer task、milestone、长期验收或父子拆分，应升级为 plan。
+- `plan` / `issue` 从完成态捞回时必须移回 active 目录、把 `status: completed` 改成 `in_progress` 或 `not_started`，并写明 `Reopen Evidence` / `Reopen Reason`。
+- plan-scoped task 不捞回；需要继续修复时追加新 task，若旧 task 已随 summary-only 删除，则基于 completed plan / issue / evidence 重新拆 task DAG。
 - `plan.child_plans <-> plan.parent_plan`，仅用于超级巨大任务的父子 Plan；父 Plan 不直接绑定 task。
 - `plan.acceptance <-> acceptance.plan`，仅当 acceptance 来源是 plan。
 - 父子 artifact 只绑定相邻层级；`handoff` 和 `backlog` 可以引用来源 artifact，但不替代来源 artifact 的状态。

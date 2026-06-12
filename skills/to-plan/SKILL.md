@@ -17,10 +17,13 @@ description: 'Create or update Sky Flow plan artifacts from a ready spec, issue,
 4. 执行 Scope Check：如果只是单一可恢复工作单元、无需 milestone / task DAG / 长期验收 gate，可推荐 `to-task` 创建 standalone task；多个独立子系统不要硬塞进一个 standalone plan，拆成多个 plan，或升级 parent / child plan。
 5. 选择 plan shape：默认 standalone；只有超大、多独立交付域或需要多轮反馈后再细化时，才 parent / child。
 6. 写入或更新 plan frontmatter、正文轻量模板和 `goal` 完成契约；未完成 plan 位于 `${SKY_FLOW_ROOT}/plan/`，已完成 plan 归档到 `${SKY_FLOW_ROOT}/plan/done/`。
-7. 自检 plan，确保能进入 `to-task` / `to-implement`，或明确停在 blocker。
-8. 创建或修改 artifact 后运行 `validate-flow`，处理结构错误后再交付。
+7. 如果输入是 completed plan 的捞回请求，先确认新证据是否推翻原 plan 的同一 goal / scope 完成结论；成立时把 plan 从 `plan/done/` 移回 `plan/`，把 `status: completed` 改成 `in_progress` 或 `not_started`，并写入 `Reopen Evidence` / `Reopen Reason`。后续增强、二期或相邻问题新建 plan 并引用 completed plan，不捞回旧 plan。
+8. 自检 plan，确保能进入 `to-task` / `to-implement`，或明确停在 blocker。
+9. 创建、移动或修改 artifact 后运行 `validate-flow`，处理结构错误后再交付。
 
 ## Plan Shape
+
+所有 plan shape 共享 completed 捞回规则：completed 后若同一 goal / scope 的完成结论被新证据推翻，移回 `${SKY_FLOW_ROOT}/plan/`，把 status 改为 `in_progress` 或 `not_started`，并记录 `Reopen Evidence` / `Reopen Reason`。
 
 ### Standalone
 
@@ -112,6 +115,7 @@ description: 'Create or update Sky Flow plan artifacts from a ready spec, issue,
 - `Validation Evidence`：已有验证结果需要长期保留时。
 - `Parent / Child Plan Notes`：只有 parent / child plan 才需要。
 - `Archive Summary` / `Facts` / `Evidence`：只有 completed plan 经 `to-archive` 压缩后才需要；plan 草稿和执行期不要提前写归档。
+- `Reopen Evidence` / `Reopen Reason`：只有 completed plan 被捞回时才需要，说明新证据和为什么原完成结论不再成立。
 
 ## Handoff Rules
 
@@ -129,6 +133,7 @@ description: 'Create or update Sky Flow plan artifacts from a ready spec, issue,
 - plan 已有关联 task，下一批可执行任务清楚：推荐 `to-implement`。
 - 目标、scope、外部契约、数据口径、业务行为或 requirements 不稳定：推荐回 `to-spec`。
 - 当前阶段无法推进、等待外部依赖或人类决策：推荐 `to-backlog`。
+- completed plan 后续发现问题：同一 goal / scope 的完成结论被推翻时按捞回规则更新；后续增强、二期或相邻问题新建 plan 并引用 completed plan。
 - 计划需要人类验收 gate、sign-off 或反馈轮次：推荐后续由 `to-acceptance` 承接。
 - 某阶段需要 review、diff 收敛、测试策略或 artifact 校验：在 milestone / task handoff 中分别推荐 `to-review`、`to-consolidation`、`to-test` 或 `validate-flow`，但不在 plan 层替它们执行。
 

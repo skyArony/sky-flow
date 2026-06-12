@@ -10,7 +10,7 @@ description: 'Select the next Sky Flow plan worth continuing from unfinished pla
 ## Quick Path
 
 1. 确定 runtime 配置：`SKY_FLOW_ROOT` 默认 `docs`，`SKY_FLOW_LANG` 默认跟随用户语言；不读取额外项目配置文件。
-2. 读取 `${SKY_FLOW_ROOT}/plan/` 下未完成的 Sky Flow plan，`${SKY_FLOW_ROOT}/plan/done/` 下 `completed_at` 或文件 mtime 在 24 小时以内的 completed plan，以及 `${SKY_FLOW_ROOT}/tasks/standalone/` 下 active standalone task。
+2. 读取 `${SKY_FLOW_ROOT}/plan/` 下未完成的 Sky Flow plan，`${SKY_FLOW_ROOT}/plan/done/` 下 `completed_at` 或文件 mtime 在 24 小时以内的 completed plan 作为后续承接背景，以及 `${SKY_FLOW_ROOT}/tasks/standalone/` 下 active standalone task。
 3. 优先运行只读 inventory 脚本生成候选清单：
 
 ```bash
@@ -28,9 +28,9 @@ node .agents/skills/sky-flow/skills/pick-plan/scripts/collect_plans.ts --root .
 纳入候选：
 
 - `artifact_type: plan` 且 `status` 不是 `completed` / `abandoned`。
-- `status: completed` 且位于 `plan/done/`，并且 `completed_at` 或文件 mtime 距今不超过 24 小时，用来发现刚完成后可承接的后续 plan。
+- `status: completed` 且位于 `plan/done/`，并且 `completed_at` 或文件 mtime 距今不超过 24 小时，用来发现刚完成后可承接的后续 plan；这不是自动捞回。
 - `artifact_type: task`、`task_role: standalone` 且 `status` 不是 `completed` / `abandoned`。
-- `status: completed` 且位于 `tasks/standalone/done/`，并且 `completed_at` 或文件 mtime 距今不超过 24 小时，用来发现刚完成后可承接的后续 task / plan。
+- `status: completed` 且位于 `tasks/standalone/done/`，并且 `completed_at` 或文件 mtime 距今不超过 24 小时，用来发现刚完成后可承接的后续 task / plan；这不是 task 捞回。
 
 单独列出但默认不推荐：
 
@@ -55,6 +55,7 @@ node .agents/skills/sky-flow/skills/pick-plan/scripts/collect_plans.ts --root .
 - `goal` 太泛，无法作为 Codex 续跑契约。
 - 当前 blocker 需要人类决策、外部系统权限或生产操作。
 - plan 依赖的 spec / issue / task 状态明显漂移，继续前应先 `validate-flow` 或回到上游 skill。
+- completed plan / standalone task 只能作为后续新 plan / 新 task 的背景；`pick-plan` 不执行捞回，也不把 plan-scoped task 当候选。
 
 ## Output Contract
 

@@ -27,7 +27,7 @@ description: "Execute and maintain a prepared Sky Flow plan/task artifact or tas
 12. 按执行事实更新 task status；若有 plan，则更新 plan progress / recovery / decision / blocker；standalone task 则更新自身 Progress / Recovery / Decision / Validation Evidence。
 13. 如果实现事实要求拆分 task、调整依赖 / 并行关系或补充验证 / 收敛 task，在已确认 scope 内按 `to-task` 规则更新 artifact 并运行 `validate-flow`。
 14. 到达人类验收、sign-off、争议确认或下一轮反馈节点时，调用 `to-acceptance` 创建或更新验收文档。
-15. plan 到达完成态后，调用 `to-archive` 压缩 task / fan-in 执行记录，只把长期事实、关键决策和证据入口留在 completed plan；standalone task 完成后精简自身正文并移入 `tasks/standalone/done/`。
+15. plan 到达完成态后，调用 `to-archive` 按 summary-only 压缩 task / fan-in 执行记录，只把长期事实、关键决策、踩坑和证据入口留在 completed plan；standalone task 完成后按 completed plan 标准精简自身正文并移入 `tasks/standalone/done/`。
 16. 遇到关键歧义、验证反复失败、scope / contract / 数据口径变化或高风险操作时，停止并询问人类。
 
 ## Execution Model
@@ -192,14 +192,15 @@ parent plan 不直接执行；必须切换到当前可执行 child plan。没有
 
 写回规则：
 
-- task 完成且验证通过：标记 completed。
+- plan-scoped task 完成且验证通过：只标记 `status: completed`，仍保留在 `tasks/<plan-id>/`，不移动到 `done/` 子目录。
+- standalone task 完成且验证通过：标记 `status: completed`，按 completed plan 标准压缩自身正文，并移入 `tasks/standalone/done/`。
 - task 产出有问题但可修：保持 in_progress，记录 blocker / next action。
 - task 阻塞：记录 blocked 信息；当前 schema 无 blocked status 时保持 in_progress 或 draft，并在正文写清 blocker。
 - task 本身无法由 Agent 完成：不要标记 completed；把人工 / 真实环境验收项转入 acceptance，并更新 plan/task 以移除或改写该不可执行 task。
 - plan 完成时，所有直属 task 必须 completed，并设置 `completed_at`。
 - plan 设置为 `status: completed` 后，必须从 `${SKY_FLOW_ROOT}/plan/` 移入 `${SKY_FLOW_ROOT}/plan/done/`，并同步本地 docs TOC / artifact 引用；完成 plan 仍保留原 `id` 和文件名。
-- completed plan 应进入 `to-archive`：默认把 task 事实、关键决策和验证证据压缩进 plan 正文，清空 `plan.tasks` 并删除该 plan 的 task 目录；如果存在审计、恢复或人类要求，保留 task 文件并在归档摘要写清原因。
-- standalone task 完成时，标记 `status: completed`，把事实、关键决策、验证证据和 follow-up 压缩进 task 自身，并从 `${SKY_FLOW_ROOT}/tasks/standalone/` 移入 `${SKY_FLOW_ROOT}/tasks/standalone/done/`；它不清空任何 plan `tasks`。
+- completed plan 应进入 `to-archive`：按 summary-only 把 task 事实、关键决策、坑点和验证证据压缩进 plan 正文，清空 `plan.tasks` 并删除该 plan 的 task 目录；如果审计、合规、争议或人类明确要求导致不能安全删除，先迁移事实或停下来确认，不把完整 plan-scoped task 文件作为标准归档结果。
+- standalone task 完成时，标记 `status: completed`，把事实、关键决策、坑点、验证证据和 follow-up 压缩进 task 自身，并从 `${SKY_FLOW_ROOT}/tasks/standalone/` 移入 `${SKY_FLOW_ROOT}/tasks/standalone/done/`；它不清空任何 plan `tasks`。
 
 ## Dynamic Plan Maintenance
 

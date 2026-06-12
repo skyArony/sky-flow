@@ -474,6 +474,34 @@ function validateNaming(
       );
     }
   }
+  if (type === 'issue') {
+    const issueFixedDir = path.join(skyFlowRoot, 'issue', 'fixed');
+    const inIssueFixedDir = isPathWithin(filePath, issueFixedDir);
+    if (String(artifact.status || '') === 'completed' && !inIssueFixedDir) {
+      addIssue(
+        errors,
+        'ISSUE_COMPLETED_NOT_IN_FIXED',
+        'error',
+        artifact,
+        filePath,
+        'path',
+        `completed issue must be stored under ${rel(issueFixedDir, projectRoot)}`,
+        projectRoot,
+      );
+    }
+    if (String(artifact.status || '') !== 'completed' && inIssueFixedDir) {
+      addIssue(
+        errors,
+        'ISSUE_UNFINISHED_IN_FIXED',
+        'error',
+        artifact,
+        filePath,
+        'path',
+        'only completed issues may be stored under issue/fixed',
+        projectRoot,
+      );
+    }
+  }
   if (type === 'task') {
     const taskRole = effectiveTaskRole(artifact);
     const declaredTaskRole = String(artifact.task_role || '');
@@ -1175,7 +1203,7 @@ function validateRelationships(
         artifact_id: plan.id,
         check: 'completed_plan_archive',
         reason:
-          'LLM should verify completed plan archive summary preserves durable facts, decisions, evidence pointers, follow-ups, and task retention rationale when tasks are compressed.',
+          'LLM should verify completed plan archive summary preserves durable facts, decisions, pitfalls, evidence pointers, follow-ups, and summary-only task retention rationale without code-change chronology.',
       });
     }
     if (plan.status === 'not_started') {

@@ -29,7 +29,7 @@
 | `pick-plan`          | 显式     | 从未完成 plan、近期完成 plan 和 standalone task 清单中挑选下一步推荐项。                               | 输出推荐 plan 或 task 和可复制续跑提示。            |
 | `to-acceptance`      | 自动     | 出现需要人类验收的点，或人类补充验收点 / 验收要求。                                                    | 完成声明前必须有验证证据。                          |
 | `to-next-acceptance` | 显式     | 处理已有 acceptance 的人类反馈并推进下一轮；作为 `to-acceptance` 的子能力维护。                         | 未提及项不默认通过。                                |
-| `to-archive`         | 自动     | plan 完成后需要压缩 task / fan-in 执行记录，或用户要求归档、压缩、清理 completed plan。                 | 默认 summary-only；删除 task 文件前必须满足当前 runtime 审批规则。 |
+| `to-archive`         | 自动     | plan 完成后需要压缩 task / fan-in 执行记录，或用户要求归档、压缩、清理 completed plan。                 | plan-scoped task 默认 summary-only；归档不保留代码修改流水；删除 task 文件前必须满足当前 runtime 审批规则。 |
 | `to-backlog`         | 显式     | 当前阶段无法推进、被阻塞、延期或需要回收。                                                             | 说明阻塞原因、依赖和建议恢复时机。                  |
 | `to-handoff`         | 显式     | 跨会话继续、换 Agent、保存可执行恢复状态。                                                             | 不写聊天摘要式 handoff。                            |
 | `to-commit`          | 自动     | 用户要求 stage、commit、commit message 或拆分提交。                                                    | 遵守项目本地提交规范和验证要求；staged diff 含 workflow artifact 时先推荐 `validate-flow`。 |
