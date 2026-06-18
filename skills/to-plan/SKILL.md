@@ -57,6 +57,27 @@ description: 'Create or update Sky Flow plan artifacts from a ready spec, issue,
 - 迭代策略：如何推进阶段、更新 plan 和 runtime plan。
 - 阻塞停止条件：何时停止并询问人类。
 
+## Milestone Discipline
+
+task-ready plan 的 `Milestones` 必须把设计、测试、轻量实现、人工 gate 和复杂实现拆开表达。默认顺序是：
+
+```text
+protocol -> constraints -> abstraction_design -> bdd_test_strategy -> enabling_implementation -> design_review_gate -> core_implementation -> verification_review_consolidation
+```
+
+允许的 milestone `Kind`：
+
+- `protocol`：明确外部协议、输入输出、事件、状态流、兼容性、调用方 / 被调用方边界。
+- `constraints`：明确不变量、禁止范围、no-touch、兼容约束、性能 / 并发 / 幂等 / 迁移 / 回滚限制和停止条件。
+- `abstraction_design`：明确模块边界、抽象层、ownership、数据流、扩展点、single writer 和可替换 seam；不写代码步骤。
+- `bdd_test_strategy`：用 `Given / When / Then` 写 1-3 个高价值行为场景，标注 ROI、稳定 seam、Red / Green / Refactor、characterization 或替代验证；普通行为测试归 `to-test`，真实事故回归才归 `to-bdd-regression`。
+- `enabling_implementation`：少量正式代码体现设计方向，优先做接口、类型、协议适配壳、模块边界、测试 seam、feature flag 壳、薄 adapter、最小 fixture 或一条最小 happy-path skeleton。它是 design-bearing scaffold，不是提前实现核心逻辑；diff 必须小到人类能一次 review，且足够体现协议、约束、抽象和测试 seam。
+- `design_review_gate`：hard stop。先安排 `to-consolidation` 收敛 enabling diff，再安排 `to-review` 审设计对齐，然后停下等人类明确批准；没有人类 approval，不得进入 `core_implementation`。如果人类要求调整，回到 `abstraction_design` / `bdd_test_strategy` / `enabling_implementation` 迭代后重新过 gate。
+- `core_implementation`：复杂逻辑实现，包括状态机、跨模块行为、业务分支、协议适配真实落地、迁移路径、并发 / 幂等处理等；必须依赖 `design_review_gate` 的人类批准。
+- `verification_review_consolidation`：最终验证、review、consolidation、validate-flow 和必要 acceptance；不夹带新功能实现，除非 review 明确要求修复。
+
+一个 milestone 只能有一个主 `Kind`。如果同一阶段同时写协议、抽象、测试和实现，应拆成多个 milestone；如果某个 Kind 不适用，必须在 `Execution Notes` 或 milestone `Readiness Gate` 说明为什么可以跳过，而不是静默省略。中小任务可以合并低风险设计说明，但不得把 `core_implementation` 放到 `bdd_test_strategy` 或 `design_review_gate` 之前。
+
 ## Body Template
 
 正文保持轻量。必备 section 只放 plan 层需要长期维护的信息；frontmatter 已表达的字段不要机械重复。
@@ -90,7 +111,11 @@ description: 'Create or update Sky Flow plan artifacts from a ready spec, issue,
 ## Milestones
 
 1. <阶段名>
+   - Kind: protocol | constraints | abstraction_design | bdd_test_strategy | enabling_implementation | design_review_gate | core_implementation | verification_review_consolidation
    - Outcome:
+   - Must Define:
+   - Must Not Include:
+   - Readiness Gate:
    - Agent / Owner:
    - Verification:
    - Handoff to `to-task`:
@@ -120,6 +145,7 @@ description: 'Create or update Sky Flow plan artifacts from a ready spec, issue,
 ## Handoff Rules
 
 - `Ready for to-task: yes`：plan 已有稳定 goal、scope、milestones、阶段级串行 / 并行意图和 task handoff，可拆 task DAG。
+- `Ready for to-task: yes` 的 milestone 必须能看出协议、约束、抽象、BDD 测试策略、enabling implementation、design review gate 和 core implementation 的顺序；若省略某类 milestone，必须写清不适用原因。
 - `Ready for to-implement: yes`：plan 已有关联 task，且下一批可执行 task 的依赖、状态、并行批次和验证意图清楚。
 - 如果没有 task，但工作足够小且明确不需要 task DAG，可以标记 `Ready for to-implement: yes`，并在 `Execution Notes` 说明 no-task execution reason。
 - 对执行模型只写必须知道的边界；完整主代理 / 子代理分工、fork、fan-in 和状态回写规则交给 `to-implement`。
@@ -134,7 +160,7 @@ description: 'Create or update Sky Flow plan artifacts from a ready spec, issue,
 - 目标、scope、外部契约、数据口径、业务行为或 requirements 不稳定：推荐回 `to-spec`。
 - 当前阶段无法推进、等待外部依赖或人类决策：推荐 `to-backlog`。
 - completed plan 后续发现问题：同一 goal / scope 的完成结论被推翻时按捞回规则更新；后续增强、二期或相邻问题新建 plan 并引用 completed plan。
-- 计划需要人类验收 gate、sign-off 或反馈轮次：推荐后续由 `to-acceptance` 承接。
+- 计划需要人类验收 gate、sign-off 或反馈轮次：推荐后续由 `to-acceptance` 承接；`design_review_gate` 可以用 plan `Progress Log` 记录当前会话明确批准，也可以用 plan 级 acceptance 承接跨会话或多轮正式 sign-off。
 - 某阶段需要 review、diff 收敛、测试策略或 artifact 校验：在 milestone / task handoff 中分别推荐 `to-review`、`to-consolidation`、`to-test` 或 `validate-flow`，但不在 plan 层替它们执行。
 
 ## Boundaries
@@ -152,6 +178,8 @@ description: 'Create or update Sky Flow plan artifacts from a ready spec, issue,
 ## Self-Review
 
 - Spec coverage：spec 的关键 requirements / acceptance scenarios 是否至少映射到一个 milestone、task handoff 或 verification intent。
+- Milestone order：task-ready plan 是否按 protocol / constraints / abstraction_design / bdd_test_strategy / enabling_implementation / design_review_gate / core_implementation / verification_review_consolidation 的工程顺序表达，或明确说明跳过原因。
+- Design gate：enabling implementation 是否保持小 diff、能体现设计方向且禁止核心复杂逻辑；core implementation 是否被 human approval gate 阻断。
 - Placeholder scan：不得出现无意义的 `TBD`、`TODO`、`handle edge cases`、`add appropriate validation` 等空泛计划语言；允许 `[NEEDS CLARIFICATION: ...]`，但必须标明是否 blocking。
 - Scope check：输入是否仍适合单个 standalone plan；如已覆盖多个独立子系统，应拆分或升级 parent / child plan。
 - Parallelism check：是否把可并行阶段和 lane 表达清楚；代码产出和文档 / artifact 更新是否默认并行，而不是无真实依赖地串行化。

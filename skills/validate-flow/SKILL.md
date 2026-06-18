@@ -62,6 +62,9 @@ node .agents/skills/sky-flow/scripts/validate_flow.ts [paths...]
 
 - dependency / parallel 关系是否符合任务语义。
 - `plan.goal` 是否足以作为 Codex 续跑契约。
+- task-ready plan 的 milestones 是否把 `protocol`、`constraints`、`abstraction_design`、`bdd_test_strategy`、`enabling_implementation`、`design_review_gate`、`core_implementation`、`verification_review_consolidation` 分层表达；若跳过某类 milestone，是否说明不适用原因。
+- `design_review_gate` 是否作为 hard stop 表达：enabling implementation diff 足够小且能体现设计方向，core implementation 只能在人类批准后开始。
+- task DAG 是否正确映射 `design_review_gate`：gate 前有 `consolidation` / `review` task，人类批准未被建成 Agent task，core implementation task 依赖 review task 并通过 `external_depends_on` 或 stop condition 表达人类批准前置。
 - fan-in 后 plan / task / acceptance 状态是否与实际阶段产物、验证证据和剩余工作一致。
 - task 是否都能由 Agent 独立完成；如果 task 的核心完成条件是人工操作、真实设备 / 账号、外部环境、审批或人工体验判断，应建议转入 acceptance。
 - standalone task 是否仍然只是单一可恢复任务；如果出现多个 peer task、milestone、长期验收 gate 或 plan 级恢复需求，应建议升级为 plan。

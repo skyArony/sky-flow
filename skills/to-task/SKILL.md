@@ -25,11 +25,12 @@ task 是执行期调度和恢复结构，不默认作为永久历史。plan-scop
 4. standalone 路径：从当前会话提取目标、scope、allowed write scope、no-touch、验证意图、恢复入口和停止条件；如果出现多个 peer task、milestone、长期验收 gate、父子拆分或需求口径不稳定，回到 `to-plan`。
 5. 读取关联 spec / issue / existing tasks，建立 task 边界、依赖、并行候选、串行 gate 和验证意图。
 6. 先过 Agent-Executable Gate：只有 Agent 可以独立执行、判断完成并回传证据的工作才创建 task；真实设备、真实账号、外部环境、人工审批、人工体验判断或缺少权限的验证项转入 `to-acceptance`，不要创建 task。
-7. 创建或更新 artifact：
+7. 如果 plan milestone 包含 `design_review_gate`，先建立 gate mapping：enabling implementation 后必须有 consolidation task 和 review task；人类批准不创建 task，改用 plan progress、acceptance 或 `external_depends_on` 作为 core implementation 的前置 gate。
+8. 创建或更新 artifact：
    - plan-scoped：`tasks/<plan-id>/<task-id>.md`，完成时仍留在该目录，只改 `status`；维护 plan frontmatter 的 `tasks` 列表，并在 plan 正文保留 task topology 摘要。
    - standalone：`tasks/standalone/<task-id>.md`，不写 `plan`，不更新任何 plan `tasks`。
-8. 自检 task：plan-scoped 检查 DAG、依赖、反向依赖和并行关系；standalone 检查 goal、scope、恢复入口、verification intent 和是否仍然不需要升级为 plan。
-9. 创建或修改 artifact 后运行 `validate-flow`，处理结构错误后再交付。
+9. 自检 task：plan-scoped 检查 DAG、依赖、反向依赖和并行关系；standalone 检查 goal、scope、恢复入口、verification intent 和是否仍然不需要升级为 plan。
+10. 创建或修改 artifact 后运行 `validate-flow`，处理结构错误后再交付。
 
 ## Task Boundaries
 
@@ -67,8 +68,20 @@ standalone task 额外要求：
 - 需要人类批准的 push / deploy / rollout / 生产或测试环境操作。
 - Agent 没有权限、入口或凭据的端到端环境验证。
 - 需要人类提供截图、操作结果、业务口径、验收结论或 sign-off 的阶段 gate。
+- `design_review_gate` 中的人类批准。Agent 可以创建或执行 gate 前的 `consolidation` / `review` task，也可以整理 approval 所需证据，但批准本身必须进入 plan progress、acceptance 或外部依赖，不创建 task。
 
 Agent 可以完成的预检、证据整理或验收文档草稿不要伪装成人工验证 task。它们应优先并入前置 implementation / verification task 的 `Validation Evidence`，或写入 acceptance 的证据区；只有预检本身足够独立、可由 Agent 完成且有明确产物时，才创建 Agent-executable task。
+
+## Design Review Gate Mapping
+
+当 plan milestone 包含 `design_review_gate`，`to-task` 必须把 gate 映射成可执行 DAG，而不是只在正文里提醒：
+
+- `enabling_implementation` task 只能产出少量 design-bearing scaffold，例如接口、类型、协议适配壳、模块边界、测试 seam、feature flag 壳、薄 adapter、最小 fixture 或一条最小 happy-path skeleton。它必须有明确 allowed write scope 和 no-touch，禁止完整状态机、复杂业务分支、并发 / 幂等 / 迁移真实落地、大规模文件改动或生产行为大幅变化。
+- `enabling_implementation` 后创建或维护 `task_type: consolidation` task，推荐执行时使用 `to-consolidation`，目标是让 enabling diff 去掉临时代码、重复实现、命名漂移和 fan-in 半成品。
+- consolidation 后创建或维护 `task_type: review` task，推荐执行时使用 `to-review`，review focus 必须包含 design alignment：协议、约束、抽象边界、BDD 场景、测试 seam、write scope 和 no-touch 是否一致。review task 只产出 findings，不修复。
+- 人类批准不是 task。需要跨会话、几轮反馈或正式 sign-off 时，创建或更新 plan 级 acceptance；当前会话明确批准时，也可以写入 plan `Progress Log`。
+- 每个 `core_implementation` task 必须依赖 gate 前的 review task，并在 `external_depends_on` 或 `Stop condition` 中写明 `human-approved-design-review-gate`；没有批准证据时，`to-implement` 必须停在 gate 前。
+- 如果人类反馈要求调整，追加新的 design / enabling / consolidation / review task，或回到 `to-plan` 调整 milestone；不要直接修改已完成 task，也不要让 core implementation 绕过 gate。
 
 ## Task Metadata
 
@@ -223,6 +236,7 @@ DAG/status 校验属于 `validate-flow`；pending diff 熵值收敛属于 `to-co
 - `depends_on` 和 `depended_by` 必须互相一致。
 - `parallel_with` 只用于同一 plan 下可并行的 task；并行必须满足依赖已满足、写集不冲突、fan-in 方式清楚。
 - 能并行的 task 应尽量并行表达；只有真实依赖、共享写集、明确 fan-in gate 或风险控制需要时才串行。
+- 如果 plan 有 `design_review_gate`，core implementation task 必须串行依赖 enabling consolidation 和 design review task，并通过 `external_depends_on` 或 stop condition 表达人类批准 gate；不得只依赖 Agent review 结果就进入 core implementation。
 - 代码任务与文档任务默认并行表达：实现 worker 写代码时，documentation worker 或主会话可以同步更新 spec / plan / task / acceptance / handoff；最终状态和完成结论由主会话 fan-in 对齐。
 - 外部 plan 依赖写入 `external_depends_on`，并说明依赖 artifact 和恢复条件。
 - 不把看起来独立但会碰同一共享核心文件的 task 并行。
@@ -265,6 +279,7 @@ task DAG ready 的条件：
 
 - 每个 task 有类型、owner 建议、write scope、no-touch、verification intent 和 output contract。
 - 每个 task 都通过 Agent-Executable Gate；人工 / 真实环境门控已转入 acceptance，而不是留在 task DAG 中阻塞完成。
+- `design_review_gate` 已正确映射：enabling consolidation 和 design review 是 task；human approval 是 acceptance / plan progress / external dependency；core implementation 被 gate 阻断。
 - 依赖、反向依赖和并行关系一致；没有把可并行任务无故串行化。
 - single writer / shared scope 风险已表达。
 - nested delegation 是否允许已写清。
@@ -284,6 +299,7 @@ standalone task ready 的条件：
 
 - Coverage：plan milestones 是否都映射到 task 或明确不拆。
 - DAG：depends_on / depended_by / parallel_with 是否一致且无循环。
+- Design gate：`design_review_gate` 是否被拆成 consolidation + review + human approval 外部 gate，core implementation 是否不能绕过。
 - Parallelism：是否尽量表达安全并行；代码产出和文档 / artifact 更新是否被建模为可并行 lane；串行关系是否都有真实依赖或 gate。
 - Scope：每个 implementation task 是否有 allowed write scope 和 no-touch。
 - Ownership：是否避免多 writer 触碰共享核心文件。
