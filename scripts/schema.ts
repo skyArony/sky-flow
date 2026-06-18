@@ -77,4 +77,5 @@ export type ArtifactRecord = {
   status: string;
   path: string;
   data: Record<string, unknown>;
+  body: string;
 };

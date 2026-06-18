@@ -17,12 +17,12 @@ description: "Execute and maintain a prepared Sky Flow plan/task artifact or tas
    - standalone task：读取该 task 的 goal、scope、handoff、verification intent、recovery 和外部依赖；不要求 plan。
 3. 如果 runtime 是 Codex，按任务复杂度维护运行时任务清单；多 task、跨阶段、存在依赖 / fan-in / blocker 时使用内置 `update_plan`，standalone task 可用一个运行时项加必要 checkpoint。
 4. 检查 artifact 状态、scope、依赖和 blocker；不满足时停止，不猜。
-5. 选择下一批 executable tasks：依赖满足、状态可推进、写集不冲突、fan-in 成本可控。
+5. 选择下一批 executable tasks：依赖满足、状态可推进、写集不冲突、fan-in 成本可控；如果 plan-scoped implementation task 过大、跨多个模块 / owner / 验证方式或可拆并行 lane，先按 `to-task` 规则在当前 plan 下拆 DAG；如果 standalone implementation scope 过大，先将 standalone task 升级为 plan，再由 `to-task` 拆成 plan-scoped task DAG；不直接执行巨型 task。
 6. 决定 execution mode：按 ROI 选择主代理直接执行还是派 worker。多 task、fan-in、上下文隔离或独立 review 收益明确时主代理偏 coordinator；单 owner、小 task、当前上下文最完整时主代理可以直接实现。
 7. 并行调度代码与文档：实现型 worker 推进代码 / 配置，文档 owner 同步更新 spec / plan / task / acceptance / handoff 等 artifact；主会话可以自己做文档 owner，也可以派 documentation worker。
 8. 派发或执行 task，收集输出。
-9. Fan-in：检查 changed files、task 要求、spec alignment、验证结果、artifact 更新和 blocker。
-10. 必要时触发 `to-test`、`to-review`、`to-consolidation`、`to-acceptance`、`validate-flow`。
+9. Fan-in：检查 changed files、task 要求、spec alignment、验证结果、artifact 更新和 blocker；implementation owner 不能自评自己的完成度，gate clearance 必须引用独立 reviewer / verifier 子代理结果，或显式记录 `independent_review: unavailable`。
+10. 必要时触发 `to-test`、`to-review`、`to-consolidation`、`to-acceptance`、`validate-flow`；当 task DAG 缺少 gate / completion verification task 时，先按 `to-task` 规则补 DAG，不直接实现。
 11. 维护 runtime plan；Codex 中对关键状态变化同步 task status、并行批次、fan-in、blocker 和 next action，避免为单 task 内微步骤过度打点。
 12. 按执行事实更新 task status；若有 plan，则更新 plan progress / recovery / decision / blocker；standalone task 则更新自身 Progress / Recovery / Decision / Validation Evidence。
 13. 如果实现事实要求拆分 task、调整依赖 / 并行关系或补充验证 / 收敛 task，在已确认 scope 内按 `to-task` 规则更新 artifact 并运行 `validate-flow`。
@@ -36,7 +36,7 @@ description: "Execute and maintain a prepared Sky Flow plan/task artifact or tas
 
 - plan owner。
 - coordinator。
-- fan-in reviewer。
+- fan-in reviewer；主代理可以汇总和裁决分歧，但不能把自己的自评作为实现完成或 gate 通过证据。
 - artifact maintainer。
 - runtime plan maintainer。
 - Codex `update_plan` maintainer。
@@ -46,12 +46,13 @@ description: "Execute and maintain a prepared Sky Flow plan/task artifact or tas
 子代理策略：
 
 - 实现型 worker / 主代理替身：优先 full-context fork。
-- explorer / reviewer / docs researcher / verifier：优先最小上下文包。
+- explorer / reviewer / docs researcher / verifier：优先最小上下文包。reviewer / verifier 默认独立于 implementation owner，用来评估覆盖、风险和完成证据。
 - 一个子代理通常对应一个 task，或一组明确同 owner、同写集边界的并行 task。
 - 子代理派发必须有正向 ROI：并行时间、上下文隔离、专业化、质量 / review 或其他明确收益需要超过 fan-in 成本。收益不明确时，主会话直接承接更好。
 - 子代理不直接抢写 plan 状态；主会话显式指定 documentation worker 为某个 artifact 的 single writer 时，可以更新正文、证据或草稿状态，最终进度、决策、阻塞和恢复入口仍由主会话 fan-in 后确认。
 - 文档更新可以和代码实现并行：主会话可作为文档 owner 在代码 worker 运行时同步更新 artifact，也可派 documentation worker；同一 spec / plan / task / acceptance 文件必须有 single writer，最终状态由主会话 fan-in 确认。
 - 子代理状态至少能表达 `DONE`、`DONE_WITH_CONCERNS`、`NEEDS_CONTEXT`、`BLOCKED`。
+- 独立评估子代理的输出至少能表达 `pass`、`blocked`、`missing-coverage`、`needs-evidence`，并写清已检查范围、未验证范围和残余风险；“看起来可以”不是 gate 证据。
 - 如果 runtime 支持二级子代理，承接 task 的子代理可以在 task write scope 和 delegation policy 内继续派发二级子代理；task owner 负责二级 fan-in，再向主代理汇报最终结果。
 - 如果某个 task 由主会话承接，主会话也可以继续为该 task 派发子代理；这不改变主会话对 plan 进度和 artifact 状态的最终维护责任。
 
@@ -89,16 +90,18 @@ description: "Execute and maintain a prepared Sky Flow plan/task artifact or tas
 
 ## Selecting Executable Tasks
 
-如果输入是 standalone task，它本身就是唯一 executable unit。开始前检查 `status`、`goal`、allowed write scope、no-touch、`external_depends_on`、verification intent 和 blocker；如果执行中需要拆 peer task、表达并行 / 依赖或新增长期验收 gate，停止并升级为 plan，而不是在 standalone task 内扩展 DAG。
+如果输入是 standalone task，它本身就是唯一 executable unit。开始前检查 `status`、`goal`、allowed write scope、no-touch、`external_depends_on`、verification intent 和 blocker；如果执行中需要拆 peer task、表达并行 / 依赖、新增长期验收 gate，或 implementation scope 已跨多个模块 / owner / 写集 / 验证方式，停止并创建 / 升级为 plan，再按 `to-task` 拆出 plan-scoped task DAG；不要在 standalone task 内扩展隐藏 DAG。
 
 可执行 task 必须满足：
 
 - `status` 是 `not_started` 或明确可继续的 `in_progress`。
 - `depends_on` 和 `external_depends_on` 已满足。
+- 如果 task 是 core implementation，必须能看到 gate 前 independent review task 已完成，且 `human-approved-design-review-gate` 有 acceptance、plan progress 或外部依赖证据；否则停在 gate 前。
 - 所属 parent / child plan 顺序允许执行。
 - 没有 blocking `[NEEDS CLARIFICATION: ...]`。
 - write scope 与同批 task 不冲突，或已有 single writer / gate。
 - verification intent 清楚。
+- implementation task 粒度足够小：一个 owner 能独立理解、执行、验证和汇报；如果覆盖多个独立实现面、写集、owner、验证方式或并行 lane，先拆成多个 task。
 - 能由 Agent 独立执行并判断完成；如果核心完成条件依赖人类操作、真实设备 / 账号、未授权外部环境、审批或人工体验判断，不执行、不标记 completed，转 `to-acceptance` 并按 `to-task` 规则从 task DAG 中纠偏。
 
 parent plan 不直接执行；必须切换到当前可执行 child plan。没有 task 且不是 no-task execution 时，回到 `to-task`。
@@ -107,6 +110,7 @@ parent plan 不直接执行；必须切换到当前可执行 child plan。没有
 
 依赖满足、写集不冲突、上下文可隔离、fan-in 成本可控时，优先评估并行 implementation task；只有并行收益明确高于 fan-in 成本时才派发，不要为了形式并行，也不要无故串行化。
 
+- 复杂 implementation task 在执行前优先拆分：按模块 / 包、写集边界、owner、验证方式、风险等级和依赖关系拆成串行或并行 task；每个拆出的 task 都要有独立 scope、no-touch、output contract、verification intent 和 stop condition。
 - 代码改动与文档 / artifact 更新可以并行；当稳定事实已经足够、写集不冲突且 fan-in 成本可控时，documentation worker 或主会话可以同步维护 spec、plan、task、acceptance、handoff、README 或其他交付文档。若文档依赖最终实现事实，先记录待 fan-in 项，避免过早写死。
 - 并行文档更新必须遵守 single writer：同一个文件、同一个 frontmatter 状态字段、同一个 plan/task status 只能由一个 owner 写；其他代理只提交事实、证据或 patch 建议。
 - 父子代理可以并行：子代理执行代码 task 时，父代理可以并行更新 runtime plan、plan progress、decision log、validation evidence 和 acceptance 草稿；如果文档更新需要代码最终事实，先写稳定事实和待 fan-in 项，最终结论在 fan-in 后落地。
@@ -125,6 +129,7 @@ parent plan 不直接执行；必须切换到当前可执行 child plan。没有
 - no-touch 是否被遵守。
 - spec / plan alignment 是否保持。
 - 验证证据是否充分。
+- review / verification gate 是否由独立 reviewer / verifier 子代理评估；implementation owner 的自评不能单独作为完成证据。
 - 是否引入新 blocker、scope creep 或未确认口径。
 
 顺序建议：
@@ -133,10 +138,11 @@ parent plan 不直接执行；必须切换到当前可执行 child plan。没有
 2. 需要测试策略、测试 ROI、BDD/TDD 或替代验证时，触发 `to-test`。
 3. Code / artifact quality review。
 4. 如果当前阶段是在关闭已选 review findings，触发 `to-review` verifier stage，并要求至少两个不同模型 verifier；只有一个供应商时使用最新模型和次新模型。
-5. 必要验证。
-6. 必要 `to-consolidation`。
-7. 必要 `to-acceptance` 生成或更新验收文档。
-8. `validate-flow` 检查 artifact/status。
+5. Completion verification：阶段或 plan 完成前触发独立 verifier / reviewer 子代理检查 task 覆盖、验证证据、scope/no-touch、遗漏实现面和 residual risk；不可用时写明 `independent_review: unavailable`，不能宣称独立 gate 已通过。
+6. 必要验证。
+7. 必要 `to-consolidation`。
+8. 必要 `to-acceptance` 生成或更新验收文档。
+9. `validate-flow` 检查 artifact/status。
 
 不接受 “close enough” 的 spec 偏差。
 
@@ -192,7 +198,7 @@ parent plan 不直接执行；必须切换到当前可执行 child plan。没有
 
 写回规则：
 
-- plan-scoped task 完成且验证通过：只标记 `status: completed`，仍保留在 `tasks/<plan-id>/`，不移动到 `done/` 子目录。
+- plan-scoped task 完成且验证通过：只标记 `status: completed`，仍保留在 `tasks/<plan-id>/`，不移动到 `done/` 子目录；implementation / core task 还必须有独立 review / verification 证据或明确的不可用降级记录。
 - standalone task 完成且验证通过：标记 `status: completed`，按 completed plan 标准压缩自身正文，并移入 `tasks/standalone/done/`。
 - task 产出有问题但可修：保持 in_progress，记录 blocker / next action。
 - task 阻塞：记录 blocked 信息；当前 schema 无 blocked status 时保持 in_progress 或 draft，并在正文写清 blocker。
@@ -209,7 +215,7 @@ parent plan 不直接执行；必须切换到当前可执行 child plan。没有
 - runtime plan：当前会话的执行投影，可以更细、更临时，用来追踪正在执行的 task、并行批次、fan-in 和验证 checkpoint；Codex runtime 必须使用内置 `update_plan` tool 维护。
 - file artifacts：长期真相源，只记录稳定进度、task status、依赖变化、关键决策、blocker、验证证据和恢复入口。
 
-standalone task 没有 parent plan；file artifact 写回只落在 task 自身，除非执行事实证明需要升级为 plan。升级时创建 plan，把 standalone task 记录为来源 / promoted-to-plan，不把多个 peer task 硬塞进 standalone task。
+standalone task 没有 parent plan；file artifact 写回只落在 task 自身，除非执行事实证明需要升级为 plan。升级时创建 plan，把 standalone task 记录为来源 / promoted-to-plan，然后由 `to-task` 在新 plan 下拆出 plan-scoped tasks；不要把多个 peer task 硬塞进 standalone task。
 
 下游动态调整不能和上游定义冲突。执行中发现计划和现实不匹配时，先分类再更新：
 
@@ -222,6 +228,8 @@ standalone task 没有 parent plan；file artifact 写回只落在 task 自身�
 动态调整规则：
 
 - 主代理可以根据执行事实维护 plan / task 状态和 task DAG；子代理只能提出调整建议，不直接改 plan。
+- 如果执行中发现 task DAG 没有把 design gate、coverage review 或 completion verification 落成 task，主代理必须先按 `to-task` 规则补 task DAG，再继续 core implementation 或完成声明。
+- 如果执行中发现 plan-scoped implementation task 过大，导致目标、scope、no-touch、验证或 gate 约束被稀释，主代理必须在原 goal / scope 内拆成多个串行 / 并行 task，并同步 runtime plan；如果 standalone implementation scope 过大，必须先创建 / 升级为 plan，再按 `to-task` 拆成 plan-scoped task DAG；不能靠一个大 task 加长说明来硬扛。
 - runtime plan 更新要及时但不过度；在 Codex 中，选择下一批 task、开始 / 完成一组可见 task、fan-in、发现 blocker 或调整 task DAG 后，应调用 `update_plan`。单个 task 内部的微步骤、短暂探测或不会改变对外状态的局部切换，不必每次调用。file artifact 只写稳定事实，不记录每个微步骤。
 - 拆分或新增 task 后，按 `to-task` 规则同步更新 plan `tasks`、task dependency fields 和 runtime plan。
 - 下游只做已确认 scope 内的执行期维护；任何策略或设计重决策都必须回到对应上游 skill 更新 artifact，再继续执行。

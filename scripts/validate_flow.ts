@@ -62,13 +62,18 @@ function parseScalar(raw: string): unknown {
 }
 
 // 解析 Markdown frontmatter，不引入 YAML 依赖，避免 setup 阶段要求项目安装包。
-function parseFrontmatter(filePath: string): { data: Frontmatter | null; error?: string } {
+function parseFrontmatter(filePath: string): { data: Frontmatter | null; body: string; error?: string } {
   const text = fs.readFileSync(filePath, 'utf8');
   const lines = text.split(/\r?\n/);
-  if (lines[0]?.trim() !== '---') return { data: null };
+  if (lines[0]?.trim() !== '---') return { data: null, body: text };
 
   const end = lines.findIndex((line, index) => index > 0 && line.trim() === '---');
-  if (end < 0) return { data: null, error: 'frontmatter start found without closing delimiter' };
+  if (end < 0)
+    return {
+      data: null,
+      body: text,
+      error: 'frontmatter start found without closing delimiter',
+    };
 
   const data: Frontmatter = {};
   let currentKey: string | null = null;
@@ -87,7 +92,7 @@ function parseFrontmatter(filePath: string): { data: Frontmatter | null; error?:
     currentKey = line.slice(0, colon).trim();
     data[currentKey] = parseScalar(line.slice(colon + 1));
   }
-  return { data };
+  return { data, body: lines.slice(end + 1).join('\n') };
 }
 
 // Sky Flow 只读取 runtime env；项目如需定制，通过 SKY_FLOW_* 环境变量覆盖。
@@ -688,6 +693,261 @@ function taskReference(task: ArtifactRecord): string {
     return `${String(task.data.plan)}/${task.id}`;
   }
   return task.id;
+}
+
+function artifactText(artifact: ArtifactRecord): string {
+  return `${artifact.id}\n${path.basename(artifact.path)}\n${JSON.stringify(artifact.data)}\n${artifact.body}`.toLowerCase();
+}
+
+function textIncludesAny(text: string, patterns: string[]): boolean {
+  return patterns.some((pattern) => text.includes(pattern.toLowerCase()));
+}
+
+function taskType(task: ArtifactRecord): string {
+  return String(task.data.task_type || '');
+}
+
+const DESIGN_REVIEW_GATE_PATTERNS = [
+  'design_review_gate',
+  'design review gate',
+  'human-approved-design-review-gate',
+];
+
+const DESIGN_GATE_SKIP_PATTERNS = [
+  'skip',
+  'skipped',
+  'not applicable',
+  'n/a',
+  'not needed',
+  'not required',
+  '不适用',
+  '跳过',
+  '无需',
+  '不需要',
+  '不启用',
+  '不采用',
+  '略过',
+];
+
+function artifactLines(artifact: ArtifactRecord): string[] {
+  return `${artifact.id}\n${path.basename(artifact.path)}\n${JSON.stringify(artifact.data)}\n${artifact.body}`
+    .split(/\r?\n/)
+    .map((line) => line.toLowerCase());
+}
+
+function artifactRoleText(artifact: ArtifactRecord): string {
+  return [
+    artifact.id,
+    path.basename(artifact.path),
+    artifact.data.milestone_role,
+    artifact.data.gate_role,
+    artifact.data.milestone,
+    artifact.data.stage,
+    artifact.data.kind,
+  ]
+    .map((value) => String(value || ''))
+    .join('\n')
+    .toLowerCase();
+}
+
+function designGateMentionIsSkipped(lines: string[], index: number): boolean {
+  const window = lines.slice(Math.max(0, index - 1), Math.min(lines.length, index + 4)).join('\n');
+  if (!textIncludesAny(window, DESIGN_GATE_SKIP_PATTERNS)) return false;
+  return (
+    textIncludesAny(lines[index], DESIGN_GATE_SKIP_PATTERNS) ||
+    textIncludesAny(window, ['readiness gate', 'execution notes', 'skip', 'skipped', '不适用', '跳过'])
+  );
+}
+
+function designReviewGateState(plan: ArtifactRecord): 'absent' | 'skipped' | 'active' {
+  const lines = artifactLines(plan);
+  const mentionIndexes = lines
+    .map((line, index) => ({ line, index }))
+    .filter(({ line }) => textIncludesAny(line, DESIGN_REVIEW_GATE_PATTERNS))
+    .map(({ index }) => index);
+  if (!mentionIndexes.length) return 'absent';
+
+  const skippedMentions = mentionIndexes.filter((index) => designGateMentionIsSkipped(lines, index));
+  return skippedMentions.length === mentionIndexes.length ? 'skipped' : 'active';
+}
+
+function isExplicitCoreImplementationTask(task: ArtifactRecord): boolean {
+  return textIncludesAny(artifactRoleText(task), [
+    'core_implementation',
+    'core implementation',
+    '核心实现',
+    '核心逻辑',
+    '复杂逻辑实现',
+  ]);
+}
+
+function isEnablingImplementationTask(task: ArtifactRecord): boolean {
+  return (
+    taskType(task) === 'implementation' &&
+    !isExplicitCoreImplementationTask(task) &&
+    textIncludesAny(artifactRoleText(task), [
+      'enabling_implementation',
+      'enabling implementation',
+      '轻量设计',
+      '设计承载',
+    ])
+  );
+}
+
+function isDesignReviewTask(task: ArtifactRecord): boolean {
+  return (
+    taskType(task) === 'review' &&
+    textIncludesAny(artifactText(task), [
+      'design_review_gate',
+      'design review',
+      'design alignment',
+      '设计对齐',
+      '抽象边界',
+      'human-approved-design-review-gate',
+    ])
+  );
+}
+
+function isCompletionVerificationTask(task: ArtifactRecord): boolean {
+  return (
+    ['review', 'verification'].includes(taskType(task)) &&
+    textIncludesAny(artifactText(task), [
+      'completion verification',
+      'completion review',
+      '完成评估',
+      '完成验证',
+      '目标覆盖',
+      '遗漏实现',
+      'missing-coverage',
+    ])
+  );
+}
+
+function declaresIndependentEvaluation(task: ArtifactRecord): boolean {
+  return hasIndependentEvaluator(task) && excludesImplementationOwner(task);
+}
+
+function hasIndependentEvaluator(task: ArtifactRecord): boolean {
+  return textIncludesAny(artifactText(task), [
+    'independent reviewer',
+    'independent verifier',
+    'independent review',
+    'independent_review',
+    'non-implementation owner',
+    '独立 reviewer',
+    '独立 verifier',
+    '独立评估',
+    '非实现 owner',
+    '非实现者',
+    '未参与实现',
+  ]);
+}
+
+function excludesImplementationOwner(task: ArtifactRecord): boolean {
+  return textIncludesAny(artifactText(task), [
+    'must not be: implementation owner',
+    'must not be implementation owner',
+    'exclude the implementation owner',
+    'excluding implementation owner',
+    'not implementation owner',
+    'not be implementation owner',
+    'non-implementation owner',
+    '非 implementation owner',
+    '非实现 owner',
+    '非实现者',
+    '排除 implementation owner',
+    '排除实现 owner',
+    '不得由 implementation owner',
+    '不得由实现 owner',
+    '不得由实现者',
+    '不能由 implementation owner',
+    '不能由实现 owner',
+    '不能由实现者',
+    '不由 implementation owner',
+    '不由实现 owner',
+    '不由实现者',
+  ]);
+}
+
+function assignsImplementationOwnerAsEvaluator(task: ArtifactRecord): boolean {
+  return artifactLines(task).some((line) => {
+    if (
+      !textIncludesAny(line, [
+        'recommended owner',
+        'owner:',
+        'assignee',
+        '承接',
+        '负责',
+        'owner 建议',
+      ])
+    )
+      return false;
+    if (!textIncludesAny(line, ['implementation owner', '实现 owner', '实现者'])) return false;
+    return !textIncludesAny(line, [
+      'must not be',
+      'exclude',
+      'excluding',
+      'not implementation owner',
+      'not be implementation owner',
+      'non-implementation owner',
+      '非',
+      '排除',
+      '不得',
+      '不能',
+      '不由',
+      '禁止',
+    ]);
+  });
+}
+
+function designGateCoreTasks(tasks: ArtifactRecord[]): ArtifactRecord[] {
+  return tasks.filter(
+    (task) => taskType(task) === 'implementation' && !isEnablingImplementationTask(task),
+  );
+}
+
+function dependsOnAnyTask(
+  edges: Map<string, Set<string>>,
+  task: ArtifactRecord,
+  dependencies: ArtifactRecord[],
+): boolean {
+  return dependencies.some((dependency) => hasPath(edges, dependency.id, task.id));
+}
+
+function reviewDependsOnConsolidation(
+  edges: Map<string, Set<string>>,
+  reviewTask: ArtifactRecord,
+  consolidationTasks: ArtifactRecord[],
+): boolean {
+  return consolidationTasks.some((consolidationTask) =>
+    hasPath(edges, consolidationTask.id, reviewTask.id),
+  );
+}
+
+function enablingFeedsConsolidation(
+  edges: Map<string, Set<string>>,
+  enablingTasks: ArtifactRecord[],
+  consolidationTasks: ArtifactRecord[],
+): boolean {
+  if (!enablingTasks.length) return true;
+  return enablingTasks.some((enablingTask) =>
+    consolidationTasks.some((consolidationTask) =>
+      hasPath(edges, enablingTask.id, consolidationTask.id),
+    ),
+  );
+}
+
+function hasHumanApprovalGate(task: ArtifactRecord): boolean {
+  return (
+    asList(task.data.external_depends_on)
+      .map(String)
+      .some((value) => value.includes('human-approved-design-review-gate')) ||
+    artifactText(task).includes('human-approved-design-review-gate')
+  );
+}
+
+function isAcceptedExternalDependency(value: string): boolean {
+  return value.includes('/') || value === 'human-approved-design-review-gate';
 }
 
 function artifactRegistryKey(artifact: Frontmatter): string {
@@ -1332,7 +1592,7 @@ function validateRelationships(
       }
       for (const external of asList(task.data.external_depends_on)) {
         if (!external) continue;
-        if (typeof external === 'string' && external.includes('/'))
+        if (typeof external === 'string' && isAcceptedExternalDependency(external))
           externalEdges.push({ from: external, to: task.id, type: 'external' });
         else
           addIssue(
@@ -1381,6 +1641,198 @@ function validateRelationships(
           );
         }
       }
+    }
+
+    const gateState = designReviewGateState(plan);
+    const requiresDesignReviewGate = gateState === 'active';
+    const shouldValidateDesignGateTasks =
+      requiresDesignReviewGate &&
+      (planningDepth === 'task_ready' || actualTasks.length > 0 || planTaskIds.length > 0);
+
+    if (shouldValidateDesignGateTasks) {
+      const consolidationTasks = actualTasks.filter((task) => taskType(task) === 'consolidation');
+      const enablingTasks = actualTasks.filter(isEnablingImplementationTask);
+      const designReviewTasks = actualTasks.filter(isDesignReviewTask);
+      const consolidatedDesignReviewTasks = designReviewTasks.filter((reviewTask) =>
+        reviewDependsOnConsolidation(edges, reviewTask, consolidationTasks),
+      );
+      const coreTasks = designGateCoreTasks(actualTasks);
+      const completionEvaluationTasks = actualTasks.filter(isCompletionVerificationTask);
+
+      if (!consolidationTasks.length) {
+        addIssue(
+          errors,
+          'DESIGN_GATE_CONSOLIDATION_TASK_MISSING',
+          'error',
+          plan.data,
+          plan.path,
+          'tasks',
+          'plan mentions design_review_gate but has no task_type: consolidation task in its DAG',
+          projectRoot,
+        );
+      }
+      if (!designReviewTasks.length) {
+        addIssue(
+          errors,
+          'DESIGN_GATE_REVIEW_TASK_MISSING',
+          'error',
+          plan.data,
+          plan.path,
+          'tasks',
+          'plan mentions design_review_gate but has no design review task in its DAG',
+          projectRoot,
+        );
+      }
+      if (consolidationTasks.length && designReviewTasks.length) {
+        for (const reviewTask of designReviewTasks) {
+          if (!reviewDependsOnConsolidation(edges, reviewTask, consolidationTasks)) {
+            addIssue(
+              errors,
+              'DESIGN_REVIEW_MISSING_CONSOLIDATION_DEPENDENCY',
+              'error',
+              reviewTask.data,
+              reviewTask.path,
+              'depends_on',
+              'design review task must depend on the gate consolidation task',
+              projectRoot,
+            );
+          }
+        }
+      }
+      if (
+        enablingTasks.length &&
+        consolidationTasks.length &&
+        !enablingFeedsConsolidation(edges, enablingTasks, consolidationTasks)
+      ) {
+        addIssue(
+          warnings,
+          'ENABLING_IMPLEMENTATION_NOT_LINKED_TO_CONSOLIDATION',
+          'warning',
+          plan.data,
+          plan.path,
+          'tasks',
+          'enabling implementation should feed into the gate consolidation task before design review',
+          projectRoot,
+        );
+      }
+      for (const reviewTask of designReviewTasks) {
+        if (assignsImplementationOwnerAsEvaluator(reviewTask)) {
+          addIssue(
+            errors,
+            'DESIGN_GATE_REVIEW_ASSIGNED_TO_IMPLEMENTATION_OWNER',
+            'error',
+            reviewTask.data,
+            reviewTask.path,
+            'task_type',
+            'design review task must not be assigned to the implementation owner',
+            projectRoot,
+          );
+        } else if (!declaresIndependentEvaluation(reviewTask)) {
+          addIssue(
+            warnings,
+            'DESIGN_GATE_REVIEW_INDEPENDENCE_UNDECLARED',
+            'warning',
+            reviewTask.data,
+            reviewTask.path,
+            'task_type',
+            'design review task should declare an independent reviewer/verifier and exclude the implementation owner',
+            projectRoot,
+          );
+        }
+      }
+      for (const coreTask of coreTasks) {
+        if (!dependsOnAnyTask(edges, coreTask, consolidatedDesignReviewTasks)) {
+          addIssue(
+            errors,
+            'CORE_TASK_MISSING_DESIGN_REVIEW_DEPENDENCY',
+            'error',
+            coreTask.data,
+            coreTask.path,
+            'depends_on',
+            'core implementation task must depend on an independent design review task that depends on gate consolidation',
+            projectRoot,
+          );
+        }
+        if (!hasHumanApprovalGate(coreTask)) {
+          addIssue(
+            errors,
+            'CORE_TASK_MISSING_HUMAN_APPROVAL_GATE',
+            'error',
+            coreTask.data,
+            coreTask.path,
+            'external_depends_on',
+            'core implementation task must declare human-approved-design-review-gate in external_depends_on or Stop condition',
+            projectRoot,
+          );
+        }
+      }
+      if (coreTasks.length && !completionEvaluationTasks.length) {
+        addIssue(
+          warnings,
+          'COMPLETION_EVALUATION_TASK_MISSING',
+          'warning',
+          plan.data,
+          plan.path,
+          'tasks',
+          'plan has core implementation tasks but no independent completion verification/review task',
+          projectRoot,
+        );
+      }
+      for (const evaluationTask of completionEvaluationTasks) {
+        if (assignsImplementationOwnerAsEvaluator(evaluationTask)) {
+          addIssue(
+            errors,
+            'COMPLETION_EVALUATION_ASSIGNED_TO_IMPLEMENTATION_OWNER',
+            'error',
+            evaluationTask.data,
+            evaluationTask.path,
+            'task_type',
+            'completion verification/review task must not be assigned to the implementation owner',
+            projectRoot,
+          );
+        } else if (!declaresIndependentEvaluation(evaluationTask)) {
+          addIssue(
+            warnings,
+            'COMPLETION_EVALUATION_INDEPENDENCE_UNDECLARED',
+            'warning',
+            evaluationTask.data,
+            evaluationTask.path,
+            'task_type',
+            'completion verification/review task should declare an independent verifier and exclude the implementation owner',
+            projectRoot,
+          );
+        }
+      }
+      llmHints.push({
+        artifact_id: plan.id,
+        check: 'design_gate_task_mapping',
+        reason:
+          'LLM should verify design_review_gate tasks cover enabling scaffold, consolidation, independent review, human approval, core implementation, and independent completion verification without relying on implementation-owner self-evaluation.',
+      });
+    } else if (gateState === 'active') {
+      llmHints.push({
+        artifact_id: plan.id,
+        check: 'design_gate_task_mapping',
+        reason:
+          'Plan mentions design_review_gate; once it becomes task_ready or binds tasks, validator should check concrete gate task mapping.',
+      });
+    } else if (gateState === 'skipped') {
+      llmHints.push({
+        artifact_id: plan.id,
+        check: 'design_gate_skipped',
+        reason:
+          'Plan mentions design_review_gate as skipped or not applicable; LLM should confirm the skip reason is explicit and valid for this scope.',
+      });
+    }
+
+    const implementationTasks = actualTasks.filter((task) => taskType(task) === 'implementation');
+    if (implementationTasks.length) {
+      llmHints.push({
+        artifact_id: plan.id,
+        check: 'implementation_task_granularity',
+        reason:
+          'LLM should verify implementation tasks are split by module, write scope, owner, verification method, risk, and parallelism instead of using one oversized task that weakens scope and gate constraints.',
+      });
     }
 
     if (plan.data.goal) {
@@ -1447,7 +1899,7 @@ function validateRelationships(
           task.data,
           task.path,
           field,
-          `standalone task must not declare local task DAG field ${field}; upgrade to a plan if peer task dependencies are needed`,
+          `standalone task must not declare local task DAG field ${field}; upgrade to a plan and split into plan-scoped tasks if peer task dependencies are needed`,
           projectRoot,
         );
       }
@@ -1455,7 +1907,7 @@ function validateRelationships(
     const externalEdges: unknown[] = [];
     for (const external of asList(task.data.external_depends_on)) {
       if (!external) continue;
-      if (typeof external === 'string' && external.includes('/'))
+      if (typeof external === 'string' && isAcceptedExternalDependency(external))
         externalEdges.push({ from: external, to: task.id, type: 'external' });
       else
         addIssue(
@@ -1473,8 +1925,16 @@ function validateRelationships(
       artifact_id: task.id,
       check: 'standalone_task_scope',
       reason:
-        'LLM should verify this task is more than a daily chat item but not complex enough for a plan, and should recommend promotion to plan if it has milestones, peer tasks, or long-lived acceptance gates.',
+        'LLM should verify this task is more than a daily chat item but not complex enough for a plan, and should recommend promotion to plan plus plan-scoped task DAG splitting if it has milestones, peer tasks, long-lived acceptance gates, or implementation scope that should be split.',
     });
+    if (taskType(task) === 'implementation') {
+      llmHints.push({
+        artifact_id: task.id,
+        check: 'standalone_implementation_granularity',
+        reason:
+          'LLM should verify standalone implementation scope is still single-module, single-owner, single-write-scope, and single-verification-mode; otherwise promote it to a plan and split it into plan-scoped tasks instead of hiding a task DAG in the standalone body.',
+      });
+    }
     llmHints.push({
       artifact_id: task.id,
       check: 'task_agent_executability',
@@ -1654,6 +2114,7 @@ function main(): number {
         status: String(parsed.data.status),
         path: filePath,
         data: parsed.data,
+        body: parsed.body,
       });
     }
     const taskRole =

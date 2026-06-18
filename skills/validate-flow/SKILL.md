@@ -49,6 +49,9 @@ node .agents/skills/sky-flow/scripts/validate_flow.ts [paths...]
 - 后序子 Plan 是否在前序子 Plan 未完成时已经进入 `in_progress` / `completed`。
 - task 是否使用合法 `task_role`，plan-scoped task 是否固定于 `tasks/<plan-id>/` 且不进入 `done/` 子目录，standalone task 是否位于 `tasks/standalone/` 或完成后的 `tasks/standalone/done/`。
 - standalone task 是否显式设置 `task_role: standalone` 和 `goal`，以及是否错误声明本地 `depends_on` / `depended_by` / `parallel_with`。
+- active `design_review_gate` 是否已落到 task DAG：必须有 `consolidation` task、independent design review task、review 依赖 consolidation、core implementation 依赖 review，并通过 `external_depends_on` 或 stop condition 表达 `human-approved-design-review-gate`。
+- design review / completion verification 是否明确排除 implementation owner；如果 review / verification task 明确分配给 implementation owner，脚本直接报错。
+- active `design_review_gate` 下 core implementation 完成前是否有 completion verification / review task；缺失或未声明独立评估时报告 warning。
 - `backlog` / `handoff` 的 artifact 来源是否能找到。
 - `completed` plan 是否仍有未完成 task，或缺少 `completed_at`。
 - `completed_at` 是否和 plan 的 `completed` 状态不一致。
@@ -63,11 +66,12 @@ node .agents/skills/sky-flow/scripts/validate_flow.ts [paths...]
 - dependency / parallel 关系是否符合任务语义。
 - `plan.goal` 是否足以作为 Codex 续跑契约。
 - task-ready plan 的 milestones 是否把 `protocol`、`constraints`、`abstraction_design`、`bdd_test_strategy`、`enabling_implementation`、`design_review_gate`、`core_implementation`、`verification_review_consolidation` 分层表达；若跳过某类 milestone，是否说明不适用原因。
-- `design_review_gate` 是否作为 hard stop 表达：enabling implementation diff 足够小且能体现设计方向，core implementation 只能在人类批准后开始。
-- task DAG 是否正确映射 `design_review_gate`：gate 前有 `consolidation` / `review` task，人类批准未被建成 Agent task，core implementation task 依赖 review task 并通过 `external_depends_on` 或 stop condition 表达人类批准前置。
+- `design_review_gate` 是否作为 hard stop 表达：enabling implementation diff 足够小且能体现设计方向，core implementation 只能在人类批准后开始；如果 gate 标注为 skipped / not applicable，跳过理由是否成立。
+- task DAG 是否正确映射 `design_review_gate`：gate 前有 `consolidation` / independent `review` task，人类批准未被建成 Agent task，core implementation task 依赖 review task 并通过 `external_depends_on` 或 stop condition 表达人类批准前置，完成前有独立 completion verification / review。
+- implementation task 粒度是否合理：复杂 plan-scoped implementation 是否按模块、write scope、owner、验证方式、风险和并行关系拆分；standalone implementation 如果需要拆分，是否先升级为 plan，再拆成 plan-scoped task DAG。
 - fan-in 后 plan / task / acceptance 状态是否与实际阶段产物、验证证据和剩余工作一致。
 - task 是否都能由 Agent 独立完成；如果 task 的核心完成条件是人工操作、真实设备 / 账号、外部环境、审批或人工体验判断，应建议转入 acceptance。
-- standalone task 是否仍然只是单一可恢复任务；如果出现多个 peer task、milestone、长期验收 gate 或 plan 级恢复需求，应建议升级为 plan。
+- standalone task 是否仍然只是单一可恢复任务；如果出现多个 peer task、milestone、长期验收 gate、复杂 implementation scope 或 plan 级恢复需求，应建议升级为 plan，并在 plan 下拆出 task DAG。
 - 捞回后的 plan / issue 是否已经移回 active 目录、改掉 `completed` 状态，并写清 `Reopen Evidence` / `Reopen Reason`。
 - completed plan 若已清空 `tasks` 或声称 summary-only 归档，归档摘要是否保留必要事实、关键决策、踩坑、证据入口和 follow-up。
 - `acceptance` 是否说清来源、轮次、验证证据和未提及项处理。

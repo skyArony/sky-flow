@@ -85,7 +85,7 @@ Sky Flow 是通用工作流 Skill 套件，覆盖 `spec`、`issue`、`plan`、`t
 - `spec.plans <-> plan.spec`
 - `issue.plans <-> plan.issues`
 - `plan.tasks <-> task.plan` 只适用于 `task_role: plan_scoped`，表示当前保留的展开 task DAG；completed plan 若已压缩为 summary-only，可为空。
-- `task_role: standalone` 不绑定 plan，不出现在 `plan.tasks`，用于比日常对话复杂但尚不值得建 plan 的单一可恢复任务；一旦需要多个 peer task、milestone、长期验收或父子拆分，应升级为 plan。
+- `task_role: standalone` 不绑定 plan，不出现在 `plan.tasks`，用于比日常对话复杂但尚不值得建 plan 的单一可恢复任务；一旦需要多个 peer task、milestone、长期验收、复杂 implementation lane 或父子拆分，应升级为 plan，再拆成 plan-scoped task DAG。
 - `plan` / `issue` 从完成态捞回时必须移回 active 目录、把 `status: completed` 改成 `in_progress` 或 `not_started`，并写明 `Reopen Evidence` / `Reopen Reason`。
 - plan-scoped task 不捞回；需要继续修复时追加新 task，若旧 task 已随 summary-only 删除，则基于 completed plan / issue / evidence 重新拆 task DAG。
 - `plan.child_plans <-> plan.parent_plan`，仅用于超级巨大任务的父子 Plan；父 Plan 不直接绑定 task。

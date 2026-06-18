@@ -1,4 +1,4 @@
 interface:
   display_name: "Pick Plan"
-  short_description: "推荐下一步 Sky Flow plan 并生成续跑提示"
-  default_prompt: "使用 $pick-plan 从 Sky Flow plan 中挑选下一步并生成含子代理授权的完整续跑提示。"
+  short_description: "推荐下一步 Sky Flow 工作，指定时直通生成续跑提示"
+  default_prompt: "使用 $pick-plan 推荐下一步 Sky Flow plan；如果我指定了某个 plan/task，则直接生成它的续跑提示。"

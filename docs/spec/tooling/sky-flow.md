@@ -558,8 +558,10 @@ artifact，不是 runtime 内存里的临时计划。
 - 恢复入口：`plan` 至少能说明 resume from、next action、current blocker 和 last validated state，让下一轮不依赖聊天历史恢复。
 - 子代理 ROI 判定：只要并行时间收益、上下文隔离收益、专业化收益、质量 / review 收益任一成立，且 fan-in 成本可控，就应该派发子代理；如果从其他角度能说明派发子代理有明确正向收益，也应该派发。该判断必须和后续 `task.depends_on` / `task.parallel_with` 对齐。
 - 并行优先：plan 应表达阶段级串行关系和可并行 lane，`to-task` 再把它收敛为具体 task DAG；能并行的任务尽量并行，不无故串行化。代码产出 lane 与文档 / artifact 更新 lane 默认并行推进，除非存在同文件 single-writer 冲突、事实未稳定或明确 fan-in gate。
+- 实现粒度：具体实施是 task DAG 的最细调度层。复杂 implementation 必须按模块、写集、owner、验证方式、风险等级和依赖关系拆成多个串行 / 并行 task；不能把多模块、多 owner、多验证方式或可并行 lane 全塞进一个大 task。
 - Milestone 分层：task-ready plan 的默认工程顺序是 `protocol -> constraints -> abstraction_design -> bdd_test_strategy -> enabling_implementation -> design_review_gate -> core_implementation -> verification_review_consolidation`。协议、约束、抽象、BDD 测试策略、轻量设计承载实现、复杂核心实现和最终验证 / review / consolidation 不应混在同一个 milestone；如果某类阶段不适用，plan 必须说明跳过原因。
-- 设计 Review Gate：`enabling_implementation` 只能用少量正式代码体现设计方向，例如接口、类型、协议适配壳、模块边界、测试 seam、feature flag 壳、薄 adapter、最小 fixture 或一条最小 happy-path skeleton；禁止提前落完整状态机、复杂业务分支、并发 / 幂等 / 迁移真实逻辑或大规模文件改动。进入 `core_implementation` 前必须先经过 `to-consolidation`、`to-review` 和人类明确 approval；没有 approval 时执行必须停在 gate 前。
+- 设计 Review Gate：`enabling_implementation` 只能用少量正式代码体现设计方向，例如接口、类型、协议适配壳、模块边界、测试 seam、feature flag 壳、薄 adapter、最小 fixture 或一条最小 happy-path skeleton；禁止提前落完整状态机、复杂业务分支、并发 / 幂等 / 迁移真实逻辑或大规模文件改动。进入 `core_implementation` 前必须先经过 task DAG 中的 `to-consolidation` task、独立 `to-review` task 和人类明确 approval；没有 approval 时执行必须停在 gate 前。
+- 独立评估：implementation owner 不能单独评估自己的完成度。design review、coverage review 和 completion verification 必须落成独立 review / verification task，由非实现 owner 的 reviewer / verifier 子代理评估；主代理只负责 fan-in、冲突裁决和状态回写。
 - 实施承接：`to-plan` 只记录进入执行前必须知道的执行边界；完整主代理 / 子代理分工、上下文 fork、fan-in 和状态回写规则归 `to-implement`。
 - Execution Safety：`to-plan` 只记录进入执行前必须知道的 gate、风险和停止条件；执行期是否继续推进由 `to-implement` 根据 task 状态、验证结果和 scope 风险判断。
 - 停止条件：范围扩大、验证失败且修复路径不唯一、公共契约 / DB / 部署等风险升级、产品 / 设计取舍不明时，plan 必须记录 blocker，执行期必须暂停并询问人类。
@@ -636,13 +638,15 @@ plan-scoped task 必须以 `plan` 文档作为输入。它负责拆分 task、�
 - 主会话继续负责 coordination、状态更新和 fan-in；这与 `coordination` 类型不派给普通子代理的规则一致。
 - `to-task` 应预估哪些 task 会产生正式产物；对有产物的阶段，根据必要程度穿插 `consolidation` 类型 task
   和阶段 review。
-- 当 plan 包含 `design_review_gate` 时，`to-task` 必须把 gate 映射成 DAG：`enabling_implementation` 后创建或维护 `consolidation` task 和 `review` task；人类 approval 不创建 task，应进入 plan progress、plan 级 acceptance 或 `external_depends_on`；每个 `core_implementation` task 必须依赖 gate 前 review task，并通过 `external_depends_on` 或 stop condition 表达 `human-approved-design-review-gate`。
+- `to-task` 必须执行 implementation granularity gate：如果一个 implementation task 覆盖多个模块 / 包 / UI 与服务端 / schema 与 runtime / 测试与迁移 / 部署配置与业务逻辑，或子部分有不同 write scope、owner、验证方式、风险等级或可独立 fan-in，必须拆成多个串行 / 并行 task。
+- 当 plan 包含 `design_review_gate` 时，`to-task` 必须把 gate 映射成 DAG：`enabling_implementation` 后创建或维护 `consolidation` task 和 independent `review` task；人类 approval 不创建 task，应进入 plan progress、plan 级 acceptance 或 `external_depends_on`；每个 `core_implementation` task 必须依赖 gate 前 review task，并通过 `external_depends_on` 或 stop condition 表达 `human-approved-design-review-gate`。
+- `to-task` 必须把完成判断拆成独立 review / verification task，而不是让 implementation task owner 自评。review / verification task 要写清 `Recommended owner: independent reviewer / verifier subagent`、`Must not be: implementation owner`、评估范围、输出契约和阻塞条件；主代理可以 fan-in，但不能把自己的自评当作 gate clearance。
 - 当 `task_type: review` 时，task 应推荐执行时使用 `to-review`，并写清 review target、focus、evidence input、output contract 和 escalation hint；高风险 review task 可要求 multi-review / synthesize 或修后 verifier stage；修复不混入 review task。
 - 当 `task_type: verification`，或 task 需要新增 / 修改测试、写 `Given / When / Then`、判断测试 ROI、选择 stable seam、决定 Red / Green / Refactor 或替代验证时，task 应推荐执行时使用 `to-test`，并写清 behavior、ROI、seam、execution mode、verification evidence 和 artifact writeback。
 - 如果 verification 的核心完成条件是人工或真实环境门控，例如员工手机、客户账号、浏览器 profile、外部平台、权限、部署审批或真实测试环境结果，不创建 verification task；这些内容进入 plan 级 acceptance，Agent 已完成的预检证据只作为验收支撑。
 - 真实事故回归的测试化 task 推荐 `to-bdd-regression`，并复用 `to-debug` 的 reproduction、evidence、incorrect path 和 correct path；普通测试策略不强行走事故回归入口。
 - `to-task` 可以在不改变 plan goal / scope / milestone intent 的前提下调整 task DAG；如果执行策略、milestone 边界、plan shape、scope 分解或 task handoff 需要变化，回到 `to-plan`；如果目标、scope、外部契约、数据口径、业务行为或 requirements 需要变化，回到 `to-spec`。
-- standalone task 必须写 `task_role: standalone` 和 `goal`，`depends_on` / `depended_by` / `parallel_with` 保持空数组；如果需要多个 peer task、milestone、并行 / 依赖或长期验收 gate，必须升级为 plan。
+- standalone task 必须写 `task_role: standalone` 和 `goal`，`depends_on` / `depended_by` / `parallel_with` 保持空数组；如果需要多个 peer task、milestone、并行 / 依赖、长期验收 gate，或 implementation scope 已跨多个模块 / owner / 写集 / 验证方式，必须先升级为 plan，再拆成 plan-scoped task DAG。
 - plan-scoped task 完成时只把 `status` 改为 `completed`，仍留在 `tasks/<plan-id>/`；不创建 `tasks/<plan-id>/done/`。
 - plan-scoped task 不做捞回。后续发现问题时，如果原 task 仍在当前 DAG 中，追加新 task 并调整依赖 / 顺序；如果原 task 已随 completed plan summary-only 归档删除，则基于 completed plan、issue 和证据重新进入 `to-task` 拆新 task。
 
@@ -669,12 +673,12 @@ Sky Flow plan / task artifact，或当前会话已经进入文件化 Sky Flow pl
 
 核心流程：
 
-1. Load and review：读取 plan、tasks、关联 spec / issue，或读取 standalone task 的 goal / scope / recovery；确认 artifact 状态可执行；如果 plan / task 有缺口、依赖不满足或 scope 不清，先停，不猜。
+1. Load and review：读取 plan、tasks、关联 spec / issue，或读取 standalone task 的 goal / scope / recovery；确认 artifact 状态可执行；如果 plan / task 有缺口、依赖不满足或 scope 不清，先停，不猜；如果 plan-scoped implementation task 过大，先按 `to-task` 在当前 plan 下拆 DAG；如果 standalone implementation scope 过大，先升级为 plan，再由 `to-task` 拆成 plan-scoped task DAG。
 2. Select executable task：plan-scoped 路径根据 `depends_on`、status、parent / child plan 顺序选择下一批 task；parent plan 不直接执行，task 缺失时回到 `to-task`。standalone task 本身就是唯一 executable unit。
 3. Decide execution mode：主代理默认是 coordinator，不直接写业务代码；实现型 task 默认派 worker。
 4. Dispatch packet：每个子代理必须拿到 mission、source artifact、task text、allowed write scope、no-touch、context policy、verification intent、output contract 和 stop condition。
 5. Code/docs parallelism：实现型 worker 推进代码 / 配置时，documentation worker 或主会话同步更新 spec、plan、task、acceptance、handoff 或交付文档；调度形态可以是子代理之间并行，也可以是父代理维护文档、子代理写代码。
-6. Fan-in and verify：主代理读取子代理结果，检查 changed files、task 要求、spec alignment、artifact 更新和验证结果；必要时触发 test / review / consolidation / acceptance / validate-flow；关闭已选 review findings 时触发 `to-review` verifier stage。
+6. Fan-in and verify：主代理读取子代理结果，检查 changed files、task 要求、spec alignment、artifact 更新和验证结果；implementation owner 不能自评自己的完成度，gate clearance 必须引用独立 reviewer / verifier 子代理结果，或显式记录 `independent_review: unavailable`；必要时触发 test / review / consolidation / acceptance / validate-flow；关闭已选 review findings 时触发 `to-review` verifier stage。
 7. Update runtime and artifacts：主代理维护 runtime plan；Codex runtime 必须调用内置 `update_plan` tool 同步 task status、并行批次、fan-in 和 next action。
 8. Artifact writeback：主代理更新 task status；若有 plan，则更新 plan progress / recovery / decision / blocker；standalone task 则更新自身 progress / recovery / decision / validation evidence。
 9. Acceptance gate：到达人类验收、sign-off、争议确认或反馈节点时，调用 `to-acceptance` 创建或更新验收文档；review synthesize 后的人类修复取舍直接在对话或 review 报告中处理，不写 acceptance artifact。
@@ -694,6 +698,7 @@ Sky Flow plan / task artifact，或当前会话已经进入文件化 Sky Flow pl
 - 子代理不直接抢写 plan 状态；主会话显式指定 documentation worker 为某个 artifact 的 single writer 时，可以更新正文、证据或草稿状态，最终进度、决策、阻塞和恢复入口仍由主会话 fan-in 后确认。
 - 子代理状态至少能表达 `DONE`、`DONE_WITH_CONCERNS`、`NEEDS_CONTEXT`、`BLOCKED`。
 - spec compliance review 应先于测试策略和 code quality review；不接受“close enough”的 spec 偏差。
+- design gate、coverage review 和 completion verification 默认由独立 reviewer / verifier 子代理完成；如果子代理不可用，必须显式降级并记录残余风险，不能宣称已完成独立评估。
 - 执行中涉及测试策略、BDD/TDD、测试 ROI、stable seam 或替代验证时，必须触发 `to-test`；真实事故回归固化继续交给 `to-bdd-regression`。
 
 并行规则：
@@ -721,6 +726,8 @@ Sky Flow plan / task artifact，或当前会话已经进入文件化 Sky Flow pl
 - 如果只是状态推进、blocker、验证证据或恢复入口变化，主代理直接更新 task / plan 对应 section；Codex 中同步调用 `update_plan`。
 - 如果代码与文档更新可以并行，主代理必须主动调度并行，而不是把文档更新固定排到代码之后；只有单写者冲突、事实依赖或高风险状态变更才串行。
 - 如果实现事实显示 task 过大、遗漏、依赖方向错误、并行关系可以释放，或需要新增 review / verification / consolidation task，主代理可在原 goal / scope 内按 `to-task` 规则维护 task DAG，并同步 runtime plan。
+- 如果执行中发现 design gate、coverage review、completion verification 或 human approval 只存在于 plan/prompt 中，没有落到 task DAG，必须先回 `to-task` 补 task DAG，再继续 core implementation 或完成声明。
+- 如果执行中发现 plan-scoped implementation task 过大，导致目标、scope、no-touch、验证或 gate 约束被稀释，必须先在当前 plan 下拆成多个更细 task，并为每个 task 写清 allowed write scope、no-touch、output contract、verification intent 和 stop condition；如果 standalone implementation scope 过大，必须先升级为 plan，再拆成 plan-scoped task DAG。
 - 如果执行策略、milestone 边界、plan shape、scope 分解或 task handoff 需要变化，必须暂停执行并调用 `to-plan` 更新 plan。
 - 如果目标、scope、外部契约、数据口径、业务行为或 requirements 需要变化，必须暂停执行并调用 `to-spec` 更新 spec。
 - 未被指定为 artifact single writer 的子代理只能提出 plan / task 调整建议；文件化 artifact 状态由主代理 fan-in 后维护。
@@ -851,7 +858,7 @@ non-blocking，且双模型 verifier gate 确认 selected findings cleared；或
 
 ### pick-plan
 
-`pick-plan` 用于从现有 plan 和 standalone task 清单中挑选下一步最值得继续推进的工作。
+`pick-plan` 用于从现有 plan 和 standalone task 清单中挑选下一步最值得继续推进的工作；用户手动指定具体 plan / standalone task 时，直接为该 artifact 生成续跑提示，不进入挑选环节。
 
 它需要显式触发，不自动运行。
 
@@ -861,12 +868,16 @@ non-blocking，且双模型 verifier gate 确认 selected findings cleared；或
 
 触发后执行：
 
-1. 读取未完成的 plan、1 天以内完成的 plan，以及 active standalone task。
+1. 先判断用户是否已经指定具体 artifact：明确路径、稳定 id、或当前对话中紧邻引用的“这个/这份 plan”。
+   - 能唯一解析到 Sky Flow plan 或 standalone task 时，只读取该 artifact 及正文直接引用的必要任务 / 验收 / handoff 入口。
+   - 直通模式不扫描全量候选，不输出候选排序，不比较其他 plan。
+   - 如果指定 artifact 缺少 goal、Recovery 不足、状态 completed / abandoned，或目录状态异常，只报告该 artifact 的可继续性问题，不改推荐其他 plan。
+2. 未指定具体 artifact 时，读取未完成的 plan、1 天以内完成的 plan，以及 active standalone task。
    - 实现应优先用只读 inventory 脚本生成候选清单；脚本只负责事实收集，不替代 Agent 做语义排序和推荐。
-2. 输出 plan list 和 standalone task list，并按继续推进价值排布优先级。
-3. 推荐一个 plan 或 standalone task。
-4. 输出推荐项的简明上下文：背景、目标、进度和下一步。
-5. 输出一个可复制代码块，供开发者在新会话中继续推进。
+3. 输出 plan list 和 standalone task list，并按继续推进价值排布优先级。
+4. 推荐一个 plan 或 standalone task。
+5. 输出推荐项或指定 artifact 的简明上下文：背景、目标、进度、下一步和执行前门禁。
+6. 输出一个可复制代码块，供开发者在新会话中继续推进。
 
 代码块内放完整续跑提示词，不带 `/goal` 前缀：
 
@@ -876,6 +887,11 @@ non-blocking，且双模型 verifier gate 确认 selected findings cleared；或
 Artifact: <plan path or standalone task path>
 当前状态: <status and recovery summary>
 下一步: <one concrete next action>
+执行前门禁:
+- 进入实现前先读取 plan/task DAG 和关联 acceptance/handoff；确认 gate、review、verification、scope/no-touch 和 next executable task 已落到具体 task。
+- 如果 design gate、coverage review、completion verification 或人工 approval 只写在 plan/prompt 里、没有落到 task DAG，先回 to-task 补 task，不得直接实现。
+- 如果 next plan-scoped implementation task 过大，跨多个模块 / owner / 写集 / 验证方式或存在可并行 lane，先按 to-task 在当前 plan 下拆成更细的串行 / 并行 task；如果 standalone implementation scope 过大，先将 standalone task 升级为 plan，再由 to-task 拆成 plan-scoped task DAG；不得用一个大 task 承载全部目标、约束和门禁。
+- implementation owner 不能自评完成；gate clearance 必须来自独立 reviewer / verifier 子代理，或明确记录 independent_review: unavailable 及残余风险。
 限制: <scope, no-touch, env, approval or blocker boundaries>
 验证方式: <from plan verification intent or local project rules>
 停下问人: <blocking ambiguity / failed validation / scope change conditions>
@@ -887,7 +903,7 @@ Artifact: <plan path or standalone task path>
 
 - 继续补充并完善提示词。
 - 换一个 plan。
-- 手动指定 plan。
+- 手动指定 plan；再次使用 `pick-plan` 时应走直通模式，不重新挑选。
 
 ### to-acceptance
 
@@ -971,6 +987,9 @@ task / spec 中需要人类判断的内容转成可反馈的验收项，记录�
 - `completed` issue 是否位于 `issue/fixed/`，以及未完成 issue 是否误放到 `issue/fixed/`。
 - plan-scoped task 是否位于所属 plan 名称目录下；standalone task 是否位于 `tasks/standalone/` 或完成后的 `tasks/standalone/done/`。
 - standalone task 是否显式设置 `task_role: standalone` 和 `goal`，以及是否错误声明本地 `depends_on` / `depended_by` / `parallel_with`。
+- active `design_review_gate` 是否已落到 task DAG：必须有 `consolidation` task、independent design review task、review 依赖 consolidation、core implementation 依赖 review，并通过 `external_depends_on` 或 stop condition 表达 `human-approved-design-review-gate`。
+- design review / completion verification 是否明确排除 implementation owner；如果 review / verification task 明确分配给 implementation owner，脚本直接报错。
+- active `design_review_gate` 下 core implementation 完成前是否有 completion verification / review task；缺失或未声明独立评估时报告 warning。
 - plan 的 `plan_role`、`planning_depth` 和父子命名是否符合层级约定。
 - 父子 artifact 是否只绑定相邻层级，且双向绑定是否一致。
 - 父 Plan 的 `child_plans` 和子 Plan 的 `parent_plan` 是否双向一致。
@@ -988,6 +1007,8 @@ LLM 收口范围：
 
 - dependency / parallel 关系是否符合任务语义，而不只是格式合法。
 - `plan.goal` 是否足以作为 Codex 续跑契约。
+- `design_review_gate` 若标注为 skipped / not applicable，跳过理由是否成立；如果其实是 active gate，必须回到 `to-task` 补 DAG。
+- implementation task 粒度是否合理：复杂 plan-scoped implementation 是否按模块、write scope、owner、验证方式、风险和并行关系拆分；standalone implementation 如果需要拆分，是否先升级为 plan，再拆成 plan-scoped task DAG。
 - fan-in 后状态是否与实际产物、验证证据和剩余工作一致。
 - task 是否都能由 Agent 独立完成；如果 task 的核心完成条件是人工操作、真实设备 / 账号、外部环境、审批或人工体验判断，应建议转入 acceptance。
 - 捞回后的 plan / issue 是否已经移回 active 目录、改掉 `completed` 状态，并写清 `Reopen Evidence` / `Reopen Reason`。
@@ -1309,9 +1330,13 @@ Plan self-review：
 
 plan-scoped task 的生命周期默认止于 plan 完成后的 `to-archive`。未完成时，task 是执行、并行和恢复的主要结构；完成后，task 中值得长期保留的事实、决策和证据应被压缩回 completed plan，完整 plan-scoped task 文件不作为长期归档形态。
 
-standalone task 的生命周期独立于 plan。未完成时位于 `tasks/standalone/`；完成后把事实、关键决策、验证证据和 follow-up 压缩进自身正文，并移入 `tasks/standalone/done/`。如果执行中发现它需要多个 peer task、milestone、长期验收 gate、父子拆分或 plan 级恢复，应创建 plan，并在 standalone task 中记录 promoted-to-plan 关系。
+standalone task 的生命周期独立于 plan。未完成时位于 `tasks/standalone/`；完成后把事实、关键决策、验证证据和 follow-up 压缩进自身正文，并移入 `tasks/standalone/done/`。如果执行中发现它需要多个 peer task、milestone、长期验收 gate、父子拆分、plan 级恢复，或 implementation scope 已跨多个模块 / owner / 写集 / 验证方式，应创建 plan，在 standalone task 中记录 promoted-to-plan 关系，然后由 `to-task` 拆成 plan-scoped task DAG。
 
 task 还必须通过 Agent 可完成性门禁。它不是给人类、Boss、客户、真实手机或外部环境的待办清单；如果完成条件需要人类操作、真实账号 / 设备 / 网络、未授权环境、审批结论或人工体验判断，不能创建 task。对应事项应进入 acceptance，由 Agent 写清验收步骤、已完成预检证据、待人工填写的结论和反馈入口。
+
+task 还必须承担执行门禁。plan 可以定义 gate 原则，但 gate 必须落到具体 task DAG：enabling implementation 后要有 consolidation task 和 independent review task，core implementation 必须依赖 review task 并通过 `external_depends_on` 或 stop condition 表达 `human-approved-design-review-gate`。实现完成后的 completion verification / review 也必须是独立 task，不能由 implementation owner 自评。
+
+task 还必须承担实现粒度门禁。具体实施不能因为写在一个 task 里就默认可执行；如果实现面跨多个模块、多个 owner、多个写集、多个验证方式或存在可并行 lane，必须拆成更细的 plan-scoped tasks。每个拆出的 task 都要有自己的 scope、no-touch、output contract、verification intent 和 stop condition；最终 review / verification 再做 fan-in 汇总。
 
 命名规则：
 
@@ -1334,9 +1359,11 @@ task 还必须通过 Agent 可完成性门禁。它不是给人类、Boss、客�
   - 它能和当前所属 `plan` 下哪些 `task` 并行。
   - 它是否允许 task owner 在 task scope 内继续派发二级子代理。
 - standalone task 必须记录 `goal`，不记录 `plan`，不出现在 `plan.tasks`。
-- standalone task 的 `depends_on`、`depended_by`、`parallel_with` 必须保持空数组；如果需要本地 task DAG，升级为 plan。
+- standalone task 的 `depends_on`、`depended_by`、`parallel_with` 必须保持空数组；如果需要本地 task DAG，或 implementation scope 已经需要按模块 / owner / 写集 / 验证方式拆分，升级为 plan，再拆成 plan-scoped task DAG。
 - standalone task 可以用 `external_depends_on` 记录外部 artifact / task 前置条件，但不能把它扩展成隐藏 mini-plan。
-- 人工 / 真实环境验收项不属于 task DAG，不应作为 `depends_on` / `depended_by` 节点阻塞后续 task；需要 gate 时由 plan 绑定 acceptance 表达。
+- 人工 / 真实环境验收项不属于 task DAG，不应作为 `depends_on` / `depended_by` 节点阻塞后续 task；需要 gate 时由 plan 绑定 acceptance 或 task `external_depends_on` 表达。
+- review / verification task 必须声明独立评估者：`Recommended owner` 应为 independent reviewer / verifier subagent，`Must not be` 应排除 implementation owner。主代理只负责 fan-in 和状态回写，不能用自己的自评替代 gate clearance。
+- plan-scoped implementation task 过大时必须在当前 plan 下拆分；standalone implementation 过大时必须先升级为 plan，再拆成 plan-scoped task DAG。不能靠在单个 task 正文里堆更多目标、约束和门禁来弥补。
 
 plan-scoped task frontmatter：
 
@@ -1361,7 +1388,7 @@ artifact_type: task
 task_role: standalone
 task_type: exploration
 status: draft
-goal: Complete this standalone task with clear evidence, preserving the declared scope and no-touch boundaries. Update this task with progress, validation evidence, and recovery notes. If peer task dependencies, milestones, or human gates become necessary, stop and promote the work to a plan.
+goal: Complete this standalone task with clear evidence, preserving the declared scope and no-touch boundaries. Update this task with progress, validation evidence, and recovery notes. If peer task dependencies, milestones, complex implementation lanes, or human gates become necessary, stop, promote the work to a plan, and split it into plan-scoped tasks.
 depends_on: []
 depended_by: []
 parallel_with: []
@@ -1391,6 +1418,7 @@ external_depends_on: []
 ## Execution Handoff
 
 - Recommended owner:
+- Must not be:
 - Context policy:
 - Delegation policy:
 - Output contract:
