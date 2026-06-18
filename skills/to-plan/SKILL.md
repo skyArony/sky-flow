@@ -70,7 +70,7 @@ protocol -> constraints -> abstraction_design -> bdd_test_strategy -> enabling_i
 - `protocol`：明确外部协议、输入输出、事件、状态流、兼容性、调用方 / 被调用方边界。
 - `constraints`：明确不变量、禁止范围、no-touch、兼容约束、性能 / 并发 / 幂等 / 迁移 / 回滚限制和停止条件。
 - `abstraction_design`：明确模块边界、抽象层、ownership、数据流、扩展点、single writer 和可替换 seam；不写代码步骤。
-- `bdd_test_strategy`：用 `Given / When / Then` 写 1-3 个高价值行为场景，标注 ROI、稳定 seam、Red / Green / Refactor、characterization 或替代验证；普通行为测试归 `to-test`，真实事故回归才归 `to-bdd-regression`。
+- `bdd_test_strategy`：用 `Given / When / Then` 先写 1-3 个最高价值行为场景；如果仍有明确高价值行为，可以继续扩展，但必须标注 ROI、稳定 seam、Red / Green / Refactor、characterization 或替代验证，避免泛化铺开；普通行为测试归 `to-test`，真实事故回归才归 `to-bdd-regression`。
 - `enabling_implementation`：少量正式代码体现设计方向，优先做接口、类型、协议适配壳、模块边界、测试 seam、feature flag 壳、薄 adapter、最小 fixture 或一条最小 happy-path skeleton。它是 design-bearing scaffold，不是提前实现核心逻辑；diff 必须小到人类能一次 review，且足够体现协议、约束、抽象和测试 seam。
 - `design_review_gate`：hard stop。先安排 `to-consolidation` 收敛 enabling diff，再安排 `to-review` 审设计对齐，然后停下等人类明确批准；没有人类 approval，不得进入 `core_implementation`。如果人类要求调整，回到 `abstraction_design` / `bdd_test_strategy` / `enabling_implementation` 迭代后重新过 gate。
 - `core_implementation`：复杂逻辑实现，包括状态机、跨模块行为、业务分支、协议适配真实落地、迁移路径、并发 / 幂等处理等；必须依赖 `design_review_gate` 的人类批准。

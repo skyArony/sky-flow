@@ -18,7 +18,7 @@ description: 'Design or update Sky Flow testing strategy for behavior changes. U
 
 1. 确定 runtime 配置：`SKY_FLOW_ROOT` 默认 `docs`，`SKY_FLOW_LANG` 默认跟随用户语言。
 2. 读取相关 spec / issue / plan / task / debug 证据和当前变更上下文；不要问能从仓库确认的问题。
-3. 用业务或系统语言写 `1-3` 个高价值 `Given / When / Then` 行为场景。
+3. 用业务或系统语言先写 `1-3` 个最高价值 `Given / When / Then` 行为场景；如果仍有明确高价值行为，可以继续扩展，但必须说明 ROI，避免泛化铺开。
 4. 通过 ROI Gate 判断 `P0` / `P1` / `P2` / `Skip`。
 5. 选择最小稳定 test seam。
 6. `P0` / `P1` 默认使用 Red / Green / Refactor；characterization test 必须明确标注。
