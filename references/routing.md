@@ -24,7 +24,7 @@
 | `to-task`            | 显式     | 从 plan 拆出 task DAG，或为比日常对话复杂但不值得建 plan 的单一工作创建 standalone task。               | plan-scoped 必须以 task-ready plan 作为输入；standalone task 不建 peer DAG；不执行 task。 |
 | `to-implement`       | 自动     | 执行和维护指定 Sky Flow plan / task artifact / task DAG，协调主代理、子代理、验证、fan-in、runtime plan、动态 task 调整和 artifact 状态回写。 | 日常任务不用；仅显式指定，或执行已制定 Sky Flow plan / task 时触发。 |
 | `to-review`          | 自动     | 小型 review、明确 review 指令，或流程阶段需要复审。                                                    | 查代码风险，不做 artifact 校验或 diff 收敛；高风险时可 multi-review + synthesize。 |
-| `to-review-loop`     | 显式     | review-fix-review 循环。                                                                               | 成本较高，必须有明确意图；clean closure 需要双模型 verifier gate。 |
+| `to-review-loop`     | 显式     | review-fix-review 循环。                                                                               | 成本较高，必须有明确意图；clean closure 需要 final `to-consolidation` 和双模型 verifier gate。 |
 | `to-agent-review`    | 显式     | Agent 决策链路、工具调用、子代理 ROI 和流程低效点复盘；常见自动场景是 runtime 自动化在固定时间点触发。 | 普通会话只在明确 Agent 复盘场景中自动触发；报告默认写入 `${SKY_FLOW_ROOT}/backlog/agent-reivew/`。 |
 | `pick-plan`          | 显式     | 从未完成 plan、近期完成 plan 和 standalone task 清单中挑选下一步推荐项。                               | 输出推荐 plan 或 task 和可复制续跑提示。            |
 | `to-acceptance`      | 自动     | 出现需要人类验收的点，或人类补充验收点 / 验收要求。                                                    | 完成声明前必须有验证证据。                          |

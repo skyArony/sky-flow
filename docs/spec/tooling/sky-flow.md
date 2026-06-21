@@ -265,7 +265,7 @@ Sky Flow 使用渐进式披露控制入口成本，避免每次触发都加载�
 | `to-implement`       | 自动     | 执行和维护指定 Sky Flow plan / task artifact / task DAG，协调主代理、子代理、runtime plan、动态 task 调整、验证、fan-in 和状态回写。 | 日常任务不用；仅显式指定，或执行已制定 Sky Flow plan / task 时触发。 |
 | `to-archive`         | 自动     | plan 完成后压缩 task / fan-in 执行记录，或用户要求归档、压缩、清理 completed plan。                     | plan-scoped task 默认 summary-only；归档不保留代码修改流水；删除 task 文件前遵守 runtime 审批规则。 |
 | `to-review`          | 自动     | 小型 review、明确 review 指令，或流程阶段需要复审。                                                    | 查代码风险，不做 artifact 校验或 diff 收敛；高风险时可 multi-review + synthesize；不自动升级为 `to-review-loop`。 |
-| `to-review-loop`     | 显式     | review-fix-review 循环。                                                                               | 成本较高，必须有明确意图；clean closure 需要双模型 verifier gate。 |
+| `to-review-loop`     | 显式     | review-fix-review 循环。                                                                               | 成本较高，必须有明确意图；clean closure 需要 final `to-consolidation` 和双模型 verifier gate。 |
 | `to-agent-review`    | 显式     | Agent 决策链路、工具调用、子代理 ROI 和流程低效点复盘；常见自动场景是 runtime 自动化在固定时间点触发。 | 普通会话只在明确 Agent 复盘场景中自动触发；报告默认写入 `${SKY_FLOW_ROOT}/backlog/agent-reivew/`。 |
 | `pick-plan`          | 显式     | 从未完成 plan、近期完成 plan 和 standalone task 清单中挑选下一步推荐项。                               | 输出推荐 plan 或 task 和可复制续跑提示。            |
 | `to-acceptance`      | 自动     | 出现需要人类验收的点，或人类补充验收点 / 验收要求。                                                    | 完成声明前必须有验证证据。                          |
@@ -825,10 +825,11 @@ plan-scoped task 文件作为长期形态。
 
 它需要显式触发，避免普通 review 被自动升级成高成本修复循环。循环过程是：先用 `to-review` 找出 blocking /
 high-ROI findings，再在已确认 scope 内修复，然后重新 review，直到 blocking findings 清零、剩余问题被记录为
-non-blocking，且双模型 verifier gate 确认 selected findings cleared；或遇到 scope / design / contract ambiguity 必须停下询问人类。
+non-blocking，且 final `to-consolidation` 已完成、双模型 verifier gate 确认 selected findings cleared；或遇到 scope / design / contract ambiguity 必须停下询问人类。
 
-`to-review-loop` 不能借修复 review 问题私自扩大范围。修复后应根据产物形态触发必要验证、`to-consolidation`
-和 `validate-flow`；如果发现计划、任务或规格需要改变，应回到 `to-plan`、`to-task` 或 `to-spec` 更新上游 artifact。
+`to-review-loop` 不能借修复 review 问题私自扩大范围。修复后应根据产物形态触发必要验证和 `validate-flow`；
+clean closure 前必须再触发一次 final `to-consolidation`，即使本轮没有修复或前面已经做过 batch-level consolidation。
+final `to-consolidation` 只看当前 loop scope / pending diff / selected findings touched files；如果它修改了文件，必须重新验证和复审后才能进入 verifier gate。如果发现计划、任务或规格需要改变，应回到 `to-plan`、`to-task` 或 `to-spec` 更新上游 artifact。
 
 `to-review-loop` 不创建 acceptance 文档，也不等待人工审核来决定 finding 修不修。它在 loop 内用两个问题自行 triage：
 这个问题在实际场景下会出 bug 吗？修它的代价是什么？真实触发概率低且修复成本高的问题默认 defer；触发路径明确、
