@@ -66,6 +66,7 @@ description: "Derive the next concise Sky Flow acceptance round from an existing
 - `Evidence` 只保留当前轮需要的证据入口和结论；Agent 可自行验证的检查结果只能作为支撑人类判断的证据，不能拆成独立验收项；完整长输出用路径或报告引用。
 - `待确认` / `Confirm With Human` 只放需要人工判定的问题，并按背景、确认步骤、明确结论组织；普通后续行动放到 plan / task 或 `Next Round`。
 - 固定核心单元是验收组，每组用 `## 验收组 <N>：<简短主题>` 作为二级标题；组内用三级标题连续出现「问题 / 需求」「验收步骤」「验收结论（人类填）」。其他 section 按实际验收价值保留，不要填低效占位。
+- `验收结论（人类填）` 只保留 `反馈` 字段；除非来源里已有明确人工反馈，否则 Agent 不替人类写通过、失败或放弃结论，也不生成单独的 `结论` 占位。
 - 能明确关联到某个验收组的 task artifact 或 commit，写入该组的 `关联` section；不能可靠关联时不要猜，也不要写占位。
 - 与某个验收组相关的关联、证据、待确认、待补充或风险，放在该组验收结论之后、下一组验收组之前，并使用三级标题；文档级 `Next Round` / `Archive` 可放在全文末尾并使用二级标题。
 - `关联` 只写可追溯引用：task artifact id / 路径、commit hash 和简短 subject；不要粘贴完整 commit diff 或长日志。
@@ -90,7 +91,6 @@ description: "Derive the next concise Sky Flow acceptance round from an existing
 
 ### 验收结论（人类填）
 
-- 结论：
 - 反馈：
 
 ### 关联
