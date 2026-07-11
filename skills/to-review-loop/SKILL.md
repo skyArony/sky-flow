@@ -14,7 +14,7 @@ description: 'Run a Sky Flow review-fix-rereview loop only when the user explici
 ## Quick Path
 
 1. 确认输入范围：
-   - Sky Flow plan / task：读取 artifact、allowed write scope、no-touch scope、verification intent 和必要的关联 spec / issue。
+   - Sky Flow spec：读取 scope、requirements、Execution Constraints、Progress、verification intent 和必要的 issue / acceptance。
    - Pending diff：检查当前 changed files 和用户指令；如果混入多个无关改动，先要求缩小 scope 或按逻辑范围拆循环。
 2. 先做 review pass，优先使用 `to-review`，聚焦 correctness、spec alignment、行为回归、安全 / 可靠性、测试缺口和维护风险；大 diff、跨模块或高风险 scope 使用 `to-review` 的 multi-review / synthesize lane。
 3. review 结果必须足够 final 才进入修复；如果 review 明确是 interim、未完成或等待 deep pass，停止并报告等待状态。
@@ -32,7 +32,7 @@ description: 'Run a Sky Flow review-fix-rereview loop only when the user explici
 
 blocking finding 包括：
 
-- 会破坏 plan / task outcome。
+- 会破坏 spec outcome、requirement 或 acceptance scenario。
 - 违反 spec requirement 或 acceptance scenario。
 - 回归用户可见行为。
 - 造成数据丢失、安全风险或权限 / 隐私边界问题。
@@ -56,7 +56,7 @@ Agent triage 每条 finding 时必须显式判断：
 
 遇到下面情况应 defer 或 stop，而不是直接修：
 
-- 修复会超出 plan / task 或用户请求 scope。
+- 修复会超出 spec 或用户请求 scope。
 - 存在多个合理设计，且选择会影响后续维护。
 - 需要改变公共契约、数据模型、发布策略或 ownership 边界，但上游没有确认。
 - 为低概率风险引入复杂 fallback、抽象、状态或兼容逻辑，且缺少具体证据。
@@ -71,9 +71,9 @@ Agent triage 每条 finding 时必须显式判断：
 - 修复后需要清理 diff 熵值时使用 `to-consolidation`。
 - clean closure 前必须有一次最终 `to-consolidation`。这次 final pass 不能被 batch-level consolidation、review、validate-flow 或 verifier gate 替代；如果它发现并修改内容，必须重新验证和复审后才能关闭 loop。
 - 只有修改 Sky Flow artifact 时才用 `validate-flow`；它不替代代码 review 或 consolidation。
-- 如果执行暴露 task 缺失、task topology 错误或实现策略变化，回到 `to-task` 或 `to-plan`。
+- 如果执行暴露拆解、owner 或并行方式不合适，由 `to-implement` 动态调整 runtime；这些变化不写入 artifact。
 - 如果 requirements、外部契约、数据语义、acceptance 行为或设计意图需要变化，回到 `to-spec`。
-- 除非当前 loop scope 明确包含 artifact maintenance，否则不直接更新 plan / task status；只向调用方报告建议状态更新。
+- 除非当前 loop scope 明确包含 artifact maintenance，否则不直接更新 spec Progress；只向调用方报告建议写回。
 
 ## Verifier Gate
 
@@ -93,7 +93,7 @@ Verifier gate 是 `to-review-loop` 的修后验收环节。它和普通 review �
 - 所有编辑必须落在确认的 allowed write scope 内，并遵守 no-touch scope。
 - 不 revert 无关的用户或其他 Agent 改动；基于当前 worktree 状态继续。
 - 不为了满足 review 建议做大范围 refactor、格式化 sweep、依赖变更或命令 / 环境变更。
-- 优先一到两个聚焦 fix batch；如果循环开始暴露无关工作，停止并建议新 plan / task。
+- 优先一到两个聚焦 fix batch；如果循环开始暴露无关工作，停止并建议新 issue 或独立 spec。
 - 复审必须检查修复后的 diff，而不是只确认文件发生过变化。
 - clean loop 的定义是：Final Consolidation Gate 已完成且没有未处理收敛项，最新 final review 对 scoped work 没有 blocking findings，且 verifier gate 对 selected findings 通过；non-blocking suggestion 可以保留，但必须报告清楚。
 
@@ -120,7 +120,7 @@ Verifier gate 是 `to-review-loop` 的修后验收环节。它和普通 review �
 
 最终输出保持短而有证据：
 
-- Scope source：plan / task / pending diff / user-selected files。
+- Scope source：spec / pending diff / user-selected files。
 - Review rounds：轮次数和最新 review 状态。
 - Verifier gate：verifier 数量、模型、每个 selected finding 的 cleared / not-cleared / disputed 状态；无法双 verifier 时写 `dual_verifier: unavailable`。
 - Fixed issues：实际修复的 blocking 和高 ROI findings。
@@ -128,7 +128,7 @@ Verifier gate 是 `to-review-loop` 的修后验收环节。它和普通 review �
 - Deferred items：non-blocking suggestion 或低 ROI finding。
 - Verification：执行过的命令或检查；跳过验证时写原因。
 - Consolidation：batch-level `to-consolidation` 和 Final Consolidation Gate 是否执行、是否发现或修改内容；如果没有文件变更，也要写明 final pass 的 no-op / no file changes 结论。
-- Next action：继续 implementation、稍后 rerun review、更新 spec / plan / task，或交给人类决策。
+- Next action：继续 implementation、稍后 rerun review、更新 spec，或交给人类决策。
 
 如果没有文件变更，包含 `no file changes` 和停止原因。
 
@@ -136,7 +136,7 @@ Verifier gate 是 `to-review-loop` 的修后验收环节。它和普通 review �
 
 - 不替代 `to-review`；它围绕 review 结果协调循环。
 - 不创建或更新 acceptance 文档；Review triage 和 closure 在 loop 内由 Agent 自行处理，只有 scope / design / contract / risk 需要人类决策时才停止报告。
-- 不作为主实现流程；执行 plan / task 使用 `to-implement`。
-- 不充当设计裁决者；上游 scope 或行为变化回 `to-spec`、`to-plan` 或 `to-task`。
+- 不作为主实现流程；执行 ready spec 使用 `to-implement`。
+- 不充当设计裁决者；scope、行为、契约或数据语义变化回 `to-spec`。
 - 不处理 commit；stage 和 commit 使用 `to-commit`。
 - 不写死项目路径、命令、部署规则、业务术语或团队流程假设。

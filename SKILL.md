@@ -1,104 +1,135 @@
 ---
 name: sky-flow
-description: 'Sky Flow workflow suite for artifact-based collaboration across spec, issue, plan, task execution, testing, acceptance, backlog, handoff, knowledge notes, and completed-plan archive compression. Use when the user mentions Sky Flow, a to-* child workflow, pick-plan, validate-flow, workflow artifacts, skill migration, or asks to create, validate, progress, resume, execute a Sky Flow plan/task, test, accept, backlog, hand off, archive, review, consolidate, commit a file-backed workflow, or capture reusable technical knowledge.'
+description: 'Lightweight artifact-based workflow suite centered on durable specs, spec-derived runtime goal selection, compact semantic Progress snapshots, and native execution. Use for Sky Flow, to-* workflows, pick-goal, spec design and progress, issue capture, implementation, testing, review, acceptance, backlog, handoff, validation, commits, or reusable technical knowledge.'
 ---
 
 # Sky Flow
 
-Sky Flow 是通用工作流 Skill 套件，覆盖 `spec`、`issue`、`plan`、`task`、`acceptance`、`backlog`、`handoff` 等 artifact 的创建、推进、校验、归档压缩与衔接，也提供通用技术知识沉淀入口。它用来把设计澄清、问题记录、实施编排、并行 fan-in、人类验收、跨会话交接和可复用开发知识沉淀成可恢复、可检索的状态。
+Sky Flow 是轻量、spec-direct 的通用工作流套件。长期设计、稳定约束、实现 readiness、关键进度和验证证据集中在 `spec`；执行拆解、owner、依赖、并行和子代理调度交给原生 runtime 动态处理。
 
-它不是所有任务的默认入口，也不是单个巨型流程。简单任务直接使用 runtime；复杂或需要留痕的任务才进入 Sky Flow。入口 Skill 只负责判断是否进入套件、选择子能力、维护 artifact 纪律并触发校验；artifact 路径和输出语言可通过 `SKY_FLOW_*` 环境变量覆盖，项目提交规范和验证命令由本地规则承担。
+它不是所有工作的默认入口。简单工作直接执行；只有需要长期设计、跨会话恢复、人类 gate、长期阻塞、易失交接或可复用知识时才创建对应 artifact。
 
-## 使用方式
+## Quick Path
 
-按下面顺序执行；这是入口 Skill 的必经短路径。
-
-1. 先判断是否进入 Sky Flow：
-   - 用户显式提到 Sky Flow、子能力名或 workflow artifact：进入。
-   - 任务需要跨会话留痕、计划编排、验收、handoff、backlog 回收或通用技术知识沉淀：进入。
-   - 只是简单代码修改、查询、解释或一次性命令，且不涉及 Sky Flow artifact：直接使用 runtime。
-2. 一旦进入且需要读取、创建或修改 artifact，先确定 runtime 配置：
-   - `SKY_FLOW_ROOT` 来自 runtime env；不存在则默认 `docs`。
-   - `SKY_FLOW_LANG` 来自 runtime env；不存在则跟随用户语言，脚本默认 `简体中文`。
+1. 判断是否进入 Sky Flow：
+   - 用户显式提到 Sky Flow、子能力或 workflow artifact：进入。
+   - 需要长期设计、文件化进度、人类验收、backlog、handoff 或知识沉淀：进入。
+   - 简单查询、解释、局部修改或一次性命令：直接使用 runtime。
+2. 需要读取、创建或修改 artifact 时确定 runtime 配置：
+   - `SKY_FLOW_ROOT` 默认 `docs`。
+   - `SKY_FLOW_LANG` 默认跟随用户语言；脚本默认 `简体中文`。
    - 不读取额外项目配置文件。
-   - 默认值满足项目需求时不需要配置；如需覆盖，在项目 `.codex/config.toml` 的 `[shell_environment_policy.set]` 中设置 `SKY_FLOW_ROOT` / `SKY_FLOW_LANG`。
 3. 选择子能力：
-   - 用户显式点名子能力时，优先使用该能力。
-   - 自动场景直接触发：debug、infra 查询 / 操作、BDD 回归固化、testing、review、commit、consolidation、acceptance、通用技术知识沉淀、completed plan 归档压缩、validate-flow、Sky Flow plan / task execution。
-   - 没有明确子能力或需要完整清单时，读取 `references/routing.md`，它是子能力和触发规则的完整来源。
-   - 执行已落地的子能力细节时，读取对应 `SKILL.md`；顶层子能力通常在 `skills/<name>/SKILL.md`，嵌套子能力可位于所属能力目录下。
-   - 标注为 `project-provided adapter` 或项目级实现的子能力（例如 `to-infra`），必须优先使用当前会话 Skills 列表给出的路径，或项目 `.claude/skills/<name>/SKILL.md`；不要按 Sky Flow core 的 `skills/<name>/SKILL.md` 拼路径。
+   - 用户显式点名时优先使用。
+   - debug、testing、review、commit、consolidation、acceptance、knowledge、validate-flow 和 ready spec execution 按触发规则自动进入。
+   - 路由不明确或需要完整清单时读取 `references/routing.md`。
 4. 维护 artifact 纪律：
-   - 重要状态必须落到 artifact，不只留在聊天里。
-   - 在 `SKY_FLOW_ROOT` 下创建、删除或移动 docs artifact 时，如果 `${SKY_FLOW_ROOT}/AGENTS.md` 或 `${SKY_FLOW_ROOT}/CLAUDE.md` 定义了 Table Of Content 维护规则，必须按本地规则同步 TOC。
-   - Codex 执行 Sky Flow plan 时，主会话必须用内置 `update_plan` tool 维护 runtime plan；并行组用 `[并行 n]` 标记，主会话负责 fan-in。
-   - 执行 Sky Flow plan 时，代码改动和 spec / plan / task / acceptance 等文档更新默认并行调度；可由多个子代理并行，也可由主会话维护文档、子代理写代码，前提是写集 single-writer 且最终由主会话 fan-in 对齐。
-   - 创建或修改 Sky Flow artifact 后，必须触发 `validate-flow`，优先运行 `node .agents/skills/sky-flow/scripts/validate_flow.ts` 生成结构化报告。
-   - 多 Agent fan-in、阶段状态更新、handoff / acceptance / commit 前，主会话负责运行 `validate-flow` 检查 artifact/status 一致性。
+   - 重要长期状态必须落到 artifact，不只留在聊天里。
+   - spec 是默认设计和进度真相源；`Progress` 只保存稳定恢复快照。
+   - runtime 调度拓扑、子代理消息、owner、依赖边和微步骤不写入 artifact。
+   - 同一文件或共享状态避免并发多写；完成交接后可以动态更换 writer，主会话负责 fan-in。
+   - 创建或修改 artifact 后运行 `validate-flow`。
+   - 本地 docs 入口定义 TOC 规则时，创建、删除或移动 artifact 必须同步维护。
 
-## 职责边界
+## Core Model
 
-- `validate-flow`：只检查 Sky Flow artifact 契约和状态一致性，包括 frontmatter、命名、DAG、相邻绑定、状态漂移、验收证据、backlog / handoff 归宿。它不做代码 review，也不收敛 pending diff。
-- `to-test`：只判断测试策略、行为场景、测试 ROI、stable seam、Red / Green / Refactor 和替代验证。它不替代 debug 诊断或真实事故回归固化。
-- `to-review`：只检查实现风险、行为回归、设计对齐、测试缺口和安全 / 可靠性问题。它可以读取 artifact 作为背景，但不修 artifact 状态，也不整理 diff。
-- `to-consolidation`：只收敛目标 diff 中的补丁式实现、临时代码、重复逻辑、旧注释、debug 残留和 fan-in 半成品。它不判断 artifact/status 是否正确，也不替代 review。
-- `to-knowledge`：只沉淀业务无关、项目无关、可跨项目复用的通用技术知识。它不替代 spec / issue / plan / backlog / handoff。
-- `to-implement`：执行和维护已准备好的 Sky Flow plan / task DAG，协调主代理、子代理、runtime plan、验证、fan-in、动态 task 调整和状态回写。它不重做设计，也不替代 review / consolidation / acceptance / validate-flow。
-- `to-archive`：只压缩已完成 plan 的执行期记录，把长期事实、关键决策和证据入口写回 completed plan；它不新增 archive artifact，也不替代 backlog / handoff / acceptance。
+```text
+spec（长期设计 + readiness + Progress）
+  ↓ 可选 pick-goal（只读目标投影与 readiness 交接）
+ready spec / implementation-ready goal
+  ↓
+native runtime execution + dynamic subagents
+  ↓
+test / review / consolidation（按风险触发）
+  ↓
+spec Progress 写回
+```
 
-这些能力可以按阶段串联，但不能互相代偿：artifact/status 问题回 `validate-flow`，测试策略和测试 ROI 回 `to-test`，代码风险回 `to-review`，diff 熵值回 `to-consolidation`，人类验收回 `to-acceptance`。
+只在真实边界出现时创建旁路 artifact：
 
-子能力之间采用“推荐而非强制”的关系。某个子能力遇到非本领域流程时，应说明推荐 skill、原因、可传递输入和是否阻塞；除非触发表明确要求自动触发，推荐本身不等于强制切换。完整推荐关系以 `${SKY_FLOW_ROOT}/spec/tooling/sky-flow.md` 为设计真相源。
+- `issue`：值得长期保留的问题、证据、机会或 unresolved finding；不是执行 slice。
+- `acceptance`：Agent 无法自证、需要人类判断的 gate。
+- `backlog`：工作退出当前执行队列，等待长期外部条件。
+- `handoff`：未提交 diff、临时环境、终端状态等易失接力信息。
 
-## 快速路由
+## Responsibility Boundaries
 
-| 场景                                 | 子能力                                             |
-| ------------------------------------ | -------------------------------------------------- |
-| 长期设计对齐、澄清或规格沉淀         | `to-spec`                                          |
-| 问题 / 线索记录，暂不修复            | `to-issue`                                         |
-| 排障、复现、root cause               | `to-debug` / `to-bdd-regression`                  |
-| 基础设施查询 / 操作、日志 / 数据源取证 | `to-infra`（project-provided adapter）             |
-| 测试策略、测试 ROI、BDD/TDD、替代验证 | `to-test`                                         |
-| 通用技术知识、踩坑、库 / 工具选型笔记 | `to-knowledge`                                    |
-| 实施计划、任务拆分、执行编排         | `to-plan` / `to-task` / `to-implement`             |
-| 完成后归档压缩                     | `to-archive`                                       |
-| 下一步 plan 选择和续跑提示           | `pick-plan`                                        |
-| review、循环修复复审、Agent 决策复盘 | `to-review` / `to-review-loop` / `to-agent-review` |
-| 人类验收、下一轮验收反馈             | `to-acceptance` / `to-next-acceptance`             |
-| 阻塞回收或跨会话恢复                 | `to-backlog` / `to-handoff`                        |
-| 提交、阶段收敛、artifact 校验        | `to-commit` / `to-consolidation` / `validate-flow` |
+- `to-spec`：对齐并维护长期设计、readiness、Execution Constraints 和 Progress。
+- `pick-goal`：只读选择 unfinished spec 并派生 portable runtime goal；显式启动时把 ready goal 交给 `to-implement`、alignment goal 交给 `to-spec`，blocked goal 不启动。
+- `to-implement`：执行 ready spec 或其派生的 implementation-ready goal，动态调度 runtime，验证、fan-in 并压缩写回 Progress。
+- `validate-flow`：只检查轻量 artifact schema、来源和状态一致性，不检查 runtime 拓扑。
+- `to-test`：测试策略、行为场景、ROI、stable seam 和替代验证。
+- `to-review`：实现风险、行为回归、设计对齐、测试缺口和可靠性问题。
+- `to-consolidation`：只收敛 pending diff 的临时代码、重复逻辑和 fan-in 残留。
+- `to-acceptance`：只承载真实人类 gate，不包装 Agent 可自行验证的检查。
+- `to-backlog`：长期阻塞和恢复条件。
+- `to-handoff`：易失接力状态，不替代 spec Progress。
+- `to-knowledge`：只沉淀业务无关、项目无关、可跨项目复用的技术知识。
 
-完整触发表和每个子能力的触发倾向只维护在 `references/routing.md`。
+这些能力不能互相代偿：结构问题回 validate-flow，设计变化回 to-spec，代码风险回 review，diff 熵值回 consolidation，人类判断回 acceptance。
 
-## Artifact 结构速记
+## Quick Routing
 
-命名：
+| 场景 | 子能力 |
+| --- | --- |
+| 长期设计、需求澄清、spec/Progress 维护 | `to-spec` |
+| 从一个或多个 spec 选择、恢复或生成 runtime goal | `pick-goal` |
+| 执行或继续 ready spec / implementation-ready goal | `to-implement` |
+| 问题 / 证据记录，暂不进入长期设计 | `to-issue` |
+| 排障、复现、root cause | `to-debug` / `to-bdd-regression` |
+| 基础设施、日志、数据源取证 | `to-infra`（project-provided adapter） |
+| 测试策略、BDD/TDD、替代验证 | `to-test` |
+| review、循环复审、Agent 决策复盘 | `to-review` / `to-review-loop` / `to-agent-review` |
+| 人类验收或下一轮反馈 | `to-acceptance` / `to-next-acceptance` |
+| 长期阻塞或易失交接 | `to-backlog` / `to-handoff` |
+| 提交、diff 收敛、artifact 校验 | `to-commit` / `to-consolidation` / `validate-flow` |
+| 通用技术知识 | `to-knowledge` |
 
-- `spec`：文件名就是唯一 ID，不使用编号前缀。
-- `issue`：未完成 issue 位于 `issue/<issue-id>.md`；已修复且 `status: completed` 的 issue 位于 `issue/fixed/<issue-id>.md`；文件 stem 等于 `id`。
-- `plan`：standalone / parent 使用 `001-xxx-xxx.md`；child 使用 `001a-xxx-xxx.md`、`001b-xxx-xxx.md`，文件 stem 等于 `id`；未完成 plan 在 `plan/`，已完成 plan 在 `plan/done/`。
-- `task`：plan-scoped task 使用 `01-xxx-xxx.md`，始终位于 `tasks/<plan-id>/` 下，完成时只改 `status`；standalone task 使用 `t001-xxx-xxx.md`，未完成时位于 `tasks/standalone/`，完成后位于 `tasks/standalone/done/`；文件 stem 等于 `id`。
-- 其他 artifact 要求文件 stem 与 `id` 一致。
+完整触发表只维护在 `references/routing.md`。
 
-关系：
+## Artifact Model
 
-- `spec.plans <-> plan.spec`
-- `issue.plans <-> plan.issues`
-- `plan.tasks <-> task.plan` 只适用于 `task_role: plan_scoped`，表示当前保留的展开 task DAG；completed plan 若已压缩为 summary-only，可为空。
-- `task_role: standalone` 不绑定 plan，不出现在 `plan.tasks`，用于比日常对话复杂但尚不值得建 plan 的单一可恢复任务；一旦需要多个 peer task、milestone、长期验收、复杂 implementation lane 或父子拆分，应升级为 plan，再拆成 plan-scoped task DAG。
-- `plan` / `issue` 从完成态捞回时必须移回 active 目录、把 `status: completed` 改成 `in_progress` 或 `not_started`，并写明 `Reopen Evidence` / `Reopen Reason`。
-- plan-scoped task 不捞回；需要继续修复时追加新 task，若旧 task 已随 summary-only 删除，则基于 completed plan / issue / evidence 重新拆 task DAG。
-- `plan.child_plans <-> plan.parent_plan`，仅用于超级巨大任务的父子 Plan；父 Plan 不直接绑定 task。
-- `plan.acceptance <-> acceptance.plan`，仅当 acceptance 来源是 plan。
-- 父子 artifact 只绑定相邻层级；`handoff` 和 `backlog` 可以引用来源 artifact，但不替代来源 artifact 的状态。
+当前 file-backed artifact：
 
-## Reference 加载
+- `spec`：长期设计、实现 readiness、稳定约束、Progress 和证据。
+- `issue`：问题与线索；completed issue 位于 `issue/fixed/`。
+- `acceptance`：人类 gate 与反馈轮次。
+- `backlog`：长期阻塞与恢复条件。
+- `handoff`：易失跨会话接力状态。
 
-- `references/routing.md`：完整子能力清单、触发表和 runtime plan 规则；路由不确定或维护触发规则时读取。
-- `references/dependencies.md`：脚本运行、setup 和外部 Skill 依赖；只有安装、运行环境或依赖问题时读取。
-- `skills/<name>/SKILL.md` 或嵌套子能力 `SKILL.md`：可独立发现的子能力执行细节；只有进入对应子能力时读取。
-- Artifact 结构规则：设计真相源在 `${SKY_FLOW_ROOT}/spec/tooling/sky-flow.md`；机器可执行约束在 `scripts/schema.ts` 和 `scripts/validate_flow.ts`。
+所有 artifact 文件 stem 等于 frontmatter `id`。关系默认使用单向 `source_type` / `source_id`；不维护反向绑定图。
 
-`to-knowledge` 默认写入普通 knowledge note，不属于 workflow artifact；只有创建或修改真正的 Sky Flow artifact 时才按 artifact 规则运行 `validate-flow`。
+通用状态：`draft`、`not_started`、`in_progress`、`completed`、`abandoned`。
 
-项目提交规范、验证命令和环境限制由项目本地规则决定；Sky Flow core 不写死项目业务规则。
+## Spec Progress
+
+Progress 是覆盖更新的恢复快照：
+
+```markdown
+## Progress
+
+- Checkpoint: <稳定状态>
+- Completed:
+  - <语义结果和必要证据>
+- Next: <目标级恢复入口，不是代码微任务>
+- Blockers:
+  - <none，或原因与恢复条件>
+- Last verified:
+  - <日期、证据、结论和残余风险>
+```
+
+Progress 只保存能力 / 行为结果、关键决策、可信 evidence、真实 blocker、residual risk 和 resume target。不得写入具体代码行号、逐文件 diff、完整命令过程、tool call、子代理身份 / 消息、runtime 工作清单、owner、并行批次或逐轮时间线；必要时可以引用少量稳定模块、类、函数、公开接口或测试套件名称。每次写回覆盖或合并旧快照，不持续追加。
+
+## Retired Model
+
+文件化执行拓扑及其创建、选择和压缩能力已归档到 `archive/skills/`，不属于 active skill 或安装范围。legacy artifact 必须迁移：长期设计和稳定进度进入 spec；真实人类 gate、长期延期和易失交接分别进入 acceptance、backlog、handoff。
+
+## Reference Loading
+
+- `references/routing.md`：完整子能力清单与触发规则。
+- `references/dependencies.md`：安装、运行环境和依赖。
+- `skills/<name>/SKILL.md`：进入对应 active 子能力时读取。
+- `docs/spec/tooling/sky-flow.md`：设计真相源。
+- `scripts/schema.ts` / `scripts/validate_flow.ts`：机器可执行的轻量 artifact 约束。
+
+项目验证命令、部署限制、业务规则和专属工具由项目本地文档承担，不写入 Sky Flow core。

@@ -6,14 +6,14 @@ Agent note:
   local skill names.
 - If a user asks in natural language or by group, resolve that in the agent
   layer before calling this script.
-- Sky Flow is a nested suite in-repo, but Claude does not discover nested
-  skills. This manager therefore links the suite entry skill and each callable
-  child skill separately into the target runtime directories.
+- Sky Flow is a nested suite in-repo. Claude needs direct links for the suite
+  entry and callable children; Codex discovers children through one suite root.
 """
 
 from __future__ import annotations
 
 import argparse
+import filecmp
 import json
 import os
 import re
@@ -43,6 +43,20 @@ TARGET_LABELS = {
     "claude": "Claude",
     "codex": "Codex",
 }
+
+# These top-level names were callable in earlier releases but no longer exist
+# in the active registry. Keep sources explicit because the reviewer profiles
+# remain as internal files, while archive/skills/to-implement stores an old
+# implementation whose top-level name is still active.
+RETIRED_SKILL_SOURCES = {
+    "pick-plan": Path("skills/pick-plan"),
+    "review-by-sanyuan": Path("skills/to-review/reviewers/review-by-sanyuan"),
+    "review-by-somestay": Path("skills/to-review/reviewers/review-by-somestay"),
+    "to-archive": Path("skills/to-archive"),
+    "to-plan": Path("skills/to-plan"),
+    "to-task": Path("skills/to-task"),
+}
+RETIRED_SKILL_NAMES = tuple(RETIRED_SKILL_SOURCES)
 
 PACKAGE_MAP = {
     "brew": {
@@ -98,6 +112,13 @@ STATUS_LABELS = {
     "dry-run": "DRY-RUN",
     "would-link": "DRY-RUN",
     "would-copy": "DRY-RUN",
+    "linked-via-suite": "SUITE",
+    "copied-via-suite": "SUITE COPY",
+    "would-link-via-suite": "DRY-RUN",
+    "would-copy-via-suite": "DRY-RUN",
+    "redundant-link": "REDUNDANT",
+    "redundant-copy": "REDUNDANT",
+    "stale-suite-copy": "STALE",
     "skipped-existing": "SKIP",
     "needs-attention": "NOT READY",
 }
@@ -115,6 +136,13 @@ STATUS_TONES = {
     "dry-run": ("blue", "bold"),
     "would-link": ("blue", "bold"),
     "would-copy": ("blue", "bold"),
+    "linked-via-suite": ("green", "bold"),
+    "copied-via-suite": ("green", "bold"),
+    "would-link-via-suite": ("blue", "bold"),
+    "would-copy-via-suite": ("blue", "bold"),
+    "redundant-link": ("yellow", "bold"),
+    "redundant-copy": ("yellow", "bold"),
+    "stale-suite-copy": ("red", "bold"),
     "skipped-existing": ("dim",),
     "needs-attention": ("yellow", "bold"),
 }
@@ -782,6 +810,121 @@ def remove_path(path: Path, dry_run: bool) -> None:
         shutil.rmtree(path)
 
 
+def resolved_symlink_target(path: Path) -> Path:
+    target = Path(os.readlink(path))
+    if not target.is_absolute():
+        target = path.parent / target
+    return target.resolve(strict=False)
+
+
+def inspect_retired_installations(
+    *,
+    remove_owned_symlinks: bool,
+    dry_run: bool = False,
+) -> dict[str, object]:
+    cleaned: list[dict[str, str]] = []
+    needs_attention: list[dict[str, str]] = []
+
+    for logical_target in TARGET_ORDER:
+        target_dir = TARGET_DIRS[logical_target]
+        for skill_name in RETIRED_SKILL_NAMES:
+            dest = target_dir / skill_name
+            if not dest.exists() and not dest.is_symlink():
+                continue
+
+            base = {
+                "name": skill_name,
+                "target": logical_target,
+                "path": str(dest),
+            }
+            expected_source = (REPO_ROOT / RETIRED_SKILL_SOURCES[skill_name]).resolve(strict=False)
+
+            if dest.is_symlink():
+                try:
+                    owned = resolved_symlink_target(dest) == expected_source
+                except OSError:
+                    owned = False
+                if owned and remove_owned_symlinks:
+                    remove_path(dest, dry_run=dry_run)
+                    cleaned.append(
+                        {
+                            **base,
+                            "state": "would-remove" if dry_run else "removed",
+                            "detail": "legacy symlink owned by this Sky Flow checkout",
+                        }
+                    )
+                    continue
+                needs_attention.append(
+                    {
+                        **base,
+                        "state": "owned-symlink" if owned else "foreign-symlink",
+                        "detail": (
+                            "legacy symlink owned by this Sky Flow checkout"
+                            if owned
+                            else "symlink target is not owned by this Sky Flow checkout"
+                        ),
+                    }
+                )
+                continue
+
+            if dest.is_dir() and (dest / "SKILL.md").is_file():
+                state = "copied"
+                detail = "retired copied skill; ownership cannot be proven safely"
+            else:
+                state = "unknown"
+                detail = "retired-name path exists but is not a recognized Sky Flow install"
+            needs_attention.append({**base, "state": state, "detail": detail})
+
+    return {
+        "retired_skills": list(RETIRED_SKILL_NAMES),
+        "cleaned": cleaned,
+        "needs_attention": needs_attention,
+        "ok": not needs_attention,
+    }
+
+
+def retired_cleanup_steps(payload: dict[str, object]) -> list[str]:
+    steps: list[str] = []
+    for item in payload.get("needs_attention", []) or []:
+        if not isinstance(item, dict):
+            continue
+        path = str(item.get("path", "")).strip()
+        name = str(item.get("name", "retired skill"))
+        if not path:
+            continue
+        steps.append(
+            f"Inspect and remove the retired `{name}` install if it is no longer needed: "
+            f"`rm -rf {shlex.quote(path)}`."
+        )
+    return steps
+
+
+def print_retired_installations(payload: dict[str, object]) -> None:
+    cleaned = payload.get("cleaned", []) or []
+    needs_attention = payload.get("needs_attention", []) or []
+    if not cleaned and not needs_attention:
+        return
+
+    print()
+    print_subheading("Retired skills")
+    for item in cleaned:
+        if not isinstance(item, dict):
+            continue
+        print_status_line(
+            str(item.get("name", "retired skill")),
+            "dry-run" if item.get("state") == "would-remove" else "ok",
+            detail=f"{TARGET_LABELS.get(str(item.get('target')), str(item.get('target')))}: {item.get('detail', '')}",
+        )
+    for item in needs_attention:
+        if not isinstance(item, dict):
+            continue
+        print_status_line(
+            str(item.get("name", "retired skill")),
+            "needs-attention",
+            detail=f"{TARGET_LABELS.get(str(item.get('target')), str(item.get('target')))}: {item.get('detail', '')}",
+        )
+
+
 def link_or_copy_skill(src: Path, dest: Path, copy_mode: bool, force: bool, dry_run: bool) -> str:
     if copy_mode:
         if dest.exists() or dest.is_symlink():
@@ -791,7 +934,15 @@ def link_or_copy_skill(src: Path, dest: Path, copy_mode: bool, force: bool, dry_
         if dry_run:
             print_dry_run(f"cp -R {display_path(src)} {display_path(dest)}")
             return "would-copy"
-        shutil.copytree(src, dest, symlinks=False)
+        ignored = ["__pycache__", "*.pyc", ".DS_Store"]
+        if src.resolve() == REPO_ROOT.resolve():
+            ignored.extend([".git", "archive"])
+        shutil.copytree(
+            src,
+            dest,
+            symlinks=False,
+            ignore=shutil.ignore_patterns(*ignored),
+        )
         return "copied"
 
     if dest.is_symlink():
@@ -813,26 +964,90 @@ def link_or_copy_skill(src: Path, dest: Path, copy_mode: bool, force: bool, dry_
     return "linked"
 
 
-def install_target_dirs(skill: SkillMeta) -> list[Path]:
-    return [TARGET_DIRS[name] for name in skill.install_targets]
+def suite_entry(registry: dict[str, SkillMeta]) -> SkillMeta:
+    return registry[suite_entry_name(registry)]
 
 
-def install_skills(skills: list[SkillMeta], copy_mode: bool, force: bool, dry_run: bool) -> dict[str, dict[str, str]]:
+def via_suite_status(status: str) -> str:
+    return {
+        "linked": "linked-via-suite",
+        "copied": "copied-via-suite",
+        "would-link": "would-link-via-suite",
+        "would-copy": "would-copy-via-suite",
+    }.get(status, status)
+
+
+def prepare_codex_suite_child(
+    skill: SkillMeta,
+    target_dir: Path,
+    *,
+    force: bool,
+    dry_run: bool,
+) -> str | None:
+    dest = target_dir / skill.name
+    if not dest.exists() and not dest.is_symlink():
+        return None
+
+    owned_symlink = False
+    if dest.is_symlink():
+        try:
+            owned_symlink = dest.resolve() == skill.path.resolve()
+        except OSError:
+            owned_symlink = False
+
+    if owned_symlink or force:
+        remove_path(dest, dry_run=dry_run)
+        return None
+    return "skipped-existing"
+
+
+def install_skills(
+    skills: list[SkillMeta],
+    registry: dict[str, SkillMeta],
+    copy_mode: bool,
+    force: bool,
+    dry_run: bool,
+) -> dict[str, dict[str, str]]:
     result: dict[str, dict[str, str]] = {}
-    targets: list[Path] = []
-    for skill in skills:
-        for target_dir in install_target_dirs(skill):
-            if target_dir not in targets:
-                targets.append(target_dir)
+    targets = [target for target in TARGET_ORDER if any(target in skill.install_targets for skill in skills)]
+    root_skill = suite_entry(registry)
 
-    for target_dir in targets:
+    for logical_target in targets:
+        target_dir = TARGET_DIRS[logical_target]
         if dry_run:
             print_dry_run(f"mkdir -p {display_path(target_dir)}")
         else:
             target_dir.mkdir(parents=True, exist_ok=True)
-        for skill in skills:
-            if target_dir not in install_target_dirs(skill):
-                continue
+
+        selected = [skill for skill in skills if logical_target in skill.install_targets]
+        if logical_target == "codex":
+            child_states = {
+                skill.name: prepare_codex_suite_child(
+                    skill,
+                    target_dir,
+                    force=force,
+                    dry_run=dry_run,
+                )
+                for skill in selected
+                if not skill.is_suite_entry
+            }
+            status = link_or_copy_skill(
+                root_skill.path,
+                target_dir / root_skill.name,
+                copy_mode=copy_mode,
+                force=force,
+                dry_run=dry_run,
+            )
+            for skill in selected:
+                reported = (
+                    status
+                    if skill.is_suite_entry
+                    else child_states.get(skill.name) or via_suite_status(status)
+                )
+                result.setdefault(skill.name, {})[str(target_dir)] = reported
+            continue
+
+        for skill in selected:
             dest = target_dir / skill.name
             status = link_or_copy_skill(skill.path, dest, copy_mode=copy_mode, force=force, dry_run=dry_run)
             result.setdefault(skill.name, {})[str(target_dir)] = status
@@ -845,31 +1060,76 @@ def command_dependencies_for_install(skills: list[SkillMeta]) -> tuple[list[str]
     return commands, python_packages
 
 
-def inspect_install_state(skill: SkillMeta) -> dict[str, object]:
+def inspect_install_state(
+    skill: SkillMeta,
+    registry: dict[str, SkillMeta] | None = None,
+) -> dict[str, object]:
     targets: dict[str, str] = {}
     for logical_target in skill.install_targets:
         target_dir = TARGET_DIRS[logical_target]
         dest = target_dir / skill.name
-        if not dest.exists() and not dest.is_symlink():
+        if dest.exists() or dest.is_symlink():
+            if dest.is_symlink():
+                try:
+                    current = dest.resolve() == skill.path.resolve()
+                except OSError:
+                    current = False
+                if logical_target == "codex" and not skill.is_suite_entry:
+                    targets[logical_target] = "redundant-link" if current else "broken"
+                else:
+                    targets[logical_target] = "linked" if current else "broken"
+                continue
+            if dest.is_dir() and (dest / "SKILL.md").is_file():
+                try:
+                    current = filecmp.cmp(dest / "SKILL.md", skill.skill_doc, shallow=False)
+                except OSError:
+                    current = False
+                if logical_target == "codex" and not skill.is_suite_entry:
+                    targets[logical_target] = "redundant-copy" if current else "stale-copy"
+                else:
+                    targets[logical_target] = "copied" if current else "stale-copy"
+                continue
+            targets[logical_target] = "broken"
+            continue
+
+        if logical_target != "codex" or skill.is_suite_entry or registry is None:
             targets[logical_target] = "missing"
             continue
-        if dest.is_symlink():
+
+        root_skill = suite_entry(registry)
+        root_dest = target_dir / root_skill.name
+        if root_dest.is_symlink():
             try:
-                targets[logical_target] = "linked" if dest.resolve() == skill.path.resolve() else "broken"
+                targets[logical_target] = (
+                    "linked-via-suite" if root_dest.resolve() == root_skill.path.resolve() else "broken"
+                )
             except OSError:
                 targets[logical_target] = "broken"
             continue
-        if dest.is_dir() and (dest / "SKILL.md").is_file():
-            targets[logical_target] = "copied"
+        if root_dest.is_dir():
+            installed_doc = root_dest / skill.skill_doc.relative_to(REPO_ROOT)
+            try:
+                current = installed_doc.is_file() and filecmp.cmp(
+                    installed_doc,
+                    skill.skill_doc,
+                    shallow=False,
+                )
+            except OSError:
+                current = False
+            targets[logical_target] = "copied-via-suite" if current else "stale-suite-copy"
             continue
-        targets[logical_target] = "broken"
+        targets[logical_target] = "missing"
 
     values = list(targets.values())
-    if values and all(value in {"linked", "copied"} for value in values):
+    ready_states = {"linked", "copied", "linked-via-suite", "copied-via-suite"}
+    if values and all(value in ready_states for value in values):
         status = "ready"
-    elif any(value == "broken" for value in values):
+    elif any(
+        value in {"broken", "stale-copy", "stale-suite-copy", "redundant-link", "redundant-copy"}
+        for value in values
+    ):
         status = "broken"
-    elif any(value in {"linked", "copied"} for value in values):
+    elif any(value in ready_states for value in values):
         status = "partial"
     else:
         status = "missing"
@@ -890,6 +1150,7 @@ def render_install_targets(target_statuses: dict[str, str]) -> str:
 
 def build_install_payload(
     skills: list[SkillMeta],
+    registry: dict[str, SkillMeta],
     *,
     copy_mode: bool,
     force: bool,
@@ -910,9 +1171,29 @@ def build_install_payload(
         dep_result.setdefault("skipped", [])
         install_python_packages(all_python_packages, dry_run=dry_run)
 
-    install_result = install_skills(skills, copy_mode=copy_mode, force=force, dry_run=dry_run)
-    ready = not dep_result["unresolved"] and all(
-        status in {"linked", "copied", "would-link", "would-copy"}
+    retired_installations = inspect_retired_installations(
+        remove_owned_symlinks=True,
+        dry_run=dry_run,
+    )
+    install_result = install_skills(
+        skills,
+        registry,
+        copy_mode=copy_mode,
+        force=force,
+        dry_run=dry_run,
+    )
+    ready = not dep_result["unresolved"] and bool(retired_installations["ok"]) and all(
+        status
+        in {
+            "linked",
+            "copied",
+            "would-link",
+            "would-copy",
+            "linked-via-suite",
+            "copied-via-suite",
+            "would-link-via-suite",
+            "would-copy-via-suite",
+        }
         for skill_targets in install_result.values()
         for status in skill_targets.values()
     )
@@ -921,6 +1202,8 @@ def build_install_payload(
         "command_dependencies": dep_result,
         "python_packages": all_python_packages,
         "install": install_result,
+        "retired_installations": retired_installations,
+        "copy_mode": copy_mode,
         "dry_run": dry_run,
         "ready": ready,
         "ok": ready,
@@ -1004,6 +1287,10 @@ def print_install_payload(payload: dict[str, object], action_label: str) -> None
             if isinstance(skill_targets, dict):
                 print(f"  {style(str(skill_name), 'bold')}  {render_install_result_cell(skill_targets)}")
 
+    retired_installations = payload.get("retired_installations", {})
+    if isinstance(retired_installations, dict):
+        print_retired_installations(retired_installations)
+
     steps: list[str] = []
     unresolved = []
     if isinstance(dep_result, dict):
@@ -1014,10 +1301,20 @@ def print_install_payload(payload: dict[str, object], action_label: str) -> None
             steps.append(f"Run `./install.sh doctor {selected}` after fixing missing commands: {', '.join(unresolved)}.")
         else:
             steps.append(f"Run `./install.sh doctor` after fixing missing commands: {', '.join(unresolved)}.")
+    if isinstance(install_result, dict):
+        for skill_name, target_states in install_result.items():
+            if not isinstance(target_states, dict) or "skipped-existing" not in target_states.values():
+                continue
+            flags = "--copy --force --no-deps" if payload.get("copy_mode") else "--force --no-deps"
+            steps.append(
+                f"Run `./install.sh {skill_name} {flags}` to replace the existing managed path explicitly."
+            )
     if payload.get("dry_run"):
         selected = " ".join(selected_skills) if len(selected_skills) <= 3 else ""
         rerun = f"./install.sh {selected}".strip()
         steps.insert(0, f"Run `{rerun}` without `--dry-run` to apply the install.")
+    if isinstance(retired_installations, dict):
+        steps.extend(retired_cleanup_steps(retired_installations))
     print_next_steps(steps)
 
 
@@ -1028,7 +1325,7 @@ def summarize_skill_statuses(skills: list[SkillMeta], registry: dict[str, SkillM
         if skill.name in cache:
             return cache[skill.name]
 
-        install_state = inspect_install_state(skill)
+        install_state = inspect_install_state(skill, registry)
         missing_commands = sorted(cmd for cmd in skill.commands if shutil.which(cmd) is None)
         dependency_states = [evaluate(registry[name]) for name in skill.required_skills]
         blocked_by = [str(dep["name"]) for dep in dependency_states if not dep.get("ready")]
@@ -1044,7 +1341,16 @@ def summarize_skill_statuses(skills: list[SkillMeta], registry: dict[str, SkillM
             notes.append(f"depends on: {', '.join(blocked_by)}")
 
         steps: list[str] = []
-        if install_state["status"] != "ready":
+        target_states = set(install_state["targets"].values())
+        if "stale-copy" in target_states or "stale-suite-copy" in target_states:
+            steps.append(
+                f"Run `./install.sh {skill.name} --copy --force --no-deps` to replace the stale managed copy."
+            )
+        elif target_states & {"redundant-link", "redundant-copy"}:
+            steps.append(
+                f"Run `./install.sh {skill.name} --force --no-deps` to remove the redundant Codex child install."
+            )
+        elif install_state["status"] != "ready":
             steps.append(f"Run `./install.sh {skill.name}` to install or repair local links.")
         if missing_commands:
             guided = guidance_steps_for_key(
@@ -1130,6 +1436,7 @@ def cmd_install(args: argparse.Namespace, registry: dict[str, SkillMeta]) -> int
     skills = resolve_skills(registry, args.skills)
     payload = build_install_payload(
         skills,
+        registry,
         copy_mode=args.copy,
         force=args.force,
         dry_run=args.dry_run,
@@ -1150,6 +1457,7 @@ def cmd_update(args: argparse.Namespace, registry: dict[str, SkillMeta]) -> int:
     skills = resolve_skills(refreshed, args.skills)
     payload = build_install_payload(
         skills,
+        refreshed,
         copy_mode=args.copy,
         force=args.force,
         dry_run=args.dry_run,
@@ -1165,11 +1473,13 @@ def cmd_update(args: argparse.Namespace, registry: dict[str, SkillMeta]) -> int:
 def cmd_doctor(args: argparse.Namespace, registry: dict[str, SkillMeta]) -> int:
     skills = resolve_skills(registry, args.skills)
     rows = summarize_skill_statuses(skills, registry)
-    ok = all(bool(row.get("ready")) for row in rows)
+    retired_installations = inspect_retired_installations(remove_owned_symlinks=False)
+    ok = all(bool(row.get("ready")) for row in rows) and bool(retired_installations["ok"])
 
     payload = {
         "skills": [skill.name for skill in skills],
         "readiness": rows,
+        "retired_installations": retired_installations,
         "ok": ok,
     }
     if args.json:
@@ -1192,6 +1502,7 @@ def cmd_doctor(args: argparse.Namespace, registry: dict[str, SkillMeta]) -> int:
             ]
         )
     print_table(["Skill", "Installed", "Commands", "Deps", "Ready"], table_rows)
+    print_retired_installations(retired_installations)
 
     notes = [row for row in rows if row["notes"]]
     if notes:
@@ -1206,6 +1517,7 @@ def cmd_doctor(args: argparse.Namespace, registry: dict[str, SkillMeta]) -> int:
         other_steps = [step for step in steps if step not in install_steps]
         if install_steps:
             steps = ["Run `./install.sh` to install or repair the suite links.", *other_steps]
+    steps.extend(retired_cleanup_steps(retired_installations))
     print_next_steps(steps)
     return 0 if ok else 1
 

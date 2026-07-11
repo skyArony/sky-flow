@@ -1,6 +1,6 @@
 ---
 name: to-consolidation
-description: 'Consolidate completed stage code or concrete output changes by checking the target scope for patchy implementation, temporary code, duplicate logic, dead leftovers, and fan-in residue. Use after a verifiable stage, multi-agent fan-in, when a plan/task inserts a consolidation task, or when the user asks to consolidate pending work. If this body is already loaded in the visible context and the scope is a simple repeated check, reuse it and run concrete diff/status checks instead of rereading the full SKILL.md; reread after compaction, rule uncertainty, or complex fan-in.'
+description: 'Consolidate completed stage code or concrete output changes by checking the target scope for patchy implementation, temporary code, duplicate logic, dead leftovers, and fan-in residue. Use after a verifiable stage, multi-agent fan-in, explicit runtime scheduling, or when the user asks to consolidate pending work.'
 ---
 
 # to-consolidation
@@ -13,9 +13,9 @@ description: 'Consolidate completed stage code or concrete output changes by che
 
 它不是普通 code review，也不是架构重构入口；它只回答一个问题：当前目标 diff 是否像一次成型的清晰实现。收敛优先提升可读性、显式性和一致性，不以“更少行数”为目标。Sky Flow artifact 结构、状态、依赖、验收证据和 backlog / handoff 归宿由 `validate-flow` 负责，不在这里检查或修正。
 
-默认范围是当前工作区 pending diff，明确包括 unstaged diff、staged diff 和 untracked files。用户指定路径、模块、文件、提交或提交区间时，只检查指定范围对应的代码 / 产物 diff；用户指定 plan / task artifact 时，只把它作为定位代码范围的上下文，不检查 artifact 状态。
+默认范围是当前工作区 pending diff，明确包括 unstaged diff、staged diff 和 untracked files。用户指定路径、模块、文件、提交、提交区间或 source spec 时，只检查指定范围对应的代码 / 产物 diff；不检查 artifact 状态。
 
-`to-consolidation` 不作为 `to-commit` 的固定前置步骤。它应像 review 一样，由 `to-task` 根据阶段风险、fan-in 复杂度、产物形态和 diff 熵值灵活插入为阶段性 task，或由用户显式触发。
+`to-consolidation` 不作为 `to-commit` 的固定前置步骤。它由 `to-implement` 根据阶段风险、fan-in 复杂度、产物形态和 diff 熵值动态触发，或由用户显式触发。
 
 ## 重复使用策略
 

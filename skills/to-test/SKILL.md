@@ -17,13 +17,13 @@ description: 'Design or update Sky Flow testing strategy for behavior changes. U
 ## Quick Path
 
 1. 确定 runtime 配置：`SKY_FLOW_ROOT` 默认 `docs`，`SKY_FLOW_LANG` 默认跟随用户语言。
-2. 读取相关 spec / issue / plan / task / debug 证据和当前变更上下文；不要问能从仓库确认的问题。
+2. 读取相关 spec / issue / debug 证据、当前 runtime 输出和变更上下文；不要问能从仓库确认的问题。
 3. 用业务或系统语言先写 `1-3` 个最高价值 `Given / When / Then` 行为场景；如果仍有明确高价值行为，可以继续扩展，但必须说明 ROI，避免泛化铺开。
 4. 通过 ROI Gate 判断 `P0` / `P1` / `P2` / `Skip`。
 5. 选择最小稳定 test seam。
 6. `P0` / `P1` 默认使用 Red / Green / Refactor；characterization test 必须明确标注。
 7. `P2` / `Skip` 记录替代验证和残余风险。
-8. 如果需要长期留痕，把测试计划、验证证据或跳过理由回写到对应 plan / task / acceptance。
+8. 如果需要长期留痕，把测试策略、验证证据或跳过理由压缩写回 spec Progress / Verification Intent；真实人类 gate 才进入 acceptance。
 9. 创建或修改 Sky Flow artifact 后运行 `validate-flow`。
 
 ## Boundaries

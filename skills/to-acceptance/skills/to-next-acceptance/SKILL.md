@@ -1,93 +1,61 @@
 ---
 name: to-next-acceptance
-description: "Derive the next concise Sky Flow acceptance round from an existing acceptance artifact and current plan/task runtime state; classify feedback, preserve only unmentioned items that still require a human gate, filter out agent-verifiable checks, identify scope, confirmation steps, evidence gaps, blockers, residual risks, and update the acceptance artifact for the next human review."
+description: 'Derive the next concise human acceptance round from an existing acceptance artifact, human feedback, source spec Progress, and current runtime evidence; preserve only unresolved items that still require a real human gate.'
 ---
 
 # to-next-acceptance
 
-`to-next-acceptance` 是 `to-acceptance` 的下级能力，用于从已有 `acceptance`、人类反馈和当前 plan / task runtime 状态推导下一轮验收。
-
-它的核心职责是：分类反馈、关闭已明确完成的项、保留仍需要人类门控的未提及项、提出下一轮验收范围、补齐证据缺口，并把需要人类确认的问题写回 artifact。
+`to-next-acceptance` 处理已有 acceptance 的人工反馈，压缩已关闭轮次，并生成下一轮真正需要人类判断的最小范围。
 
 ## Quick Path
 
-1. 确定 runtime 配置：`SKY_FLOW_ROOT` 默认 `docs`，`SKY_FLOW_LANG` 默认跟随用户语言；不读取额外项目配置文件。
-2. 读取 existing `acceptance`，再读取其 `source_type` / `source_id` 指向的 `plan`、`task`、`spec` 或会话上下文。
-3. 读取当前 runtime 状态：已完成任务、验证证据、失败检查、残余风险、blocker、scope 变化和人类反馈。
-4. 分类当前轮每个验收项，并先判断它是否仍然需要人类参与：
-   - 明确通过。
-   - 明确失败或需要返工。
-   - 需要澄清。
-   - 有争议或证据不足。
-   - 未被提及但仍有人工验收价值。
-   - Agent 可自行验证或不再需要人类门控。
-   - 应转入 `backlog` 或其他 artifact。
-5. 关闭明确通过、明确放弃、或已转为 Agent 自证的项，压缩到 `Archive` 或合并为证据；明确失败、仍需人类门控的未提及项、证据不足和需澄清的项进入下一轮。
-6. 推导下一轮验收范围、验收问题、证据缺口、待补充材料、残余风险和需要人类确认的点。
-7. 更新 `round`、当前轮的问题 / 需求、验收步骤、验收结论（人类填）、`Next Round`、`待确认` / `Confirm With Human`、`待补充`、`Evidence` 和 `Archive`。
-8. 创建或修改 artifact 后运行 `validate-flow`，处理结构错误后再交付。
+1. 读取 existing acceptance、人工反馈、source spec Progress 和当前验证证据。
+2. 把上一轮每项分类：pass、explicit fail、unmentioned、scope change、needs evidence。
+3. 先过滤 Agent 可自行完成的验证；这些回 runtime 执行或作为 evidence，不继续占用人类 gate。
+4. 只保留失败、争议、缺信息、需要风险决策或明确未完成的人类门控项。
+5. `round` +1，旧轮次压缩到 Archive，更新 source spec 的 blocker / next / evidence。
+6. 修改 artifact 后运行 `validate-flow`。
 
 ## Feedback Classification
 
-先分类再行动，不要一边猜测一边改状态。
+- `pass`：人类明确通过；归档结论与证据，不带入下一轮。
+- `explicit fail`：明确失败、异常或待修；如果仍需人类复验，进入下一轮；否则先回 runtime 修复。
+- `unmentioned`：不默认通过。判断它是否仍需要人类 gate；Agent 可自证的直接移出。
+- `scope change`：反馈改变 requirement、contract、data semantics 或 acceptance behavior，暂停并回 `to-spec`。
+- `needs evidence`：缺少证据；Agent 能补则先补，必须由人类提供则保留待补充。
 
-- `explicit pass`：人类明确通过，或明确说某项不再需要验收。压缩进 `Archive`。
-- `explicit fail`：人类明确失败、异常、待修、继续跟进。写入下一轮验收项，并连接到相关 plan / task next action。
-- `clarification needed`：反馈含糊，无法判断是否通过或失败。保留到 `待确认` / `Confirm With Human`。
-- `disputed`：证据与反馈冲突、实现状态与验收口径冲突。保留到下一轮，写清冲突和需要决策的问题。
-- `unmentioned`：人类没有提到。不得默认通过；只有它仍然需要人类验收、知晓、补信息或决策时，才继续保留到下一轮。
-- `no human gate / agent-verifiable`：当前项只是命令结果、文件检查、模板渲染、lint / build / test、静态 diff 或纯实现细节。不要继续作为验收项保留；能支撑人类判断时合并到相关项的 `证据`，否则压缩到 `Archive` 或移除低价值占位。
-- `backlog candidate`：当前轮无法推进、依赖外部条件或超出当前 scope。建议转入 `backlog`，在 acceptance 中保留引用和原因。
+## Inputs
 
-## Deriving The Next Round
+- acceptance 当前轮次、反馈、未关闭项和 Archive。
+- source spec Requirements、Acceptance Scenarios、Execution Constraints、Progress。
+- runtime 新证据、失败验证、blocker 和残余风险。
+- 人类新增范围或明确风险接受。
 
-下一轮范围来自四类输入：
-
-- 当前 acceptance 的未关闭项中仍需要人类门控的部分。
-- 人类反馈中的失败、异常、补充要求和澄清问题。
-- plan / task runtime 状态中的新证据、失败验证、blocker、scope 变化和残余风险。
-- 来源 spec / plan / task 中尚未被验收覆盖的关键行为或交付边界。
-
-推导时必须内部确认这些问题；写入 artifact 时只保留影响下一轮验收判断的短内容，不机械展开完整清单：
-
-- Next scope：下一轮需要人类验收什么。
-- Acceptance questions：人类需要判断哪些可判定问题。
-- Evidence gaps：哪些证据缺失、过期或无法支撑完成声明。
-- Required evidence：下一轮前 Agent 应补哪些验证、报告或观察结果。
-- Residual risks：哪些风险仍然存在，是否阻塞通过。
-- Stop points：哪些问题需要先问人，不能继续猜。
+不能从以上来源证明的新 scope 不得凭空加入。
 
 ## Update Rules
 
-- `round` 递增 1；正文写清上一轮结论和本轮目标。
-- 当前轮只保留下一次需要人类判断、知晓、补信息或决策的内容；旧轮次压缩到 `Archive`。
-- 已关闭项归档时保留：原验收项摘要、反馈结论、处理结果、关键证据、关闭日期。
-- 未关闭项不要复制长上下文；重写成下一轮可执行、可判断的简洁验收步骤。
-- `Evidence` 只保留当前轮需要的证据入口和结论；Agent 可自行验证的检查结果只能作为支撑人类判断的证据，不能拆成独立验收项；完整长输出用路径或报告引用。
-- `待确认` / `Confirm With Human` 只放需要人工判定的问题，并按背景、确认步骤、明确结论组织；普通后续行动放到 plan / task 或 `Next Round`。
-- 固定核心单元是验收组，每组用 `## 验收组 <N>：<简短主题>` 作为二级标题；组内用三级标题连续出现「问题 / 需求」「验收步骤」「验收结论（人类填）」。其他 section 按实际验收价值保留，不要填低效占位。
-- `验收结论（人类填）` 只保留 `反馈` 字段；除非来源里已有明确人工反馈，否则 Agent 不替人类写通过、失败或放弃结论，也不生成单独的 `结论` 占位。
-- 能明确关联到某个验收组的 task artifact 或 commit，写入该组的 `关联` section；不能可靠关联时不要猜，也不要写占位。
-- 与某个验收组相关的关联、证据、待确认、待补充或风险，放在该组验收结论之后、下一组验收组之前，并使用三级标题；文档级 `Next Round` / `Archive` 可放在全文末尾并使用二级标题。
-- `关联` 只写可追溯引用：task artifact id / 路径、commit hash 和简短 subject；不要粘贴完整 commit diff 或长日志。
-- 如果所有验收项都有明确结论且无下一轮动作，可把 `status` 设为 `completed`；否则保持 `in_progress` 或 `draft`。
+- 当前轮只保留下一次需要人类判断、明确确认、接受风险、补信息或决策的内容。
+- 已关闭项 Archive 保留：摘要、反馈结论、处理结果、关键证据、关闭日期。
+- 未关闭项重写成可执行、可判断的简洁步骤，不复制长上下文。
+- ordinary resume target 写回 spec Progress，不放在 acceptance；保持目标级，不写代码微任务。
+- 能明确关联的 spec / commit 放在对应验收组；不能确认时省略。
+- 所有 gate 关闭且无下一轮时设置 `completed`，关键结论回写 source spec。
 
 ## Next Round Template
-
-可直接更新到原 acceptance 文档中，按实际内容裁剪空 section。下一轮也必须保持简洁，一个问题 / 需求 一组，每组用二级标题 `验收组` 承载，组内固定包含三级标题「问题 / 需求」「验收步骤」「验收结论（人类填）」。
 
 ```markdown
 ## 验收组 1：<简短主题>
 
 ### 问题 / 需求
 
-<用 2-4 句话说明本轮为什么仍需要人类验收、知晓、补信息或决策。>
+<本轮为什么仍必须由人类判断。>
 
 ### 验收步骤
 
-1. <先查看什么页面、真实环境、artifact、证据或背景。>
-2. <再对比什么业务口径、用户体验、风险说明、反馈或决策选项。>
-3. 确认 <需要人类给出的明确结论，例如通过、驳回、补充材料、接受风险或调整范围。>
+1. <查看什么行为、环境、spec 或证据。>
+2. <对比什么口径、体验、风险或选项。>
+3. 确认 <通过、驳回、补材料、接受风险或调整范围。>
 
 ### 验收结论（人类填）
 
@@ -95,41 +63,31 @@ description: "Derive the next concise Sky Flow acceptance round from an existing
 
 ### 关联
 
-- Task: <能明确关联到本验收组的 task artifact id / 路径；不能可靠关联时省略>
-- Commit: <能明确关联到本验收组的 commit hash 和简短 subject；不能可靠关联时省略>
+- Spec: <path / id；无可靠关联时省略>
+- Commit: <hash + subject；无可靠关联时省略>
 
 ### 证据
 
-- <Agent 已完成且支撑人类判断的证据入口和结论；没有时省略>
-
-### 待确认
-
-<用 1-2 句话说明为什么需要人工确认；没有人工确认项时省略。>
-
-1. <先查看什么信息、页面、artifact 或证据。>
-2. <再对比什么口径、反馈或预期结果。>
-3. 确认 <需要人类给出的明确结论，例如通过、驳回、补充证据或调整范围。>
+- <支撑本轮判断的关键证据；没有时省略>
 
 ### 待补充
 
-- <缺少但需要补齐的背景、证据、artifact 链接或验收材料；没有明确补充项时省略。>
+- <必须由人类补齐的材料或信息>
 
 ### 残余风险
 
-- <仍需人类知情或阻塞通过的风险>
+- <仍需知情或会阻塞通过的风险>
 
 ## Next Round
 
 - Scope:
-- Questions:
+- Human questions:
 - Evidence gaps:
-- Agent next action:
 
 ## Archive
 
 - Round <N> closed on <YYYY-MM-DD>:
-  - Passed:
-  - Failed / carried forward:
+  - Outcome:
   - Evidence:
   - Notes:
 ```
@@ -137,23 +95,17 @@ description: "Derive the next concise Sky Flow acceptance round from an existing
 ## Boundaries
 
 - 不把未提及项默认通过。
-- 不把 Agent 可自行验证的旧验收项因为“未提及”就继续带到下一轮。
-- 不凭空创建新 scope；scope 变化必须来自来源 artifact、人类反馈或已确认 runtime 事实。
-- 不在 acceptance 中修 plan / task DAG；需要调整执行计划时回到 `to-plan` / `to-task` / `to-implement`。
-- 不把验收反馈写成聊天摘要；只保留可恢复的结论、证据、问题和下一步。
-- 不把证据缺口包装成通过；缺口要显式列入下一轮。
+- 不把 Agent 可自证项继续包装成人工验收。
+- 不把纯 FYI 或无需人类输出的结论带入下一轮；写入对话或 source spec Progress / evidence。
+- 不在 acceptance 中修改长期设计；scope / contract 变化回 `to-spec`。
+- 不把普通后续动作、runtime checklist 或调度状态写入 acceptance。
+- 不把证据缺口包装成通过。
 
 ## Self-Review
 
-- Classification：每个旧验收项是否已分类，尤其是未提及项。
-- Human gate：下一轮保留的每个验收组是否仍需要人类验收、知晓、补信息或决策；Agent 可自行验证项是否已合并为证据、归档或移除。
-- Grouping：是否使用 `## 验收组 <N>：<简短主题>` 分组，且组内三级标题包含问题 / 需求、验收步骤和验收结论（人类填）。
-- Brief：下一轮问题 / 需求 是否用几句话说清楚，没有复制长上下文。
-- Steps：失败、仍需人类门控的未提及项、争议和证据不足的项是否被整理成人类可判断的验收步骤。
-- Evidence：下一轮完成声明需要的证据是否明确。
-- Links：能关联到验收组的 task artifact / commit 是否已放在对应组内，且没有猜测性引用。
-- Optional sections：非核心 section 是否都承载有效信息，没有低效占位。
-- Questions：需要人类确认的问题是否按背景、确认步骤、明确结论组织。
-- Runtime alignment：plan / task 状态、验证证据和 acceptance 轮次是否一致。
-- Archive：已关闭项是否压缩归档而不是删除。
-- Validation：修改 artifact 后是否运行 `validate-flow`。
+- 每个旧项是否已分类。
+- 下一轮每组是否仍是真实人类 gate。
+- 失败和证据缺口是否先区分 Agent 可补与人类必须补。
+- source spec Progress、acceptance round 和证据是否一致。
+- 旧轮次是否压缩而不是复制。
+- artifact 修改后是否运行 `validate-flow`。

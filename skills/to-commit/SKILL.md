@@ -9,7 +9,7 @@ description: 'Handle Sky Flow commit work: inspect the working tree, stage only 
 
 ## 输入补全
 
-- 先从用户指令、当前 plan / task scope、handoff、项目本地规则和工作区状态推断，不询问已经能从仓库事实确认的信息。
+- 先从用户指令、source spec scope、handoff、项目本地规则和工作区状态推断，不询问已经能从仓库事实确认的信息。
 - 默认提交范围限定当前会话主题涉及的改动；不要把所有未提交文件自动纳入提交范围，除非开发者显式指定全量或具体路径。
 - 用户未指定单 commit 还是多 commit 时，如果当前会话范围内存在无关改动，默认拆成多个小 commit；如果边界会影响 staged 范围且无法安全推断，先问用户。
 - 提交风格、header 长度、必填 scope 和语言先读取项目本地规则；没有额外规则时默认 Conventional Commits。
@@ -19,7 +19,7 @@ description: 'Handle Sky Flow commit work: inspect the working tree, stage only 
 
 1. 读取项目本地规则，确认提交语言、message 格式和 scope；无额外规则时默认 Conventional Commits。
 2. 用 `git status`、`git diff`、必要时 `git diff --stat` 建立工作区事实。
-3. 从用户意图、当前 plan / task scope、artifact 绑定关系和工作区状态确定提交范围；默认只包含当前会话涉及的改动。
+3. 从用户意图、source spec scope、artifact 来源和工作区状态确定提交范围；默认只包含当前会话涉及的改动。
 4. 判断单 commit 还是多 commit；用户未指定且当前会话范围内存在无关改动时，默认拆成多个小 commit。
 5. 按逻辑边界拆分：feature / refactor、前后端、格式 / 逻辑、测试 / 生产代码、依赖 / 行为变更。
 6. 精确 stage 目标范围；混合文件使用 patch staging，误暂存时用 patch unstage 或等价方式撤回。
@@ -35,9 +35,9 @@ description: 'Handle Sky Flow commit work: inspect the working tree, stage only 
 
 ## Workflow Artifact Gate
 
-只有 staged diff 中包含 Sky Flow artifact 时，`to-commit` 才在提交前推荐运行 `validate-flow`。workflow artifact 指 `artifact_type` 为 `spec`、`issue`、`plan`、`task`、`acceptance`、`backlog` 或 `handoff` 的文件，通常位于 `${SKY_FLOW_ROOT}` 下。
+只有 staged diff 中包含 Sky Flow artifact 时，`to-commit` 才在提交前推荐运行 `validate-flow`。workflow artifact 指 `artifact_type` 为 `spec`、`issue`、`acceptance`、`backlog` 或 `handoff` 的文件，通常位于 `${SKY_FLOW_ROOT}` 下。
 
-`to-commit` 不执行 `to-consolidation`。diff 收敛和 fan-in 残留检查应由 `to-task` 在阶段性 task 中灵活安排，或由用户 / 上游 workflow 明确触发；提交阶段只做 staged 范围、artifact 校验和最小相关验证。
+`to-commit` 不执行 `to-consolidation`。diff 收敛和 fan-in 残留检查应由 `to-implement` 根据 runtime 风险动态触发，或由用户明确触发；提交阶段只做 staged 范围、artifact 校验和最小相关验证。
 
 ## Commit message 模板
 
@@ -86,7 +86,7 @@ fix(core): 修复任务匹配口径 - `abc1234` - ***Amend***
 - 保留非本次范围改动
 
 ### 🧾 剩余改动
-- `docs/plan/xxx.md` 未提交，非本次范围
+- `docs/spec/xxx.md` 未提交，非本次范围
 - 其他 3 个文件...
 ```
 
@@ -103,7 +103,7 @@ fix(core): 修复任务匹配口径 - `abc1234` - ***Amend***
     - 同步迁移计划记录
 
 ### 🧾 剩余改动
-- `docs/plan/xxx.md` 未提交，非本次范围
+- `docs/spec/xxx.md` 未提交，非本次范围
 - 其他 8 个文件...
 ```
 

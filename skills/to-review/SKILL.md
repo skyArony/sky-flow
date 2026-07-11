@@ -1,6 +1,6 @@
 ---
 name: to-review
-description: 'Review code diffs and Sky Flow artifacts such as spec, plan, task, acceptance, backlog, or handoff outputs. Use to find bugs, regression risks, missing verification, scope drift, artifact boundary problems, and implementation/design alignment issues. Default to read-only review; delegate to internal review-by-somestay or review-by-sanyuan profiles only when depth requires it, and synthesize multi-review findings when risk justifies independent reviewers.'
+description: 'Review code diffs and active Sky Flow artifacts such as spec, issue, acceptance, backlog, or handoff outputs. Use to find bugs, regression risks, missing verification, scope drift, artifact boundary problems, and implementation/design alignment issues. Default to read-only review; use independent reviewers when risk justifies them.'
 ---
 
 # to-review
@@ -9,26 +9,26 @@ description: 'Review code diffs and Sky Flow artifacts such as spec, plan, task,
 
 它不替代：
 
-- `validate-flow`：结构化校验 artifact schema、状态一致性和相邻绑定。
+- `validate-flow`：结构化校验 artifact schema、单向来源和状态一致性。
 - `to-consolidation`：收敛 pending diff 中的临时代码、重复逻辑和 fan-in 残留。
-- `to-implement`：执行 plan / task、维护状态和调度 fan-in。
+- `to-implement`：执行 ready spec 或其派生的 implementation-ready goal，动态调度 runtime 并维护稳定 Progress。
 
 ## Quick Path
 
-1. 确认 review 范围：默认审当前 pending diff；用户指定文件、目录、artifact、commit range 或 task 输出时，以指定范围为准。
+1. 确认 review 范围：默认审当前 pending diff；用户指定文件、目录、artifact、commit range 或实现输出时，以指定范围为准。
 2. 整理 `review_context`：需求 / artifact 来源、预期行为、已知偏离、已跑验证、非目标、base / head 或输入输出路径。
 3. 选择 `review_focus`：`spec-compliance`、`code-quality` 或 `general`；artifact 输出优先看 scope、边界、依赖、验收和验证证据。
 4. 选择深度和 lane：小范围低风险走 `fast`；非平凡 diff 或 artifact 输出走 `medium`；命中共享边界或系统性风险才走 `deep`；大 diff、跨模块、高 blast radius 或用户要求多 Agent review 时进入 `multi-review` lane。
-5. 单 reviewer lane 按深度加载对应 reviewer profile：`medium` 读取 `reviewers/review-by-somestay/SKILL.md`；只有 `medium` 明确建议深挖时读取 `reviewers/review-by-sanyuan/SKILL.md`。
+5. 单 reviewer lane 按深度加载对应内部 profile：`medium` 读取 `reviewers/review-by-somestay/PROFILE.md`；只有 `medium` 明确建议深挖时读取 `reviewers/review-by-sanyuan/PROFILE.md`。这些 profile 不是可安装 skill。
 6. `multi-review` lane 必须让 reviewer 独立产出 findings，再 synthesize 为一份排序清单；不要让后一个 reviewer 继承前一个 reviewer 的结论。
 7. 如果目标是验证修复是否解决已选 review findings，进入 verifier stage；至少使用两个独立 verifier，模型必须不同。
 8. 输出 findings-first 报告；无问题时明确写 `no findings`、检查范围和未验证点。
 
 ## Scope Rules
 
-- Review scope 必须具体到文件、目录、artifact、commit range、task 输出或 pending diff；不要只写模糊摘要。
+- Review scope 必须具体到文件、目录、artifact、commit range、实现输出或 pending diff；不要只写模糊摘要。
 - 只能基于用户请求、artifact 内容、diff、commit message 和相邻代码推断意图。需求不明时标注 `intent inferred from diff/artifact`，不要把推断写成已确认事实。
-- artifact review 可以读取相邻 spec / plan / task / acceptance 作为背景，但不直接修改它们。
+- artifact review 可以读取 source spec、issue、acceptance、backlog 或 handoff 作为背景，但不直接修改它们。
 - 发现 scope drift、write scope 越界、no-touch 违规、状态和产物不匹配时，按 review finding 报告；结构字段校验交给 `validate-flow`。
 - 默认只读。只有父级 workflow 明确切到修复环节，才可以把 findings 交给实现或 `to-review-loop`。
 
@@ -44,9 +44,9 @@ description: 'Review code diffs and Sky Flow artifacts such as spec, plan, task,
 
 ### medium
 
-默认主力路径，用于非平凡 diff、实现完成后的阶段 review、task 输出 review、artifact 边界 review 或验证缺口检查。
+默认主力路径，用于非平凡 diff、实现完成后的阶段 review、runtime fan-in 输出、artifact 边界 review 或验证缺口检查。
 
-- 加载 `reviewers/review-by-somestay/SKILL.md`。
+- 加载 `reviewers/review-by-somestay/PROFILE.md`。
 - 优先高信号、低误报、具体修复建议。
 - 必须判断是否需要升级 `deep`，并说明理由。
 
@@ -58,7 +58,7 @@ description: 'Review code diffs and Sky Flow artifacts such as spec, plan, task,
 
 - 跨模块、共享契约、公共 schema、共享状态或状态机风险。
 - 安全、并发、事务、权限、数据迁移、回滚或删除风险。
-- plan / task / spec / acceptance 之间存在可能影响执行或验收的边界错配。
+- spec Progress / Execution Constraints / acceptance 之间存在可能影响执行或验收的边界错配。
 - medium findings 分布在多个区域，或高影响 finding 需要系统级证据。
 
 `deep` 不是重做 medium；它只验证线索、深挖系统性风险并纠偏误报。
@@ -118,8 +118,8 @@ Verifier stage 用于验收已选 review findings 是否被修复，不用于发
 审查 Sky Flow artifact 或执行输出时，重点看：
 
 - spec 是否把目标、非目标、术语、外部契约和验收口径说清楚。
-- plan 是否保持 goal / scope / milestones / progress / recovery 一致，不把实施细节塞进计划层。
-- task 是否有清晰 allowed write scope、no-touch、依赖、owner 建议、验证意图和输出契约。
+- spec 是否保持 intent / scope / requirements / readiness / Progress 一致，并避免记录 runtime topology。
+- runtime fan-in 是否遵守 spec scope、no-touch、验证意图和 stop conditions。
 - acceptance 是否有可复核证据，不把未验证内容写成已通过。
 - handoff / backlog 是否能恢复上下文，且没有替代原 artifact 的状态真相。
 - 实现输出是否符合对应 artifact，不扩大 scope，不遗漏 P0 / P1 验证。
@@ -128,13 +128,13 @@ Verifier stage 用于验收已选 review findings 是否被修复，不用于发
 
 `to-review` 默认只读，不直接修复。发现问题后按归口推荐，不强制跳转：
 
-- review 发现 artifact frontmatter、DAG、状态或相邻绑定问题：推荐 `validate-flow`。
+- review 发现 artifact frontmatter、source 或状态问题：推荐 `validate-flow`。
 - review 发现补丁式实现、临时代码、重复逻辑、debug 残留或 fan-in 半成品：推荐 `to-consolidation`。
 - synthesize 后需要人类决定哪些 finding 值得修、哪些接受风险或延后：直接在对话或 review 报告中输出 triage 清单和两个 ROI 问题，不创建 `acceptance` artifact。
 - review 发现 blocking 或高 ROI finding：只输出 finding、证据、影响和建议修复方向；不推荐、不自动进入 `to-review-loop`。`to-review-loop` 只能由用户显式触发。
 - review 发现测试策略、BDD 场景、测试 ROI、stable seam 或替代验证不清：推荐 `to-test`。
 - review 发现真实事故回归需要固化：推荐 `to-bdd-regression`。
-- review 发现目标、scope、契约、数据口径或 requirements 需要变化：推荐 `to-spec`；执行策略或 task 拆分变化推荐 `to-plan` / `to-task`。
+- review 发现目标、scope、契约、数据口径或 requirements 需要变化：推荐 `to-spec`；只涉及执行顺序、拆解或并行方式时由 `to-implement` 在 runtime 动态调整。
 
 ## Severity
 

@@ -7,7 +7,7 @@ description: 'Review agent decision-making inside Sky Flow by analyzing visible 
 
 `to-agent-review` 是 Sky Flow 内部的 Agent 决策复盘入口。它分析可见会话、执行记录、工具调用、子代理产物、fan-in 结果、runtime plan 和 Sky Flow artifact 维护情况，定位决策链路问题、低效点和可落地改进项。
 
-它不是普通代码 review，也不是项目私有复盘流程。默认产物写入 `${SKY_FLOW_ROOT}/backlog/agent-reivew/`，这是 Agent 复盘报告目录约定，不等同于调用 `to-backlog`，也不要求生成 `backlog` artifact。发现的改进可以进一步转入 Sky Flow `spec`、`plan`、`task` 或明确标记为暂不落地。
+它不是普通代码 review，也不是项目私有复盘流程。默认产物写入 `${SKY_FLOW_ROOT}/backlog/agent-reivew/`，这是 Agent 复盘报告目录约定，不等同于调用 `to-backlog`，也不要求生成 `backlog` artifact。发现的改进可以进一步转入 Sky Flow `spec`、`issue` 或明确标记为暂不落地。
 
 ## Quick Path
 
@@ -16,12 +16,12 @@ description: 'Review agent decision-making inside Sky Flow by analyzing visible 
 3. 默认用本目录 preflight helper 按 runtime、日期、当前项目根目录、compact 摘要和 Top session 生成 manifest；项目复盘必须过滤当前项目根目录，只有用户明确要求跨项目 / 全局复盘时才取消根目录过滤。
 4. 先读 compact preflight 输出里的 `codex_cwd_filter`、`aggregate.decision_signals`、Top session 摘要、`candidate_bottlenecks` 和 `suggested_read_lines`，再决定需要精读哪些证据；只有诊断分歧或需要完整结构化输入时才去掉 `--compact`。
 5. 精读 JSONL 行窗时优先使用 preflight helper 的行窗摘要能力；该摘要会遮蔽 hidden fields，并保留 `exit_code`、`original_token_count`、输出字符数和截断片段。
-6. 确认输入范围：用户指定的 transcript、执行记录、日志片段、工具调用摘要、plan / task / handoff artifact、子代理输出或当前会话上下文；如果 preflight 后仍不足以复盘关键问题，先请求最小补充材料。
+6. 确认输入范围：用户指定的 transcript、执行记录、日志片段、工具调用摘要、spec / handoff artifact、子代理输出或当前会话上下文；如果 preflight 后仍不足以复盘关键问题，先请求最小补充材料。
 7. 建立证据地图：按时间线整理目标、关键决策、工具调用、失败 / 重试、等待、子代理派发、fan-in、验证、runtime plan 更新和 artifact 写回。
 8. 按分析维度归类问题，区分必要等待、人类决策等待、基础设施等待、工具延迟和 Agent 低效；不要把 `expected no-match`、存在性探测、`git diff --no-index` 或轮询等待直接当作低效。
 9. 填写固定量化信号清单；没有证据的项写 `unknown`，不要估算成事实。
 10. 输出或更新 `${SKY_FLOW_ROOT}/backlog/agent-reivew/<yyyy-mm-dd>-<scope>.md`，默认采用 plain-language brief-first 结构：先用人话解释“问题是什么、为什么重要、下一步做什么”，再给指标和证据；每条建议必须有 ROI、落点、done-when 和 non-goal。
-11. 需要改变长期 workflow 规则、计划或任务时，转入对应 Sky Flow 子能力：`to-spec`、`to-plan` 或 `to-task`。
+11. 需要改变长期 workflow 规则时转 `to-spec`；需要记录独立改进候选时转 `to-issue`；执行拆解由 runtime 动态决定。
 
 ## Preflight Helper
 
@@ -50,8 +50,8 @@ description: 'Review agent decision-making inside Sky Flow by analyzing visible 
 - 工具效率：是否重复搜索、重复读取、使用低效命令，或应脚本化而仍靠人工操作。
 - 子代理 ROI：派发是否过早 / 过晚，任务包是否包含 mission、scope、no-touch、verification intent、output contract 和 stop condition。
 - Fan-in：是否检查写入范围、冲突、验证证据、spec alignment、blocker 和状态回写。
-- Runtime plan：是否及时维护运行时计划，是否记录并行批次、fan-in、blocker、next action 和动态 task 调整。
-- Artifact 写回：plan / task / handoff / acceptance 是否记录稳定事实，而不是只留在聊天里。
+- Runtime checklist：是否在复杂度值得时及时维护，是否记录 fan-in、blocker、next action 和动态调整，且没有过度打点。
+- Artifact 写回：spec Progress / handoff / acceptance / backlog 是否只记录稳定事实，而不是聊天或调度流水。
 - 验证与收敛：是否在合适阶段触发验证、`to-review`、`to-consolidation` 和 `validate-flow`。
 - 决策质量：是否存在过早实现、过度设计、补丁式返工、未说明的 pushback 或低价值自动化。
 
@@ -69,8 +69,8 @@ description: 'Review agent decision-making inside Sky Flow by analyzing visible 
 | `subagent_count` | 子代理数量、任务包完整度、完成 / blocked / needs-context 状态分布。 |
 | `parallelism_efficiency` | 子代理是否真正并行、主会话等待时间、fan-in 是否阻塞关键路径。 |
 | `fan_in_rounds` | fan-in 轮数、冲突次数、遗漏补传次数、是否检查 changed files / scope / evidence。 |
-| `runtime_plan_updates` | runtime plan 更新次数、是否在 task start / completion / blocker / fan-in 后及时更新。 |
-| `artifact_writebacks` | plan / task / acceptance / handoff / backlog / report 写回次数和遗漏点。 |
+| `runtime_plan_updates` | runtime checklist 更新次数、是否在阶段开始 / 完成 / blocker / fan-in 后按需更新。 |
+| `artifact_writebacks` | spec / acceptance / handoff / backlog / report 写回次数和遗漏点。 |
 | `validation_evidence` | 验证命令 / 检查项、pass / fail / skipped、跳过理由。 |
 | `blocker_and_question_count` | blocker、需要人类确认的问题、已解决 / 未解决数量。 |
 
@@ -85,8 +85,7 @@ description: 'Review agent decision-making inside Sky Flow by analyzing visible 
 每条建议必须给出落点：
 
 - `spec`：Sky Flow 行为契约、artifact 规则或 workflow 语义需要澄清。
-- `plan`：需要编排成阶段目标。
-- `task`：可以直接拆成可执行工作。
+- `issue`：独立问题或改进候选需要保留证据，但尚不值得修改长期 spec。
 - `agent-review-report`：只沉淀到 `${SKY_FLOW_ROOT}/backlog/agent-reivew/`，暂不转入正式 workflow artifact。
 - `none`：明确不落地，并写明原因。
 
@@ -170,8 +169,8 @@ description: 'Review agent decision-making inside Sky Flow by analyzing visible 
 - 默认报告目录：`${SKY_FLOW_ROOT}/backlog/agent-reivew/`。
 - 该目录只是复盘报告落点，不代表调用 `to-backlog`，也不自动创建 `backlog` artifact。
 - 需要改变 Sky Flow 契约或 artifact schema 语义：进入 `to-spec`，不要在复盘报告里直接改规则。
-- 需要实施一组改进：进入 `to-plan`，再由 `to-task` 拆 DAG。
-- 已有 plan 下的明确小修：可建议新增 `task`，由 `to-implement` 调度。
+- 需要实施已确认的长期改进：更新 ready spec 后由 `to-implement` 动态调度。
+- 明确小修且不需要长期设计：直接 runtime 执行。
 - 复盘只形成观察和建议：保留在 `agent-review-report`。
 - 只有创建或修改 Sky Flow artifact 时才运行 `validate-flow`；单纯写复盘报告不要求 artifact 校验。
 
@@ -181,7 +180,7 @@ description: 'Review agent decision-making inside Sky Flow by analyzing visible 
 - 不收敛 pending diff；补丁式实现和 fan-in 残留交给 `to-consolidation`。
 - 不替代 `validate-flow` 检查 artifact/status 一致性。
 - 除 `${SKY_FLOW_ROOT}/backlog/agent-reivew/` 这个通用复盘报告目录外，不写死项目路径、项目角色称呼、业务术语或运行时专属命令。
-- 不自动修改 workflow 规则、routing、spec、plan 或 task；复盘只给建议，除非用户明确要求落地。
+- 不自动修改 workflow 规则、routing、spec 或 issue；复盘只给建议，除非用户明确要求落地。
 
 ## Self-Review
 
@@ -189,6 +188,6 @@ description: 'Review agent decision-making inside Sky Flow by analyzing visible 
 - Evidence：每个发现是否有可见证据和来源索引。
 - Classification：是否区分必要等待、人类等待、基础设施等待、工具延迟和 Agent 低效。
 - ROI：每条建议是否有优先级、预期收益、维护成本和落点。
-- Sky Flow alignment：改进是否按性质进入 agent-review-report / spec / plan / task / none，而不是私有项目流程。
+- Sky Flow alignment：改进是否按性质进入 agent-review-report / spec / issue / none，而不是私有项目流程。
 - Readability：第一屏是否不用解释就能看懂；每个 finding 是否有“这到底是什么意思”的人话版本。
 - Brevity：是否合并重复问题，避免长篇粘贴 transcript。

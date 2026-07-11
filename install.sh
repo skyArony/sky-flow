@@ -31,10 +31,13 @@ What happens:
   - Default action is `install`, so `./install.sh` installs the full Sky Flow suite.
   - Claude installs live under ~/.claude/skills.
   - Codex installs live under ~/.agents/skills, so a separate ~/.codex/skills layer is not needed.
-  - The manager links the suite entry skill and each callable child skill separately because Claude does not discover nested skills.
+  - Claude gets direct suite and child links because it does not discover nested skills.
+  - Codex gets the suite entry once and discovers callable child skills through that root.
+  - Repo-owned redundant Codex child symlinks are removed; copies or foreign links require --force.
   - Nested skill `install_targets` are respected, so Codex-only skills such as `to-claude-review` stay out of Claude installs.
   - `install` and `update` auto-install supported runtime commands when possible.
-  - `doctor` checks local links plus per-skill runtime readiness.
+  - `install` / `update` safely remove retired symlinks owned by this checkout.
+  - `doctor` checks local links, retired copy-mode residue, and per-skill runtime readiness.
 EOF
 }
 

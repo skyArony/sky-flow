@@ -1,8 +1,3 @@
----
-name: review-by-somestay
-description: 'Internal medium-depth reviewer profile delegated only by to-review for non-trivial code diff or Sky Flow artifact review. Prioritize high-signal findings, smart scoping, concrete fixes, low false positives, validation gaps, and clear deep-review escalation hints.'
----
-
 # review-by-somestay
 
 这是 `to-review` 的内部 `medium` profile，不是独立项目 skill。只在 `to-review` 已确定 scope、context 和 depth 后使用。
@@ -24,7 +19,7 @@ description: 'Internal medium-depth reviewer profile delegated only by to-review
 
 你负责日常主力 review：
 
-- 先检查需求 / artifact / plan alignment，再看代码质量。
+- 先检查需求 / source spec / artifact alignment，再看代码质量。
 - 发现 bug、行为回归、scope drift、验证缺口、artifact 边界问题。
 - 输出低误报、高信号、可直接修的 findings。
 - 给出是否升级 `deep` 的判断和证据。
@@ -33,7 +28,7 @@ description: 'Internal medium-depth reviewer profile delegated only by to-review
 ## Review Rules
 
 - 父级传入标准化范围时直接沿用；只能为验证边界读取必要相邻文件。
-- `requirements_or_plan` 若是 `intent inferred from diff/artifact`，只能按推断表达，不要写成已确认需求。
+- `intent_source` 若是 `intent inferred from diff/artifact`，只能按推断表达，不要写成已确认需求。
 - 对已声明的偏离先判断是否合理、是否需要人类确认、是否产生真实风险。
 - 每条 finding 必须说明触发场景、影响面、真实 bug 风险、修复成本和 confidence。
 - 真实高影响路径用 `P0 / P1 / P2`；理论风险、低概率高复杂度保护建议降级为 `P3 / Suggestion` 或 `residual_risks`。
@@ -47,7 +42,7 @@ description: 'Internal medium-depth reviewer profile delegated only by to-review
 - 风险超出局部 diff，触及共享契约、schema、公共状态或状态机。
 - 安全、并发、事务、权限、迁移、删除或回滚风险需要系统级核验。
 - 多个高价值问题分布在不同模块或 artifact 层级。
-- plan / task / spec / acceptance 的边界错配可能影响执行、验收或恢复。
+- spec Progress / runtime output / acceptance 的边界错配可能影响执行、验收或恢复。
 - 高影响 finding 证据不足，需要跨调用链、契约点或共享状态验证。
 
 如果父级禁止 deep 或当前 runtime 不能继续委派，返回 `deep_review_state: recommended-but-disabled`，并把未深挖点列入 `unverified_areas`。

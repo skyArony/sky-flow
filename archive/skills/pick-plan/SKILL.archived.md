@@ -5,6 +5,8 @@ description: 'Select the next Sky Flow plan worth continuing from unfinished pla
 
 # pick-plan
 
+> Archived on 2026-07-11. Sky Flow no longer selects plan/task artifacts; ready specs resume directly through `to-implement`.
+
 `pick-plan` 从现有 Sky Flow `plan` artifact 和 standalone task 清单中挑选下一步最值得继续推进的工作，并输出一个可直接用于新会话续跑的完整提示词代码块。用户已经指定具体 plan / standalone task 时，它走直通模式：只读取指定 artifact，跳过候选排序和推荐比较，直接输出该 artifact 的续跑提示词。它只做只读选择和上下文整理，不修改 plan、task、handoff 或代码。
 
 ## Quick Path

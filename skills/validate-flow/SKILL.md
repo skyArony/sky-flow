@@ -1,107 +1,102 @@
 ---
 name: validate-flow
-description: 'Validate Sky Flow artifacts with a deterministic TypeScript precheck and an LLM semantic pass. Use whenever creating or modifying Sky Flow spec, issue, plan, task, acceptance, backlog, or handoff artifacts, or before committing workflow artifact changes.'
+description: 'Validate the simplified Sky Flow artifact model with a deterministic TypeScript precheck and a focused semantic pass. Use after creating or modifying spec, issue, acceptance, backlog, or handoff artifacts, and before committing those artifact changes.'
 ---
 
 # validate-flow
 
-`validate-flow` 用于检查 Sky Flow artifact 是否符合规范。
+`validate-flow` 检查 Sky Flow artifact 的最小结构、来源和恢复语义。它保护长期状态，但不把 runtime 调度重新固化成文件约束。
 
-它不是普通完成前自检，也不是 LLM 逐项读文档的 review。Sky Flow artifact 的结构、状态、依赖、验收证据、backlog / handoff 归宿和 fan-in 后状态漂移都归它负责；`to-review` 只检查代码风险，`to-consolidation` 只处理代码 / 产物 diff 收敛。
+当前 file-backed artifact 只有：`spec`、`issue`、`acceptance`、`backlog`、`handoff`。执行拆解、owner、依赖、并行与 fan-in 批次属于 runtime，不进入 validator。
 
-创建或修改 Sky Flow artifact 后必须运行；执行 plan 的主会话在多 Agent fan-in、阶段状态更新、handoff / acceptance / commit 前负责运行它并处理报告，不把 artifact 状态校验下放给普通 worker。
+## Quick Path
 
-校验采用两段式：
-
-1. 脚本预检：确定性检查 frontmatter、枚举、命名、artifact root、相邻绑定、DAG 和依赖一致性。
-2. LLM 收口：基于脚本结构化报告判断语义是否合理、上下文是否充分、状态是否漂移、争议项是否要问人。
-
-## 脚本预检
-
-运行：
+1. 确定 `SKY_FLOW_ROOT` 和 `SKY_FLOW_LANG`；未设置时默认 `docs` 和 `简体中文`。
+2. 运行确定性预检：
 
 ```bash
 node .agents/skills/sky-flow/scripts/validate_flow.ts [paths...]
 ```
 
-不传路径时，脚本扫描 `${SKY_FLOW_ROOT}` 下带 Sky Flow frontmatter 的 Markdown artifact。传入文件或目录时，只检查指定范围。
+仓库内开发时也可以运行：
 
-脚本输出 JSON，包含：
+```bash
+node scripts/validate_flow.ts [paths...]
+```
+
+3. 先处理 `errors`，再判断 warnings 是否需要修复或人类确认。
+4. 只对脚本不能判断的内容做语义收口；不要重新建立执行图。
+
+不传路径时扫描 `${SKY_FLOW_ROOT}`；传入文件或目录时只检查显式范围。输出 JSON 包含：
 
 - `summary`
 - `checked_artifacts`
-- `graph`
+- `graph.source_links`
 - `errors`
 - `warnings`
 - `llm_review_hints`
 
-有 `errors` 时退出码为 1；只有 warnings 时退出码为 0。
+## Deterministic Checks
 
-脚本预检覆盖这些机器可判断的状态 / 关系问题：
+脚本只检查机器可以可靠判断的内容：
 
-- `plan.acceptance` 与 plan 来源 `acceptance` 是否缺失、类型错误或互相指错。
-- plan 来源 `acceptance` 是否反向列入对应 `plan.acceptance`；即使 `plan.acceptance` 为空也必须报错，避免验收状态漂移。
-- `plan_role` / `planning_depth` 是否使用合法枚举。
-- `completed` plan 是否位于 `plan/done/`，以及非 `completed` plan 是否误放到 `plan/done/`。
-- `completed` issue 是否位于 `issue/fixed/`，以及非 `completed` issue 是否误放到 `issue/fixed/`。
-- 父 Plan 的 `child_plans` 与子 Plan 的 `parent_plan` 是否缺失、类型错误或互相指错。
-- 父 Plan 是否直接绑定 task，或子 Plan 是否没有复用父 Plan 的三位数字前缀。
-- 后序子 Plan 是否在前序子 Plan 未完成时已经进入 `in_progress` / `completed`。
-- task 是否使用合法 `task_role`，plan-scoped task 是否固定于 `tasks/<plan-id>/` 且不进入 `done/` 子目录，standalone task 是否位于 `tasks/standalone/` 或完成后的 `tasks/standalone/done/`。
-- standalone task 是否显式设置 `task_role: standalone` 和 `goal`，以及是否错误声明本地 `depends_on` / `depended_by` / `parallel_with`。
-- active `design_review_gate` 是否已落到 task DAG：必须有 `consolidation` task、independent design review task、review 依赖 consolidation、core implementation 依赖 review，并通过 `external_depends_on` 或 stop condition 表达 `human-approved-design-review-gate`。
-- design review / completion verification 是否明确排除 implementation owner；如果 review / verification task 明确分配给 implementation owner，脚本直接报错。
-- active `design_review_gate` 下 core implementation 完成前是否有 completion verification / review task；缺失或未声明独立评估时报告 warning。
-- `backlog` / `handoff` 的 artifact 来源是否能找到。
-- `completed` plan 是否仍有未完成 task，或缺少 `completed_at`。
-- `completed_at` 是否和 plan 的 `completed` 状态不一致。
-- `not_started` plan 下是否已有 `in_progress` / `completed` task。
-- task 是否在依赖 task 未完成时已经进入 `in_progress` / `completed`。
-- `abandoned` artifact 是否有对应 backlog 或人工协商线索。
+- frontmatter 是否存在且可解析。
+- `id`、`artifact_type`、`status` 和各 artifact 最小必填字段。
+- 文件 stem 是否等于 `id`，artifact 是否位于 `${SKY_FLOW_ROOT}`。
+- spec 是否错误使用数字编号前缀。
+- completed issue 是否位于 `issue/fixed/`，以及未完成 issue 是否误放 fixed 目录。
+- acceptance type 是否有效。
+- acceptance / backlog / handoff 的单向 source 是否可解析；部分校验范围缺少来源时只 warning。
+- abandoned artifact 是否有 linked backlog 或需要补充人类协商依据。
+- ready / active / completed spec 是否缺少 `Progress` 快照。
+- retired artifact type 或拓扑字段是否仍残留。
 
-## LLM 收口
+旧执行拓扑不会兼容通过：legacy artifact 必须把长期设计、完成结果、下一步、blocker 和证据迁移到 spec；真实人类 gate、长期延期和易失交接分别使用 acceptance、backlog、handoff。
 
-脚本通过后，LLM 只处理脚本不能可靠判断的语义问题：
+## Semantic Pass
 
-- dependency / parallel 关系是否符合任务语义。
-- `plan.goal` 是否足以作为 Codex 续跑契约。
-- task-ready plan 的 milestones 是否把 `protocol`、`constraints`、`abstraction_design`、`bdd_test_strategy`、`enabling_implementation`、`design_review_gate`、`core_implementation`、`verification_review_consolidation` 分层表达；若跳过某类 milestone，是否说明不适用原因。
-- `design_review_gate` 是否作为 hard stop 表达：enabling implementation diff 足够小且能体现设计方向，core implementation 只能在人类批准后开始；如果 gate 标注为 skipped / not applicable，跳过理由是否成立。
-- task DAG 是否正确映射 `design_review_gate`：gate 前有 `consolidation` / independent `review` task，人类批准未被建成 Agent task，core implementation task 依赖 review task 并通过 `external_depends_on` 或 stop condition 表达人类批准前置，完成前有独立 completion verification / review。
-- implementation task 粒度是否合理：复杂 plan-scoped implementation 是否按模块、write scope、owner、验证方式、风险和并行关系拆分；standalone implementation 如果需要拆分，是否先升级为 plan，再拆成 plan-scoped task DAG。
-- fan-in 后 plan / task / acceptance 状态是否与实际阶段产物、验证证据和剩余工作一致。
-- task 是否都能由 Agent 独立完成；如果 task 的核心完成条件是人工操作、真实设备 / 账号、外部环境、审批或人工体验判断，应建议转入 acceptance。
-- standalone task 是否仍然只是单一可恢复任务；如果出现多个 peer task、milestone、长期验收 gate、复杂 implementation scope 或 plan 级恢复需求，应建议升级为 plan，并在 plan 下拆出 task DAG。
-- 捞回后的 plan / issue 是否已经移回 active 目录、改掉 `completed` 状态，并写清 `Reopen Evidence` / `Reopen Reason`。
-- completed plan 若已清空 `tasks` 或声称 summary-only 归档，归档摘要是否保留必要事实、关键决策、踩坑、证据入口和 follow-up。
-- `acceptance` 是否说清来源、轮次、验证证据和未提及项处理。
-- `backlog` 是否讲清主题、阻塞原因、依赖条件和推荐恢复时机。
-- `handoff` 是否保留可执行恢复状态，而不是聊天摘要。
-- `abandoned` 是否确实有人类协商依据。
-- warning 是否需要升级为阻塞或回到用户确认。
+LLM 只判断：
 
-LLM 不应重新做脚本已经确定的机械校验。
+- spec Intent、Scope、Requirements、Decisions、Acceptance Scenarios、Verification Intent 和 Implementation Readiness 是否一致。
+- spec `Progress` 是否是紧凑语义恢复快照，包含 Checkpoint、Completed、Next、Blockers、Last verified；是否只保存结果、决策、证据、blocker、风险和目标级恢复入口，而没有代码行号、逐文件 diff、完整命令 / tool call、子代理过程、执行流水或文件化工作图。
+- Progress 的必要定位是否优先使用稳定模块、类、函数、公开接口或测试套件名称，而不是易漂移的具体代码行。
+- no-touch、人类 gate、不可逆操作和独立 review 等真实 Execution Constraints 是否清楚，且没有预设 runtime owner。
+- issue 是否保存了证据和有价值的下一决策，而不是实施脚本。
+- acceptance 是否确实需要人类参与，证据和反馈轮次是否清楚。
+- backlog 是否真的退出当前执行队列，阻塞、依赖和恢复条件是否可判定。
+- handoff 是否只保存易失接力状态，没有复制 spec Progress。
+- warning 是否需要升级为 blocker 或回到用户确认。
 
-## 校验边界
+不要检查或要求 runtime worker 数量、依赖边、并行 lane、owner、微步骤或调度历史。
+
+## Validation Timing
+
+必须运行：
+
+- 创建或修改 Sky Flow artifact 后。
+- spec status、Implementation Readiness、Progress checkpoint / blocker / completion 发生稳定变化后。
+- handoff / acceptance / backlog 交付前。
+- staged diff 包含 workflow artifact 且准备 commit 前。
+
+短暂 runtime checklist 更新、子代理派发和微步骤变化不需要 artifact 校验。
+
+## Boundaries
 
 - 只读检查，不自动修复。
-- `SKY_FLOW_ROOT` / `SKY_FLOW_LANG` 只来自 runtime env；未设置时使用默认值。
-- 外部 task 依赖缺失先 warning，不直接阻塞。
-- `html_interactive` 是保留枚举，默认给 warning。
+- 不做代码 review；实现风险交给 `to-review`。
+- 不收敛 pending diff；交给 `to-consolidation`。
+- 不选择测试策略；交给 `to-test`。
+- 不用另一个严格 schema 取代已经删除的执行拓扑。
+- `html_interactive` 仍是保留枚举，默认 warning。
 
 ## 推荐关系
 
-`validate-flow` 只报告 artifact 契约和状态一致性问题；修复或后续动作按问题归口推荐，不强制跳转：
+- spec 设计、readiness 或 Progress 不一致：`to-spec`。
+- acceptance 来源、证据或反馈轮次不清：`to-acceptance` / `to-next-acceptance`。
+- backlog 阻塞或恢复条件不清：`to-backlog`。
+- handoff 缺少可执行接力状态：`to-handoff`。
+- 结构通过但实现风险、测试缺口或交付质量仍不确定：`to-review` / `to-test`。
 
-- `spec` 语义、requirements、acceptance scenarios 或设计边界不一致：推荐 `to-spec`。
-- `plan` goal、scope、milestone、progress、parent / child plan 或 recovery 不一致：推荐 `to-plan`。
-- `task` DAG、depends_on / depended_by / parallel_with、write scope 或 verification intent 不一致：推荐 `to-task`。
-- completed plan 的 task 压缩、归档摘要或 retention 策略不清：推荐 `to-archive`。
-- `acceptance` 来源、轮次、证据或未提及项处理不清：推荐 `to-acceptance` 或 `to-next-acceptance`。
-- `backlog` 来源、阻塞原因、依赖或恢复时机不清：推荐 `to-backlog`。
-- `handoff` 恢复状态不足：推荐 `to-handoff`。
-- 脚本报告显示 artifact 结构无问题，但实现风险、测试缺口或交付质量仍不确定：推荐 `to-review`，不要让 `validate-flow` 代替 review。
+## Dependencies
 
-## 依赖
-
-依赖和安装方式见 `../../references/dependencies.md`。脚本默认使用 Node.js 直接运行 TypeScript。
+依赖和安装方式见 `../../references/dependencies.md`。validator 默认使用 Node.js 直接运行 TypeScript。

@@ -5,6 +5,8 @@ description: 'Create or update Sky Flow task artifacts from a task-ready plan; d
 
 # to-task
 
+> Archived on 2026-07-11. Sky Flow no longer persists task artifacts or task DAGs; decomposition is runtime-only.
+
 `to-task` 生成或更新 Sky Flow `task` artifacts。默认路径是从 `task_ready` plan 拆出 plan-scoped task DAG；也可以在目标比日常对话复杂、需要可恢复状态和验证意图、但尚不值得创建 plan 时，从当前会话创建 standalone task。
 
 plan-scoped task 把 plan 的 milestones 拆成可执行 task DAG：task 类型、依赖、并行关系、ownership、write scope、no-touch、verification intent、output contract、delegation policy 和可选 steps。standalone task 是单一执行单元，不绑定 plan、不建 peer task DAG，不作为长期 plan 的替代品。

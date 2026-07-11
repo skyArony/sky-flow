@@ -1,55 +1,61 @@
 # Sky Flow Routing
 
-本文件是 Sky Flow 子能力清单和触发规则的完整来源。根 `SKILL.md` 只保留入口必经短路径和快速路由，避免 Agent 每次加载重复细节。已落地为独立 skill 的顶层子能力通常放在 `skills/<name>/SKILL.md`；嵌套子能力可以放在所属能力目录下；普通 `.md` 引用文件不会被发现为 callable skill。
+本文件是 active 子能力和触发规则的完整来源。根 `SKILL.md` 只保留入口短路径和快速路由。
 
-## 触发顺序
+## Trigger Order
 
-1. 显式点名优先：用户提到 `to-spec`、`to-plan`、`validate-flow` 等子能力时，直接进入对应能力。
-2. 自动场景必须触发：debug、infra 查询 / 操作、BDD 回归固化、testing、review、commit、consolidation、acceptance、通用技术知识沉淀、completed plan 归档压缩、validate-flow、Sky Flow plan / task execution 命中时，不等待用户再次点名。
-3. Artifact 操作前先确定 runtime 配置：任何读取、创建或修改 Sky Flow artifact 的任务，都先确定 `SKY_FLOW_ROOT` 和 `SKY_FLOW_LANG`，没有环境变量时使用默认值。
-4. 简单任务快速退出：不需要 workflow artifact、不需要跨会话状态、不命中自动场景时，直接使用 runtime。
+1. 显式点名优先：用户点名某个 active 子能力时直接进入。
+2. 自动场景触发：debug、infra、BDD 回归、testing、review、commit、consolidation、acceptance、knowledge、validate-flow，以及 ready spec execution。
+3. artifact 操作前确定 `SKY_FLOW_ROOT` / `SKY_FLOW_LANG`；未设置时使用默认值。
+4. 不需要长期 artifact、跨会话状态或专门能力的简单工作直接使用 runtime。
 
-## 完整触发表
+## Active Skills
 
-| Skill                | 触发倾向 | 进入场景                                                                                               | 注意事项                                            |
-| -------------------- | -------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------- |
-| `to-spec`            | 显式     | 先做人类对齐和系统化设计澄清，再按确认结果生成或更新长期留存的 spec。                                  | 不强制立刻写 artifact 或进入 plan。                 |
-| `to-issue`           | 显式     | 在本地 docs issue 目录记录近期问题、现象、证据、线索或可独立认领 slice，尚不进入修复。                  | 不创建外部 tracker issue；不替代 debug 或 plan。    |
-| `to-debug`           | 自动     | 定位问题、复现异常、分析 root cause。                                                                  | 调试循环入口；基础设施查询 / 操作转项目级 `to-infra`，真实事故回归转 `to-bdd-regression`。 |
-| `to-infra`           | 自动     | 查询或操作基础设施、环境、日志、数据库、缓存、Metrics、Grafana、AlertManager、部署或外部系统。           | Project-provided adapter；Sky Flow core 不实现具体环境细节。 |
-| `to-bdd-regression`  | 自动     | 线上 bug、客户反馈、日志 / 数据异常、时序或状态机问题需要固化为 BDD-style 回归。                         | `to-debug` 子能力；复用已有诊断信息，不重复取证。   |
-| `to-test`            | 自动     | 新增 / 修改测试、写 Given / When / Then、判断测试 ROI、选择 stable seam、决定 Red / Green / Refactor 或替代验证。 | 不替代 `to-debug`；真实事故回归转 `to-bdd-regression`；项目命令由本地规则决定。 |
-| `to-knowledge`       | 自动     | 调研、排障、实现或 review 中发现业务无关、项目无关、可跨项目复用的基础设施、组件、库、工具、架构模式、踩坑或技术选型知识。 | 默认写普通 knowledge note，不是 workflow artifact；可旁路子代理用足够低成本模型沉淀，有可靠证据且低成本时自动执行，否则只推荐。 |
-| `to-plan`            | 显式     | 从 spec、issue 或当前会话生成实施计划；承载目标、范围、阶段、进度、恢复入口和 handoff。                  | 普通 / 中等任务保持单 Plan；task DAG 和执行模型分别交给 `to-task` / `to-implement`。 |
-| `to-task`            | 显式     | 从 plan 拆出 task DAG，或为比日常对话复杂但不值得建 plan 的单一工作创建 standalone task。               | plan-scoped 必须以 task-ready plan 作为输入；standalone task 不建 peer DAG；不执行 task。 |
-| `to-implement`       | 自动     | 执行和维护指定 Sky Flow plan / task artifact / task DAG，协调主代理、子代理、验证、fan-in、runtime plan、动态 task 调整和 artifact 状态回写。 | 日常任务不用；仅显式指定，或执行已制定 Sky Flow plan / task 时触发。 |
-| `to-review`          | 自动     | 小型 review、明确 review 指令，或流程阶段需要复审。                                                    | 查代码风险，不做 artifact 校验或 diff 收敛；高风险时可 multi-review + synthesize。 |
-| `to-review-loop`     | 显式     | review-fix-review 循环。                                                                               | 成本较高，必须有明确意图；clean closure 需要 final `to-consolidation` 和双模型 verifier gate。 |
-| `to-agent-review`    | 显式     | Agent 决策链路、工具调用、子代理 ROI 和流程低效点复盘；常见自动场景是 runtime 自动化在固定时间点触发。 | 普通会话只在明确 Agent 复盘场景中自动触发；报告默认写入 `${SKY_FLOW_ROOT}/backlog/agent-reivew/`。 |
-| `pick-plan`          | 显式     | 从未完成 plan、近期完成 plan 和 standalone task 清单中挑选下一步推荐项。                               | 输出推荐 plan 或 task 和可复制续跑提示。            |
-| `to-acceptance`      | 自动     | 出现需要人类验收的点，或人类补充验收点 / 验收要求。                                                    | 完成声明前必须有验证证据。                          |
-| `to-next-acceptance` | 显式     | 处理已有 acceptance 的人类反馈并推进下一轮；作为 `to-acceptance` 的子能力维护。                         | 未提及项不默认通过。                                |
-| `to-archive`         | 自动     | plan 完成后需要压缩 task / fan-in 执行记录，或用户要求归档、压缩、清理 completed plan。                 | plan-scoped task 默认 summary-only；归档不保留代码修改流水；删除 task 文件前必须满足当前 runtime 审批规则。 |
-| `to-backlog`         | 显式     | 当前阶段无法推进、被阻塞、延期或需要回收。                                                             | 说明阻塞原因、依赖和建议恢复时机。                  |
-| `to-handoff`         | 显式     | 跨会话继续、换 Agent、保存可执行恢复状态。                                                             | 不写聊天摘要式 handoff。                            |
-| `to-commit`          | 自动     | 用户要求 stage、commit、commit message 或拆分提交。                                                    | 遵守项目本地提交规范和验证要求；staged diff 含 workflow artifact 时先推荐 `validate-flow`。 |
-| `to-consolidation`   | 自动     | 阶段产物完成、多 Agent fan-in 后、task 显式安排收敛或用户要求收敛 diff。                               | 只收敛当前 pending diff，不查 artifact/status；不作为 `to-commit` 固定前置。 |
-| `validate-flow`      | 自动     | 创建或修改 Sky Flow artifact 后、plan 主会话 fan-in 后，或提交 workflow artifact 前。                  | 只检查 artifact 契约和状态一致性。                  |
+| Skill | 触发倾向 | 进入场景 | 边界 |
+| --- | --- | --- | --- |
+| `to-spec` | 显式 | 长期设计、需求澄清、spec / readiness / Progress 更新 | 先对齐再写；不记录 runtime 拓扑 |
+| `pick-goal` | 显式 | 从一个或多个 spec 选择、恢复、生成或启动 runtime goal | 选择只读；ready 交 `to-implement`，alignment 交 `to-spec`，blocked 不启动 |
+| `to-implement` | 自动 | 用户要求执行 / 继续 ready spec 或其派生的 implementation-ready goal | 动态执行并压缩写回 Progress；不接收 alignment 或 blocked goal |
+| `to-issue` | 显式 | 记录值得长期保留的问题、证据、机会或 unresolved finding | 不是执行 slice；不创建外部 tracker |
+| `to-debug` | 自动 | 定位问题、复现异常、分析 root cause | infra 取证转项目 adapter；事故回归转 BDD |
+| `to-infra` | 自动 | 环境、日志、数据库、缓存、Metrics、告警、部署或外部系统 | project-provided adapter |
+| `to-bdd-regression` | 自动 | 真实 bug / 事故需要固化成证据驱动回归 | 复用 debug 已有证据 |
+| `to-test` | 自动 | 测试策略、BDD/TDD、ROI、stable seam、替代验证 | 不替代 debug |
+| `to-knowledge` | 自动 | 发现业务无关、可跨项目复用的技术知识 | 不记录项目 / 业务实现状态 |
+| `to-review` | 自动 | code / artifact review 或阶段复审 | 默认只读；风险高时独立 reviewer |
+| `to-review-loop` | 显式 | review-fix-rereview | 高成本；要求 final consolidation 和 verifier gate |
+| `to-agent-review` | 显式 | 复盘 Agent 决策链、工具、动态调度、fan-in 和状态写回 | 默认输出报告，不自动改规则 |
+| `to-acceptance` | 自动 | 真实人类验收、sign-off、补信息或风险决策 | Agent 可自证事项不进入 |
+| `to-next-acceptance` | 显式 | 根据人类反馈推进下一轮 acceptance | 未提及项不默认通过 |
+| `to-backlog` | 显式 | 工作长期退出当前执行队列、等待外部条件 | 短期 blocker 留在 spec Progress |
+| `to-handoff` | 显式 | 易失本地状态需要换会话 / Agent 接力 | 不复制 spec Progress |
+| `to-commit` | 自动 | stage、commit、message 或拆分提交 | staged artifact 先 validate-flow |
+| `to-consolidation` | 自动 | 阶段完成、多 Agent fan-in 或用户要求收敛 diff | 只处理 pending diff 熵值 |
+| `validate-flow` | 自动 | 创建 / 修改 artifact、稳定 Progress 写回或提交前 | 只检查轻量结构和来源 |
+| `to-claude-review` | 显式 | Codex 需要 Claude Code 只读第二意见 | Codex-only bridge |
 
-## Runtime Plan
+## Native Runtime Execution
 
-使用 Codex 执行 Sky Flow plan 时，`to-implement` 主会话负责把文件化 plan / task DAG 映射为 `update_plan` 任务清单，并随着 task 状态变化持续更新。
+ready spec 或其派生的 implementation-ready goal 由 `to-implement` 直接交给原生 runtime：
 
-当文件化 plan 是父 Plan 时，主会话只把当前可执行子 Plan 映射为 runtime 任务清单；父 Plan 本身只提供总纲和
-`child_plans` 串行顺序。
+- 工作简单时主代理直接执行，不创建额外 checklist。
+- 复杂工作可以使用 runtime checklist、子代理或其他原生协调能力；不预设角色、packet 或固定流水线。
+- 同一文件 / 共享状态避免并发多写；交接后可以动态更换 writer。
+- 只有语义级 checkpoint、outcome、blocker、evidence、risk 或 resume target 写回 spec Progress。
+- scope 内 implementation strategy 由 runtime 自主调整；material goal、external behavior、contract 或 data semantics 变化时回 `to-spec`。
 
-并行组使用 `[并行 n]` 标记：
+runtime checklist 不是 artifact，不接受 `validate-flow`，也不应被复制进 spec、handoff 或 backlog。
 
-```text
-- task A
-- [并行 1] task B-1
-- [并行 1] task B-2
-- task C
-```
+用户明确要求从多个 spec 中选择或生成目标时，先用 `pick-goal` 只读派生 portable runtime goal；`Progress.Next` 只是恢复入口，不是 goal 本身。若用户同时要求启动，ready goal 交给 `to-implement`，alignment goal 交给 `to-spec`，仍有 blocker 时只报告解除条件。原生 goal 创建后，执行和稳定状态写回由接收方负责。
 
-主会话负责 plan 级 coordination / fan-in 和 artifact 状态维护。若 runtime 支持二级子代理，task owner 可以在自己的 task scope 内继续派发二级子代理，但必须自行 fan-in 后把最终结果回报主会话。
+## Real Boundary Routing
+
+- 临时执行阻塞：写入 spec Progress `Blockers`。
+- 长期延期或退出当前执行队列：`to-backlog`。
+- 未提交 diff、终端、临时环境或易失证据需要接力：`to-handoff`。
+- 人类 approval、真实设备 / 账号 / 环境、体验或风险接受：`to-acceptance`。
+- Agent 可自行验证：直接测试 / review / consolidate，证据压缩回 spec Progress。
+
+## Retired Skills
+
+历史文件化执行拓扑能力保存在仓库根 `archive/skills/`，不被 active installer 发现，也不得从 routing 推荐。迁移时把长期设计、稳定状态和证据压入 spec；只把真实边界分流到 acceptance、backlog 或 handoff。

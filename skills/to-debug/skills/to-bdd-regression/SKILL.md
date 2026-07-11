@@ -28,7 +28,7 @@ description: Sky Flow to-debug 的子能力。将真实线上 bug、客户反馈
 
 - 如果 `to-debug` 已提供 reproduction、confirmed hypothesis、evidence、incorrect path 和 correct path，直接复用，不重复查日志或重新列完整假设矩阵。
 - 如果缺少会改变测试行为的证据，回到 `to-debug` 补复现或回到 `to-infra` 补日志、DB、缓存、Metrics、Dashboard 或告警证据。
-- 如果发现 correct path 其实是产品 / 契约 / 数据口径问题，不直接写测试；回到上游 spec / plan / debug 流程确认。
+- 如果发现 correct path 其实是产品 / 契约 / 数据口径问题，不直接写测试；回到上游 spec / debug 流程确认。
 
 ## 输入包
 

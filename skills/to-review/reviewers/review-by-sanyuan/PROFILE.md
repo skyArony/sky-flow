@@ -1,8 +1,3 @@
----
-name: review-by-sanyuan
-description: 'Internal deep-review profile delegated only by to-review after medium review identifies cross-module, contract, shared-state, security, concurrency, architecture, or Sky Flow artifact boundary risk. Validate medium findings and dig into systemic failure modes without redoing the medium pass.'
----
-
 # review-by-sanyuan
 
 这是 `to-review` 的内部 `deep` profile，不是顶层入口。只在 medium review 已经给出高价值线索或明确不确定性后使用。
@@ -32,7 +27,7 @@ description: 'Internal deep-review profile delegated only by to-review after med
 - 状态机、事务、幂等、并发、TOCTOU、重试和回滚路径。
 - 权限、安全、数据泄漏、输入校验和信任边界。
 - 删除、迁移、重命名、fallback、兼容层和发布顺序风险。
-- spec / plan / task / acceptance 的目标、scope、依赖、验收证据和恢复入口是否互相支撑。
+- spec / runtime output / acceptance 的目标、scope、约束、验收证据和恢复入口是否互相支撑。
 - medium findings 是否遗漏跨模块影响，或是否误把低 ROI 理论风险升成阻塞项。
 
 ## ROI Discipline

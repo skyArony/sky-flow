@@ -5,6 +5,8 @@ description: 'Create or update Sky Flow plan artifacts from a ready spec, issue,
 
 # to-plan
 
+> Archived on 2026-07-11. Sky Flow no longer creates plan artifacts; execution starts directly from a ready spec.
+
 `to-plan` 生成或更新 Sky Flow `plan` artifact。它把 ready spec、issue 或已确认会话目标转成可长期维护的执行计划：目标契约、范围边界、阶段、进度、恢复入口、并行 / 串行意图，以及进入 `to-task` / `to-implement` 的 handoff。
 
 它只负责计划层。plan 应记录阶段级串行关系、可并行 lane 和 task handoff；精确 task DAG 由 `to-task` 写入 task metadata 并回填 plan 摘要。执行协调、子代理派发、fan-in、验证和状态回写由 `to-implement` 承担。

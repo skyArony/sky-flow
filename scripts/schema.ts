@@ -1,29 +1,17 @@
-// Sky Flow artifact 的稳定枚举；Markdown spec 和校验器都应与这里保持一致。
+// Sky Flow keeps only durable collaboration boundaries as file-backed artifacts.
 export const ARTIFACT_TYPES = [
   'spec',
   'issue',
-  'plan',
-  'task',
-  'step',
   'acceptance',
   'backlog',
   'handoff',
 ] as const;
 
+// These artifact types are intentionally rejected by the current validator.
+// Their historical skills live under archive/ and are not installable.
+export const RETIRED_ARTIFACT_TYPES = ['plan', 'task', 'step'] as const;
+
 export const STATUSES = ['draft', 'not_started', 'in_progress', 'completed', 'abandoned'] as const;
-
-export const TASK_TYPES = [
-  'exploration',
-  'implementation',
-  'review',
-  'verification',
-  'documentation',
-  'coordination',
-  'consolidation',
-] as const;
-
-// Task 角色：plan 下的 DAG 节点，或不值得升级为 plan 的轻量独立任务。
-export const TASK_ROLES = ['plan_scoped', 'standalone'] as const;
 
 export const ACCEPTANCE_TYPES = [
   'interactive',
@@ -32,31 +20,40 @@ export const ACCEPTANCE_TYPES = [
   'html_interactive',
 ] as const;
 
-// Plan 层级角色：普通计划、超级巨大任务总纲、总纲下的串行子计划。
-export const PLAN_ROLES = ['standalone', 'parent', 'child'] as const;
-
-// Plan 细化程度：只到总纲方向，或已经可以进入 to-task。
-export const PLANNING_DEPTHS = ['outline', 'task_ready'] as const;
-
-// 编号只用于稳定排序，不表达优先级。
-export const STANDALONE_PLAN_ID_PATTERN = /^\d{3}-[a-z0-9]+(?:-[a-z0-9]+)*$/;
-export const CHILD_PLAN_ID_PATTERN = /^\d{3}[a-z]-[a-z0-9]+(?:-[a-z0-9]+)*$/;
-export const PLAN_ID_PATTERN = /^(?:\d{3}|\d{3}[a-z])-[a-z0-9]+(?:-[a-z0-9]+)*$/;
-export const TASK_ID_PATTERN = /^\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*$/;
-export const STANDALONE_TASK_ID_PATTERN = /^t\d{3}-[a-z0-9]+(?:-[a-z0-9]+)*$/;
-
-// 这里只放机器可确定的必填字段；语义充分性留给 LLM 收口。
+// Only mechanically necessary fields belong here. Content sufficiency stays in
+// the semantic pass so the schema does not recreate a rigid workflow.
 export const REQUIRED_FIELDS: Record<string, string[]> = {
   base: ['id', 'artifact_type', 'status'],
-  task: ['task_type', 'depends_on', 'depended_by', 'parallel_with', 'external_depends_on'],
   acceptance: ['acceptance_type', 'source_type', 'source_id', 'round'],
   backlog: ['source_type', 'source_id', 'depends_on', 'recommended_resume'],
   handoff: ['source_type', 'source_id', 'resume_from'],
 };
 
-export const RECOMMENDED_PLAN_FIELDS = ['goal', 'issues', 'tasks', 'completed_at'] as const;
+// Legacy topology fields must not leak into the simplified artifact model.
+export const RETIRED_TOPOLOGY_FIELDS = [
+  'plan',
+  'plans',
+  'plan_id',
+  'plan_path',
+  'task',
+  'tasks',
+  'task_id',
+  'task_path',
+  'step',
+  'steps',
+  'plan_role',
+  'planning_depth',
+  'parent_plan',
+  'child_plans',
+  'parent_task',
+  'child_tasks',
+  'task_role',
+  'task_type',
+  'depended_by',
+  'parallel_with',
+  'external_depends_on',
+] as const;
 
-// 默认值保持项目无关；需要定制时通过 SKY_FLOW_* 环境变量覆盖。
 export const DEFAULT_SKY_FLOW_ROOT = 'docs';
 export const DEFAULT_SKY_FLOW_LANG = '简体中文';
 

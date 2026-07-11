@@ -5,6 +5,8 @@ description: "Compress completed Sky Flow plan/task/acceptance artifacts after a
 
 # to-archive
 
+> Archived on 2026-07-11. Plan/task archive compression was retired with those artifact types.
+
 `to-archive` 在 Sky Flow plan 完成后压缩执行期 artifact，也定义 standalone task 完成后的自压缩规则。它不新增长期 artifact 类型；plan 归档摘要写回 completed plan 本身，plan-scoped task 文件视为执行脚手架，默认 summary-only 清理，验收通过的 acceptance 默认压缩为长期验收凭证。standalone task 没有 parent plan，完成后按 completed plan 的标准把事实和证据压缩回 task 自身并移动到 `tasks/standalone/done/`。
 
 ## Quick Path
