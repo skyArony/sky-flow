@@ -1,6 +1,6 @@
 ---
 name: to-handoff
-description: 'Create or update Sky Flow handoff artifacts only for volatile cross-session or cross-agent transfer state such as uncommitted diffs, terminal state, temporary environments, and short-lived evidence; keep durable design and progress in the source spec.'
+description: 'Create or update a Sky Flow handoff artifact only when the user explicitly invokes $to-handoff for volatile cross-session or cross-agent transfer state such as uncommitted diffs, terminal state, temporary environments, or short-lived evidence.'
 ---
 
 # to-handoff

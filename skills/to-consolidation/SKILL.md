@@ -1,6 +1,6 @@
 ---
 name: to-consolidation
-description: 'Consolidate completed stage code or concrete output changes by checking the target scope for patchy implementation, temporary code, duplicate logic, dead leftovers, and fan-in residue. Use after a verifiable stage, multi-agent fan-in, explicit runtime scheduling, or when the user asks to consolidate pending work.'
+description: 'Consolidate a stable completed-stage diff only when the user explicitly invokes $to-consolidation. Check the target scope for patchy implementation, temporary code, duplicate logic, dead leftovers, and fan-in residue while preserving behavior.'
 ---
 
 # to-consolidation
@@ -15,7 +15,7 @@ description: 'Consolidate completed stage code or concrete output changes by che
 
 默认范围是当前工作区 pending diff，明确包括 unstaged diff、staged diff 和 untracked files。用户指定路径、模块、文件、提交、提交区间或 source spec 时，只检查指定范围对应的代码 / 产物 diff；不检查 artifact 状态。
 
-`to-consolidation` 不作为 `to-commit` 的固定前置步骤。它由 `to-implement` 根据阶段风险、fan-in 复杂度、产物形态和 diff 熵值动态触发，或由用户显式触发。
+`to-consolidation` 不作为 `to-implement`、`to-review-loop` 或 `to-commit` 的固定前置步骤，也不因 fan-in 或 diff 熵值自动触发。只有用户显式调用 `$to-consolidation` 时才运行；其他流程直接做最小 diff sanity 并报告明显收敛迹象。
 
 ## 重复使用策略
 
@@ -27,16 +27,18 @@ description: 'Consolidate completed stage code or concrete output changes by che
 
 然后按本 Skill 已加载的规则判断是否有临时代码、无关 diff、重复实现、debug 残留或需要人类确认的问题。复用规则只减少重复读文档，不减少 diff / status 检查。
 
+同一稳定阶段最多执行一轮完整收敛。finding 修复后默认只复查相关 hunk、调用链、工作区状态和必要验证；只有修复改变公共契约、资金 / 状态机语义、重新发生 fan-in、显著扩大 scope，或原收敛留下系统性未知时，才重开完整收敛。fan-in、最终交付、提交前等 gate 如果重合，合并为一次。
+
 ## Workflow
 
-1. 建立范围事实：用只读 Git / 文件命令确认 unstaged、staged、untracked 三类 pending diff，以及目标路径、模块或提交区间。
-2. 只读扫描目标 diff 和必要相邻代码，记录补丁式痕迹、重复实现和 fan-in 残留。
-3. 判断是否需要只读并行审查；共享核心文件只能并行分析、串行修改。
+1. 建立范围事实：用只读 Git / 文件命令确认 unstaged、staged、untracked 三类 pending diff，以及目标路径、模块或提交区间。大 diff 先用 stat / numstat 建立按领域和风险分组的 change map。
+2. 从目标 diff、新增符号和调用点开始探索，由模型根据复杂度和证据需要自行决定读取范围；避免无收益地重复读取已由可信 lane 覆盖的文件组。
+3. 默认由当前 Agent 检查；只有用户显式要求 delegation / subagent 时才拆成最少量的只读 lane。共享核心文件只能并行分析、串行修改。
 4. Fan-in 发现，分类为可直接收敛、需要人类确认、保留但说明原因。
 5. 只修无歧义低风险整理，例如当前目标 diff 引入的临时代码、重复实现、非公共错误抽象、浅层 wrapper、过深嵌套、旧注释、debug 残留、无用配置，以及目标范围内明确的 format / lint 问题。
 6. guard / fallback、错误处理、职责分布只在本次 diff 引入重复、叠加、遮蔽或风格漂移且证据明确时收敛；涉及行为口径、兼容逻辑或公共契约时先询问人类。
 7. 检查目标 diff 和必要相邻代码后停止；不要为了理论上的历史问题做全仓搜索式清理。
-8. 复查 diff，确认没有引入目标文件外的无关格式化、额外重构、临时代码或扩大范围。
+8. 复查实际修改的 hunk 和受影响调用链，确认没有引入目标文件外的无关格式化、额外重构、临时代码或扩大范围；不因局部修复重跑完整收敛。
 9. 如果实际修改了可执行代码，运行与改动相关的最小验证；无法验证时说明原因。
 
 ## 收敛判定
@@ -99,7 +101,7 @@ description: 'Consolidate completed stage code or concrete output changes by che
 
 ## 并行策略
 
-小 diff 由主会话直接检查。fan-in 或跨模块 diff 可拆成 `2-3` 个只读 lane，按文件组或风险视角并行审查；子代理只输出发现、证据和建议，主会话负责 fan-in、判断 ROI 和最终修改。
+默认由当前 Agent 直接检查。只有用户显式要求 delegation / subagent 时才拆成少量只读 lane；按不重叠文件组分配，避免多个 lane 用不同“风险视角”重复读取同一实现。子代理只输出 findings、证据和未验证项，不复述无问题区域；主会话负责一次 fan-in、ROI 判断和最终修改。
 
 如果 runtime 没有子代理，就按同样视角串行执行，不因此扩大 scope。
 

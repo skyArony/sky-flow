@@ -2,8 +2,8 @@
 name: to-claude-review
 description: >
   Codex-only review-first bridge into Claude Code through `claude-agent-acp`.
-  Use when Codex wants a synchronous or detached second-opinion review with
-  findings-first output while Codex keeps implementation ownership.
+  Use only when the user explicitly invokes $to-claude-review for a synchronous
+  or detached second opinion while Codex keeps implementation ownership.
 install_targets: [codex]
 required:
   commands: [python3, claude, claude-agent-acp]
@@ -17,8 +17,9 @@ guidance:
 
 # To-Claude-Review
 
-Use this skill from Codex when Claude Code should act as a review-only /
-second-opinion bridge instead of a general implementation delegate.
+Use this skill only when the user explicitly requests `$to-claude-review` and
+Claude Code should act as a review-only / second-opinion bridge instead of a
+general implementation delegate.
 
 `./install.sh to-claude-review` should auto-install the npm-backed
 `claude-agent-acp` runtime when the machine already has npm, or a supported

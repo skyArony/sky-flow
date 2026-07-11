@@ -1,6 +1,6 @@
 ---
 name: to-issue
-description: 'Create or update local Sky Flow issue artifacts for durable problems, evidence, opportunities, or unresolved findings that should be understood before direct runtime work or long-lived spec design.'
+description: 'Create or update a local Sky Flow issue artifact only when the user explicitly invokes $to-issue for a durable problem, evidence set, opportunity, or unresolved finding that should be understood before runtime work or long-lived spec design.'
 ---
 
 # to-issue

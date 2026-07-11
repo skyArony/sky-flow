@@ -14,5 +14,7 @@ Archived entries:
 - `pick-plan`: retired selector and its collector / UI metadata.
 - `to-archive`: retired execution-record compressor.
 - `to-implement`: snapshot of the retired topology-driven executor; the active skill with the same name was rewritten as a thin spec executor.
+- `to-test`: retired testing-strategy workflow; test ROI, stable seams, and ordinary verification now belong to the native runtime.
+- `to-bdd-regression`: retired incident-regression workflow; its evidence-to-regression invariant now belongs to `to-debug`.
 
-Archived on 2026-07-11 as part of the spec-direct workflow simplification.
+The execution-topology skills were archived on 2026-07-11. The two testing workflows were archived on 2026-07-13 after their remaining invariants moved into the native runtime and `to-debug`.

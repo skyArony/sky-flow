@@ -1,21 +1,22 @@
 ---
 name: to-acceptance
-description: 'Create or update concise Sky Flow acceptance artifacts only for real human gates: behavior the agent cannot self-verify, significant decisions or risks humans must approve, missing information humans must provide, or feedback/sign-off checkpoints.'
+description: 'Create or update a durable Sky Flow acceptance artifact only when the user explicitly invokes $to-acceptance for a real human gate: behavior the agent cannot self-verify, a significant decision or risk, missing human input, or multi-round sign-off.'
 ---
 
 # to-acceptance
 
-`to-acceptance` 只承载真实人类门控。Agent 能通过代码、命令、测试、lint、build、渲染或静态 review 自行判断的事项必须先自行验证，最多作为支撑人类判断的简短 evidence。
+`to-acceptance` 只在用户显式调用时，为需要长期保留或多轮跟踪的真实人类门控创建 artifact。普通一次性问题直接在对话中询问。Agent 能通过代码、命令、测试、lint、build、渲染或静态 review 自行判断的事项必须先自行验证，最多作为支撑人类判断的简短 evidence。
 
 ## Quick Path
 
-1. 确定 `SKY_FLOW_ROOT` / `SKY_FLOW_LANG`。
-2. 读取来源：优先 spec，也可以是 conversation、issue、backlog、handoff 或 existing acceptance。
-3. 过滤候选项：只保留真实设备 / 账号 / 环境 / 体验、产品或风险决策、缺失人类输入、明确 sign-off。
-4. 如果所有内容都可由 Agent 自证，不创建 acceptance；直接报告并写回 spec Progress / evidence。
-5. 创建或更新 `${SKY_FLOW_ROOT}/acceptance/<id>.md`，不覆盖人工反馈。
-6. 每个验收组保持「问题 / 需求 → 验收步骤 → 验收结论（人类填）」。
-7. 修改 artifact 后运行 `validate-flow`。
+1. 确认用户显式要求 durable acceptance artifact；一次性 gate 直接在对话中处理。
+2. 确定 `SKY_FLOW_ROOT` / `SKY_FLOW_LANG`。
+3. 读取来源：优先 spec，也可以是 conversation、issue、backlog、handoff 或 existing acceptance。
+4. 过滤候选项：只保留真实设备 / 账号 / 环境 / 体验、产品或风险决策、缺失人类输入、明确 sign-off。
+5. 如果所有内容都可由 Agent 自证，不创建 acceptance；直接报告并写回 spec Progress / evidence。
+6. 创建或更新 `${SKY_FLOW_ROOT}/acceptance/<id>.md`，不覆盖人工反馈。
+7. 每个验收组保持「问题 / 需求 → 验收步骤 → 验收结论（人类填）」。
+8. 修改 artifact 后运行 `validate-flow`。
 
 ## Source And Metadata
 
@@ -134,7 +135,7 @@ Agent 自证结果可以压缩到验收组 `证据`，不能拆成独立验收�
 ## Boundaries
 
 - 不替代 spec Progress 或 runtime 执行。
-- 不替代 `to-test`、`to-review` 或 `validate-flow`。
+- 不替代 native runtime 测试、`to-review` 或 `validate-flow`。
 - 不把普通 review triage 写成人工验收。
 - 不为纯 FYI、完成播报或无需人类输出的重大结论创建 acceptance；写入对话或 spec Progress / evidence。
 - 不把未验证内容包装成通过。

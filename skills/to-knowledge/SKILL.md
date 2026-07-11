@@ -1,11 +1,11 @@
 ---
 name: to-knowledge
-description: 'Capture concise, source-backed, project-agnostic developer knowledge notes for infrastructure, foundational components, libraries, tooling, architecture patterns, troubleshooting lessons, and technology option comparisons. Never record concrete business, customer, project, incident, domain-rule, internal-environment, account, financial, operational, or project-implementation information.'
+description: 'Capture a concise, source-backed, project-agnostic developer knowledge note only when the user explicitly invokes $to-knowledge. Never record concrete business, customer, project, incident, domain-rule, internal-environment, account, financial, operational, or project-implementation information.'
 ---
 
 # to-knowledge
 
-`to-knowledge` 把开发过程中发现的通用技术事实、踩坑、注意点、工具 / 库特性和技术选型对比，沉淀成长期知识笔记。它偏向自动触发，但必须轻量：不打断主任务，不把原始文档搬运进仓库。
+`to-knowledge` 只在用户显式调用时，把开发过程中发现的通用技术事实、踩坑、注意点、工具 / 库特性和技术选型对比沉淀成长期知识笔记。日常任务可以在交付中推荐值得沉淀的主题，但不自动创建笔记。
 
 默认写入 `${SKY_FLOW_ROOT}/knowledge/`。knowledge note 不是 Sky Flow workflow artifact；默认不要写 `artifact_type` frontmatter，除非本地知识库已经定义了独立 schema。
 
@@ -41,30 +41,12 @@ description: 'Capture concise, source-backed, project-agnostic developer knowled
 - 未查证的传闻、论坛结论或模型记忆；只能作为待验证线索，不写成事实。
 - 为了“完整”搬运原始文档、教程全文、API 列表或大段代码。
 
-## Auto Trigger Rules
+## Invocation Policy
 
-- 已经在主任务中拿到可靠证据，且 5-10 分钟内能写清楚时，直接创建或更新 1 条高价值知识笔记。
-- 如果 runtime 支持子代理，优先把知识沉淀作为旁路子代理任务执行；主代理继续推进主线，只负责 fan-in 最终笔记路径和关键结论。
-- 发现多个候选知识点时，只沉淀最有复用价值的 1-3 条；其余在交付说明中列为建议，不展开。
-- 需要额外长时间调研、需要登录、需要生产系统证据或会改变主任务节奏时，先完成主任务，再推荐使用 `to-knowledge`。
-- 用户显式要求沉淀知识时，`to-knowledge` 成为主任务，可以系统化调研、对比和整理。
-
-## Sidecar Delegation
-
-知识沉淀通常不需要最高等级模型。主代理应按任务风险选择足够的子代理能力：
-
-- `simple note`：主任务已经确认事实和来源，只需要整理成 1 条短笔记。使用低成本模型即可。
-- `comparison note`：需要整理多个库 / 方案的优劣势，但来源清楚、范围有限。使用中等模型。
-- `research note`：需要重新查证最新版本、来源冲突、长文档压缩、安全 / 基础设施风险判断。使用更强模型或留给主代理确认。
-
-旁路子代理输入应尽量小：
-
-- Topic：要沉淀的知识点和推荐分类。
-- Evidence：已确认事实、权威链接、检查日期和必要摘录。
-- Boundary：明确排除所有项目 / 业务 / 客户 / 事故 / 内部环境信息；输出中不得出现业务例子或项目专属证据摘录。
-- Output：目标路径、是否更新已有笔记、最终 note 内容和 sources。
-
-旁路子代理不应接手主任务、修改 workflow artifact 状态、访问生产系统或扩大调研范围。它只输出 knowledge note；主代理 fan-in 时检查来源、范围、安全和路径。
+- 只有用户显式调用 `$to-knowledge` 时才创建或更新笔记；主任务中偶然发现知识点不自动旁路沉淀。
+- 一次默认只处理一个高价值主题；用户明确要求批量整理时才扩展。
+- 默认由当前 Agent 完成。只有用户显式要求 delegation / subagent 时才派发，并保持 Topic、Evidence、Boundary、Output 四项输入紧凑。
+- 需要额外长时间调研、登录或生产系统证据时，先说明缺口与授权边界，不扩大当前任务。
 
 ## Categories
 

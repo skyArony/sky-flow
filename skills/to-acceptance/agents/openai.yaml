@@ -1,0 +1,6 @@
+interface:
+  display_name: "To Acceptance"
+  short_description: "显式创建需要长期保留、多轮反馈或明确签字的人类验收门控"
+  default_prompt: "使用 $to-acceptance 创建或更新一个 durable human gate。"
+policy:
+  allow_implicit_invocation: false

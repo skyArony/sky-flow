@@ -1,6 +1,6 @@
 ---
 name: pick-goal
-description: 'Select an unfinished Sky Flow spec and derive a concise portable runtime goal from its durable intent, scope, success conditions, constraints, verification intent, and Progress recovery state. Use when the user explicitly asks to pick, recommend, resume, generate, or start a goal from one or more Sky Flow specs. Selection stays read-only; an explicit start hands an implementation-ready goal to to-implement, an alignment goal to to-spec, and leaves a blocked goal unstarted.'
+description: 'Select an unfinished Sky Flow spec and derive a concise portable runtime goal only when the user explicitly invokes $pick-goal. Selection stays read-only; an explicit start routes a ready goal to to-implement and leaves a blocked goal unstarted.'
 ---
 
 # pick-goal
@@ -26,13 +26,14 @@ runtime goal = current execution projection
 
 从相关语义派生目标，而不是要求固定 section 名称：
 
-- Objective：spec 希望最终成立的结果。
-- Done condition：可观察的 requirements / acceptance / verification evidence。
-- Boundaries：scope、no-touch、权限、真实人类 gate 和其他稳定 constraints。
-- Current truth：Progress 中仍成立的 checkpoint、outcome、blocker 和 evidence。
-- Resume target：下一轮优先推进的目标级入口；它不是 goal 本身，也不是具体代码操作。
+- 目标：spec 希望最终成立的结果。
+- 成功边界：可观察的 requirements / acceptance / verification evidence。
+- 关键约束：scope、no-touch、权限、真实人类 gate 和其他稳定 constraints。
+- 相关契约：与当前目标直接相关的外部行为、数据、权限或兼容边界；没有时省略。
+- 当前事实：Progress 中仍成立的 checkpoint、outcome、blocker 和 evidence。
+- 恢复目标：下一轮优先推进的目标级入口；它不是 goal 本身，也不是具体代码操作。
 
-输出保持紧凑，通常包含 source spec、goal、done condition、constraints、current truth、resume target 和需要停下问人的条件。不预写实现步骤、子代理数量、runtime checklist 或固定验证顺序。
+输出保持紧凑，按相关性包含来源 spec、目标、成功边界、关键约束、相关契约、当前事实、恢复目标和需要停下问人的条件。不预写实现步骤、子代理数量、runtime checklist 或固定验证顺序。
 
 ## Native Goal Boundary
 

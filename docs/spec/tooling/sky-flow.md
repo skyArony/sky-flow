@@ -6,12 +6,12 @@ status: completed
 
 # Sky Flow 工作流套件
 
-最后更新：2026-07-11
+最后更新：2026-07-13
 
 ## Intent
 
 - Problem: 文件化执行层、静态依赖图和 runtime 自主调度重复表达同一件事；随着模型能够动态派发子代理、调整顺序和 fan-in，过重约束开始降低执行效率。
-- Outcome: Sky Flow 只持久化长期设计与真实协作边界，默认从 ready spec 直接执行；执行拆解与分工由 runtime 动态完成。
+- Outcome: Sky Flow 只持久化长期设计与真实协作边界，默认从 ready spec 直接执行并由 runtime 完成普通验证；重型 workflow 能力保留为用户显式调用，执行拆解与分工由 runtime 动态完成。
 - Audience: 使用、维护或扩展 Sky Flow 的 Agent、开发者与需要跨会话恢复状态的人类协作者。
 
 ## Context
@@ -19,6 +19,7 @@ status: completed
 ### Confirmed Facts
 
 - Agent runtime 已能根据当前事实动态拆解工作、选择主代理或子代理、维护临时 checklist、调整并行并完成 fan-in。
+- Skill 使用 progressive disclosure；一旦隐式命中就会读取完整正文，因此过宽触发面会把可选能力变成日常上下文和延迟成本。
 - 预先写死的文件化执行图容易在第一轮探索后失效，还要求额外维护字段、双向关系、状态和校验器。
 - 长期设计、行为约束、关键决策、当前 checkpoint、blocker 和验证证据仍需要可恢复、可检索的文件化真相源。
 - 人类 approval、真实设备 / 账号 / 环境、长期外部依赖和易失接力状态仍然是独立协作边界。
@@ -29,6 +30,7 @@ status: completed
 - 简单工作不得为了使用流程而创建 artifact。
 - 文件化状态必须紧凑，不能退化成执行流水或隐藏拓扑。
 - 同一文件或共享状态避免并发多写；完成交接后可以动态更换 writer，多 Agent 输出由主会话 fan-in。
+- 简化不得删除 authority、no-touch、不可逆操作确认或确定性完成证据；减少的是重复模型 pass，不是安全与正确性边界。
 
 ## Scope
 
@@ -52,13 +54,15 @@ status: completed
 ```text
 spec（长期设计 + readiness + Progress）
   ↓
-可选 pick-goal（只读 goal projection）
+显式可选 $pick-goal（只读 goal projection）
   ↓
-native runtime execution + dynamic subagents
+native runtime execution
   ↓
-test / review / consolidation（按实际风险触发）
+直接测试 / 静态检查 / build / 真实路径 / diff sanity
   ↓
 spec Progress 写回
+
+显式可选：review / review-loop、consolidation、知识沉淀、第二意见、多 Agent、durable acceptance
 ```
 
 旁路 artifact 只在真实边界出现：
@@ -139,6 +143,19 @@ spec 至少表达：
 
 不要把 runtime work items、owner、依赖、并行批次或子代理消息写进 spec。
 
+## Design Alignment Contract
+
+`to-spec` 不以问题数量或模板完整度衡量对齐质量，而以是否找到了决定设计成立的核心底座衡量：
+
+- `底座对齐`确认根问题、成功边界、不变量、系统 / authority 边界、关键契约与非目标。
+- `决策归属`区分仓库事实、人类决策、Agent 决策、runtime 选择和外部未知；可查事实不转问用户，边界内工程判断不误升级。
+- `决策前沿`只存在于对话 / runtime，按依赖顺序关闭会改变多个下游判断的根问题；一次只问一个人类决策，并给出推荐、影响和解锁范围。
+- `就绪证明`确认实现者不需要猜测产品口径、外部行为、数据语义、权限边界或验收方式。
+
+spec 只保存稳定决策和仍真实开放的实质问题。重要决策可按需标注归属；开放问题可按需标注负责人、重要性、推荐与解锁范围。问题树、问答时间线、已关闭分支和 runtime 选择不得持久化。
+
+复杂或高风险设计按需加载深度对齐参考；简单工作不得因此被迫创建 spec 或经历完整 grill 流程。
+
 ## Progress Contract
 
 推荐格式：
@@ -186,15 +203,17 @@ Progress 是覆盖更新的语义恢复快照：
 `to-implement` 直接读取 ready spec 或由它派生的 implementation-ready runtime goal。alignment goal 回 `to-spec`，仍有 blocker 的 goal 不启动。执行器只规定不可越过的目标、权限、真实 gate、并发写安全、完成证据和 Progress 边界；实现策略保持高自由度。
 
 - 读取足以理解目标、成功标准、当前真相、constraints 和恢复入口的语义；不要求固定 section schema。
-- runtime 自主选择探索、实现、工具、checklist、子代理、顺序、并行和验证组合。
+- runtime 自主选择探索、实现、工具、checklist、顺序和普通验证组合；Sky Flow 不预设 lane、角色或重复 pass。
 - Mission 必须清楚；其他 delegation packet 字段只在相关时提供，不形成缩小版 task 模板。
-- 测试、review、consolidation、acceptance 和 validation 按证据缺口与风险选用，不形成固定流水线。
+- 只有多个消费者或上下文容易在交接中失真时，才在 runtime 内一次投影`目标 / 成功边界 / 关键约束 / 相关契约 / 当前事实`并复用；它不是固定 packet，也不写入 artifact。
+- runtime 支持模型选择时，清楚、局部、可验证的工作可使用满足要求的最小模型；高歧义、高风险或最终冲突仲裁使用更强模型。
+- 普通测试、测试 ROI、stable seam、静态检查、build、真实路径验证和 diff sanity 由 runtime 直接判断与执行；真实事故回归留在 `to-debug` 的同一证据循环。专门 review、review loop、consolidation、知识沉淀、第二意见、多 Agent 和 file-backed acceptance 只在用户显式调用时进入；已有 durable constraint 由 runtime 用最小充分路径满足，不隐式加载其他重型 Skill。
 - 多个修复方向或 fan-in 冲突优先继续取证和裁决；只有触及用户拥有的重大决策、权限或不可逆边界且无法安全推导时才问人。
 - 只在语义 checkpoint、outcome、blocker、evidence、risk 或 resume target 稳定变化时写回 spec。
 
 ### Subagent ROI
 
-只有明确收益高于 fan-in 成本时派发：
+Sky Flow 默认不要求派发子代理。只有用户显式要求多 Agent，或 source spec 明确要求独立评估时，runtime 才在授权边界内决定是否派发；派发仍要求收益高于 fan-in 成本：
 
 - 并行时间收益。
 - 上下文隔离收益。
@@ -207,11 +226,22 @@ Progress 是覆盖更新的语义恢复快照：
 
 gate 保留为不变量，不再物化成执行节点：
 
-- spec、用户或实际风险要求独立 review 时，implementation owner 不得自行清除。
-- fresh reviewer / verifier 动态派发，结论写入 Last verified。
+- spec 或用户明确要求独立 review 时，implementation owner 不得自行清除。实际风险只能在安全 / 权限 / 资金 / 数据 / 迁移等高风险且当前证据不足时升级独立评估，不能因普通 P1 标签自动升级。
+- 独立评估默认一个 fresh reviewer / verifier；只有用户明确要求，或 P0 安全边界仍存在证据冲突时才使用第二个模型 / 供应商。结论写入 Last verified。
 - 独立评估不可用时记录 `independent_review: unavailable` 和残余风险。
-- 人类 approval、真实设备 / 账号 / 环境、体验或风险接受进入 acceptance。
+- 人类 approval、真实设备 / 账号 / 环境、体验或风险接受先在对话中停止并询问；只有需要 durable、多轮或跨会话 gate 且用户显式调用时才创建 acceptance。
 - Agent 可自行完成的 test、lint、build、静态 review 直接执行并记录证据。
+
+### Review Efficiency
+
+- 普通实现不自动进入 `to-review`；runtime 用测试、静态证据、真实路径和 focused diff check 完成自检。
+- 用户显式调用 `$to-review` 时，默认一个 reviewer 同时给出设计 / spec 符合性和代码质量结论，并列出无法验证项。
+- 只有大 diff、多 reviewer 或重复复审时才准备文件化 review context；必须引用 source spec / goal，不能只提供 diff。
+- 多 reviewer 只在用户显式要求，或 source spec 的 Independent Review 明确要求多个独立结论时使用，并保持独立上下文。
+- consolidation 只在用户显式调用 `$to-consolidation` 时进入；runtime 仍应直接清理自己引入的明显临时残留和无关 diff。
+- finding 修复后默认由当前执行者定点验证对应 hunk、真实路径和必要测试；只有 P0、证据冲突、高风险安全 / 资金 / 权限 / 迁移且定点证据不足，或用户 / spec 明确要求时才启动一个独立 verifier。
+- 只有独立 verifier 后仍存在证据冲突、P0 安全边界需要双重确认，或用户明确要求时，才使用两个模型 / 供应商。
+- 没有文件变化或 confirmed finding 时不启动 verifier，由整合 review 直接给出可追溯结论。
 
 ## Artifact Boundaries
 
@@ -223,7 +253,7 @@ issue 保存问题、证据、影响和一个有价值的下一决策。它不�
 
 ### Acceptance
 
-acceptance 只承载 Agent 无法自行判断或必须由人类拍板的事项。来源优先是 spec 或 conversation，也可以来自 issue、backlog 或 handoff。
+acceptance 只承载 Agent 无法自行判断或必须由人类拍板、且需要 durable / 多轮 / 跨会话记录的事项。一次性补信息或确认直接在对话处理；用户显式调用 `$to-acceptance` 后才创建 file-backed artifact。
 
 每组保持「问题 / 需求 → 验收步骤 → 验收结论（人类填）」；Agent 可自证结果只作为简短 evidence。
 
@@ -248,8 +278,7 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
 | `pick-goal` | 从 unfinished spec 只读派生 portable runtime goal，并在显式启动时按 readiness 交接 |
 | `to-implement` | spec-direct runtime execution 与稳定写回 |
 | `to-issue` | 本地问题与证据记录 |
-| `to-debug` / `to-bdd-regression` | 诊断与真实事故回归 |
-| `to-test` | 测试策略与验证 ROI |
+| `to-debug` | 诊断与真实事故回归 |
 | `to-review` / `to-review-loop` | 风险审查与显式复审循环 |
 | `to-agent-review` | Agent 决策链复盘 |
 | `to-consolidation` | pending diff 熵值收敛 |
@@ -312,12 +341,12 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
 4. 执行出现设计变化。
    - Given 新事实会改变 requirement、contract、data semantics 或 acceptance behavior
    - When Agent 无法在既有 spec 内安全继续
-   - Then 停止执行并回 `to-spec` 对齐
+   - Then 停止执行并建议用户显式调用 `$to-spec` 对齐，不在实现层猜设计
 
 5. 人类 gate 不被伪装成 Agent 自证。
    - Given 完成依赖真实设备、账号、环境、体验或风险接受
    - When Agent 到达该边界
-   - Then 创建或更新 acceptance，不宣称自行通过
+   - Then 在对话中停止并请求人类结论，不宣称自行通过；只有用户显式要求 durable gate 时才创建或更新 acceptance
 
 6. Progress 不膨胀成流水账。
    - Given 多轮执行和多个子代理完成工作
@@ -330,7 +359,7 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
    - Then 返回明确 migration error，不提供兼容执行路径
 
 8. 多个 spec 可以派生一个 runtime goal。
-   - Given 用户要求挑选下一目标且存在多个 unfinished spec
+   - Given 用户显式调用 `$pick-goal` 且存在一个或多个 unfinished spec
    - When `pick-goal` 运行
    - Then 它按用户意图和 durable semantics 选择一个 spec，输出 portable goal，不创建 artifact、不把 Progress.Next 当 goal、不自动执行
 
@@ -343,6 +372,46 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
    - Given Claude 需要直接 child links 而 Codex 能从 suite root 发现 nested Skills
    - When install、update 或 doctor 运行
    - Then Claude 按 Skill 直接判定，Codex 按 suite root 判定，并在 copy-mode 校验目标 child 的当前内容
+
+11. 仓库事实不被伪装成人类问题。
+   - Given 一个设计分叉可以从代码、docs、schema 或现有证据确认
+   - When `to-spec` 对齐设计
+   - Then Agent 自行取证并说明结论，不询问用户仓库当前如何实现
+
+12. 决策按真实 authority 分流。
+   - Given 设计同时包含产品口径、边界内工程选择和执行时细节
+   - When 判断决策归属
+   - Then 只把产品口径交用户，Agent 自主完成工程选择，runtime 细节不进入 spec
+
+13. 决策前沿先关闭根问题。
+   - Given 多个实质问题存在依赖关系
+   - When 进行复杂 spec 对齐
+   - Then 一次只问一个最靠近根部的问题，附推荐、影响和解锁范围，且不持久化问题树
+
+14. 多消费者复用紧凑 runtime context。
+   - Given 实现需要多个 reviewer 或子代理理解相同边界
+   - When runtime 派发工作
+   - Then 可复用目标、成功边界、关键约束、相关契约和当前事实，而不创建固定 packet 或 artifact
+
+15. review 成本与风险匹配。
+   - Given 复审没有高风险证据、fan-in 熵值或 confirmed finding
+   - When review 或 review loop 收口
+   - Then 不强制 final consolidation、独立 verifier 或双 verifier，并由一次整合 review 或定点验证给出结论
+
+16. 日常实现不自动加载重型能力。
+   - Given 用户要求普通实现、测试修改或修复，且 source spec 没有独立评估 constraint
+   - When runtime 执行并验证结果
+   - Then 直接判断测试 ROI 并运行必要测试、静态检查、build、真实路径和 diff sanity，不自动进入 `to-review`、`to-consolidation`、多 Agent 或 artifact 写入
+
+17. 重型能力由用户主动开启。
+   - Given 用户需要专门 review、review-fix-rereview、diff 收敛、知识沉淀、第二意见、多 Agent 或 durable acceptance
+   - When 用户显式调用对应 `$skill`；或 source spec 已持久化独立评估 constraint
+   - Then 只运行被请求的 Skill；独立评估 constraint 由 runtime 用最小充分路径满足，不隐式加载其他重型 Skill
+
+18. 真实事故回归不另开工作流。
+   - Given `to-debug` 已确认真实事故的 expected behavior、复现、incorrect path 和 correct path
+   - When 存在稳定测试 seam
+   - Then 用最小失败测试命中 incorrect path，修复后用同一测试验证 correct path；没有稳定 seam 时保留可重复 replay / smoke evidence 和 residual risk
 
 ## Requirements
 
@@ -363,6 +432,15 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
 - R15: `to-implement` 只硬性保护用户 intent、真实 constraints、authority、并发写安全和 completion evidence；其他执行策略必须保持为 runtime 自主选择或启发式建议。
 - R16: `pick-goal` 显式启动必须按 readiness 唯一交接；它不拥有 implementation 或 alignment 执行。
 - R17: installer / doctor 必须使用 target-specific discovery：Claude 要求直接 child install，Codex 通过 suite root 接受 nested child，并保持 copy-mode stale 检测。
+- R18: `to-spec` 必须用底座对齐、决策归属、决策前沿和就绪证明识别实质决策；不能用固定问题数量替代真实对齐。
+- R19: 仓库事实必须优先取证，人类只决定其 authority 范围内的产品 / 业务 / 风险 / 外部行为 / 权限 / 不可逆事项。
+- R20: 问题树与问答过程只存在于对话 / runtime；spec 只保存稳定结论和仍真实开放的问题。
+- R21: 多消费者 runtime context 可按需投影目标、成功边界、关键约束、相关契约和当前事实，但不得成为固定 schema 或持久化 artifact。
+- R22: 显式 `to-review` 必须默认由一个 reviewer 同时判断设计 / spec 符合性和代码质量；finding 修复默认定点验证，额外 reviewer / verifier 只在用户 / spec 明确要求或高风险证据不足时触发。
+- R23: `to-spec` 必须有覆盖简单任务、仓库事实、authority、外部契约和过大 scope 的轻量回归夹具。
+- R24: 重型 Skill 必须使用显式调用策略；普通实现、测试修改、修复和交付检查不得因宽泛 description 自动加载它们。
+- R25: runtime 必须直接完成与风险匹配的确定性验证；显式 Skill policy 不得被误解为可以跳过 test、lint、typecheck、build、真实路径或权限 gate。
+- R26: 测试 ROI、stable seam、普通测试实现与验证组合必须属于 native runtime；真实事故回归必须留在 `to-debug`，不得要求独立测试 workflow 才能完成。
 
 ## Decisions
 
@@ -389,6 +467,30 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
   - Why: ready、alignment 和 blocked 的处理边界需要明确，但持久化中间层会重新制造被删除的执行拓扑。
 - Decision: installer 使用 target-specific discovery model。
   - Why: Claude 需要直接 child links；Codex 已能从 suite root 发现 nested Skills，重复链接会扩大安装面并让 doctor 与真实 runtime 状态不一致。
+- 决策: spec 对齐采用底座对齐、决策归属、决策前沿和就绪证明。
+  - 归属: 人类确认方向，Agent 负责方法设计。
+  - 理由: 重点关闭会改变成功边界和关键契约的少数根决策，而不是象征性提问。
+  - 放弃方案: 固定问题清单或持久化 decision graph；前者容易漏掉核心底座，后者会恢复流程负担。
+- 决策: 深度 grill 指引与评估夹具按需加载，不增加顶层 callable skill。
+  - 归属: Agent（已确认边界内）。
+  - 理由: progressive disclosure 保持简单任务快速，同时让复杂设计具备压力检查能力。
+- 决策: 复杂执行可使用一次性 runtime context 投影，但不规定固定 packet。
+  - 归属: Agent（已确认边界内）。
+  - 理由: 多消费者复用共同语义可减少重复 token 和上下文漂移，又不限制 runtime 调度。
+- 决策: review 合并双维度判断；consolidation 只显式触发，verifier 只补真实高风险证据缺口。
+  - 归属: Agent（已确认边界内）。
+  - 理由: 保留高风险独立验证，同时移除低风险范围的固定重复 pass。
+- 决策: 仍有独立价值的重型 workflow Skill 保留能力但关闭隐式调用。
+  - 归属: 人类确认方向，Agent 负责具体边界。
+  - 理由: progressive disclosure 只有在触发准确时才节省上下文；显式 `$skill` 让日常任务不为 review loop、consolidation、knowledge、second opinion、多 Agent 或 durable acceptance 支付固定成本。
+  - 放弃方案: 删除所有重型能力；放弃，因为复杂或高风险任务仍需要可复用入口。
+- 决策: 退役 `to-test` 与 `to-bdd-regression`，只把最小不变量合入 native runtime 和 `to-debug`。
+  - 归属: 人类确认方向，Agent 负责迁移边界。
+  - 理由: 最新 runtime 已能按风险选择测试 ROI、stable seam、Red / Green 和替代验证；事故回归若脱离 debug 证据另开流程，只会重复上下文并增加延迟。
+  - 放弃方案: 继续作为显式 Skill 保留；放弃，因为它们的独特价值可以分别由一条 ROI 规则和一个 evidence-to-regression 规则完整表达。
+- 决策: 普通正确性反馈由 runtime 直接完成，模型独立 pass 不替代确定性证据。
+  - 归属: Agent（已确认边界内）。
+  - 理由: 测试、静态检查、build、真实路径和 diff sanity 通常比重复模型审查更快、更稳定；authority 与不可逆边界仍保留。
 
 ## Verification Intent
 
@@ -404,6 +506,12 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
   - goal 显式启动按 readiness 交给 `to-implement` 或 `to-spec`；blocked goal 不启动。
   - Claude direct-child 与 Codex suite-root 的 install / doctor 判定一致，Codex copy-mode 仍能发现 stale nested Skill。
   - Progress 不包含代码行号、逐文件 / 命令 / tool / Agent 流水。
+  - `to-spec` 能区分仓库事实、人类 / Agent 决策、runtime 选择和外部未知，并形成可解释就绪证明。
+  - 深度对齐参考只按复杂度加载，评估夹具覆盖 6 类代表性案例。
+  - 仍 active 的 heavy Skill 使用 `allow_implicit_invocation: false`，routing 与 description 不再自动推荐它们。
+  - `to-test` 与 `to-bdd-regression` 不在 active discovery / routing；installer 能识别并清理它们指向当前 checkout 的旧直链。
+  - review context 同时携带 source spec / goal 和 diff；finding 修复默认定点验证，review-loop 不再强制 consolidation、独立 verifier 或双 verifier。
+  - 普通实现路径仍直接运行必要测试、静态检查、build、真实路径和 diff sanity，显式调用策略不降低验证完整性。
 - Suggested Evidence:
   - `node --check scripts/validate_flow.ts`
   - `node scripts/validate_flow.ts docs/spec/tooling/sky-flow.md`
@@ -411,7 +519,9 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
   - `./install.sh --dry-run --no-deps`
   - retired artifact / topology negative fixtures
   - active tree residual keyword scan
-  - pending diff review and consolidation
+  - `python3 skills/to-review/scripts/test_prepare_review_context.py`
+  - `python3 -m json.tool evals/to-spec/cases.json`
+  - pending diff integrated sanity；不隐式运行 review、consolidation 或多 Agent
 
 ## Execution Constraints
 
@@ -421,7 +531,7 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
 - Required Human Gates:
   - none；用户已明确批准 breaking removal。
 - Independent Review:
-  - 完成前对 pending diff 做独立 read-only review。
+  - 默认无；当前执行者做 focused diff review 与确定性验证。只有用户 / spec 明确要求，或高风险证据不足时才增加独立 reviewer。
 - Irreversible / External Actions:
   - 清理安装目录中的旧 symlink 只允许删除明确指向本仓库 retired skill path 的链接。
 - Stop Conditions:
@@ -435,11 +545,11 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
 
 - Ready: yes
 - Blocking Questions: none
-- Notes: spec-direct、goal projection、semantic Progress 和 high-freedom executor 已由用户明确确认。
+- Notes: spec-direct、中文决策对齐、goal projection、semantic Progress、high-freedom executor、显式重型能力和 deterministic-first verification 已由用户明确确认。
 
 ## Progress
 
-- Checkpoint: spec-direct 模型已稳定；goal projection 有唯一 readiness 交接，Claude/Codex 安装判定匹配各自 discovery，Progress 只保存语义恢复状态。
+- Checkpoint: spec-direct 模型已稳定；普通工作由 native runtime 与确定性反馈闭环，测试 ROI / stable seam 由 runtime 判断，事故回归由 `to-debug` 闭环；其余重型 Skill 只由用户显式调用，Progress 只保存语义恢复状态。
 - Completed:
   - plan/task/step 拓扑与旧选择 / 归档能力已退出 active surface，历史只保留不可调用 archive。
   - `pick-goal` 已成为只读 spec→runtime goal 投影；active `to-implement` 只保留目标、安全、authority、evidence 和 Progress 硬边界。
@@ -447,8 +557,13 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
   - issue、acceptance、backlog、handoff、validator 和 installer 边界已与 spec-direct 模型一致；旧 reviewer 顶层安装残留已清理。
   - ready、alignment、blocked goal 已分别闭合到 `to-implement`、`to-spec` 和未启动状态，不新增中间 artifact。
   - installer 已按 Claude direct-child、Codex suite-root 分流，并保留 nested copy stale 检测。
+  - `to-spec` 已形成底座对齐、决策归属、决策前沿和就绪证明；深度 grill 参考按需加载，问题树不持久化。
+  - 复杂执行可复用中文 runtime context 投影；显式 review 默认一次给出 spec 符合性与代码质量，consolidation 只显式触发，verifier 只补真实高风险证据缺口。
+  - 仍有独立价值的 heavy Skill 已关闭隐式调用；普通实现不自动派发多 Agent、启动 review / consolidation、写 knowledge 或创建 acceptance artifact。
+  - `to-test` 与 `to-bdd-regression` 已退出 active surface；测试 ROI 规则收进 `to-implement`，真实事故的 evidence-to-regression 规则收进 `to-debug`。
+  - 6 类 spec alignment 评估案例和 review context 夹具已纳入回归面。
 - Next: none。
 - Blockers:
   - none
 - Last verified:
-  - 2026-07-11：artifact 与 Skill structure 校验无误，installer 和 agent-review regressions 全绿；全量 doctor 的 20 个 active Skill 均 ready，Codex 顶层只保留 suite root，retired / internal reviewer 顶层入口为 0。
+  - 2026-07-13：13 个显式 Skill 均带 `allow_implicit_invocation: false` 并由回归测试保护；skill-manager 8 项、review-context 1 项、agent-review 15 项通过，核心 spec 校验 0 error / 0 warning，install dry-run 正常，doctor 的 18 个 active Skill 全部 ready。残余风险是 spec alignment eval 仍为案例与量表，尚未运行跨模型实测。

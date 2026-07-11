@@ -1,0 +1,6 @@
+interface:
+  display_name: "To Next Acceptance"
+  short_description: "显式整理已有人工反馈、关闭已完成项并生成最小下一轮验收"
+  default_prompt: "使用 $to-next-acceptance 从已有反馈生成最小下一轮验收。"
+policy:
+  allow_implicit_invocation: false

@@ -1,6 +1,6 @@
 ---
 name: to-backlog
-description: 'Create or update Sky Flow backlog artifacts only when work leaves the active execution queue because it is blocked, deferred, abandoned, or waiting on a long-lived external condition; preserve source, evidence, dependencies, and a concrete resume condition.'
+description: 'Create or update a Sky Flow backlog artifact only when the user explicitly invokes $to-backlog for work leaving the active queue because it is blocked, deferred, abandoned, or waiting on a long-lived external condition.'
 ---
 
 # to-backlog

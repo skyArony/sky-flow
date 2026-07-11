@@ -1,0 +1,6 @@
+interface:
+  display_name: "To Claude Review"
+  short_description: "显式请求 Claude Code 提供只读第二意见审查"
+  default_prompt: "使用 $to-claude-review 请求 Claude Code 对指定范围给出只读第二意见。"
+policy:
+  allow_implicit_invocation: false

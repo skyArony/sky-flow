@@ -1,233 +1,163 @@
 ---
 name: to-spec
-description: 'Align, create, and maintain the durable Sky Flow spec that carries design truth, implementation readiness, execution constraints, and a compact Progress recovery snapshot. Use for long-lived design, requirement clarification, spec updates, or design changes discovered during implementation.'
+description: 'Align, create, or maintain a durable Sky Flow spec only when the user explicitly invokes $to-spec for long-lived design, requirement clarification, implementation readiness, execution constraints, or a compact Progress recovery snapshot.'
 ---
 
 # to-spec
 
-`to-spec` 先做人类对齐，再在确认后创建或更新 Sky Flow `spec`。spec 是长期设计真相源，也是文件化执行状态的唯一默认载体；ready 后由 `to-implement` 直接执行，不再生成中间执行 artifact。
+`to-spec` 先建立共同底座，再把已经稳定的设计真相写入 Sky Flow `spec`。spec 是长期设计与恢复状态的默认载体；ready 后由 `to-implement` 直接执行，不生成 plan/task 等中间 artifact。
 
-简单、一次性、无需长期设计沉淀的工作直接使用 runtime，不应为了流程完整感创建 spec。
+简单、一次性且不需要长期设计沉淀的工作直接交给 runtime。
 
 ## Quick Path
 
-1. 确定 runtime 配置：`SKY_FLOW_ROOT` 默认 `docs`，`SKY_FLOW_LANG` 默认跟随用户语言。
-2. 判断当前是 `alignment-only` 还是 `artifact-write`：用户仍在 brainstorm、问“怎么看”或设计分叉未收敛时，只做对话对齐；用户确认设计或明确要求写入时再修改 spec。
-3. 只读校准相关 docs、代码、schema、issue、现有 spec、近期变更和用户目标。
-4. 收敛 problem、outcome、audience、scope、non-goals、requirements、acceptance scenarios、decisions 和 verification intent。
-5. 对真实分叉给出 2-3 个互斥方案、取舍和推荐；没有真实分叉时不要机械凑选项。
-6. 写入或更新 spec，并判断 `Implementation Readiness`。
-7. 如果 spec 已 ready，初始化或刷新 `Progress`，让 `Next` 指向下一轮目标级恢复入口，而不是具体代码动作。
-8. 创建或修改 spec 后运行 `validate-flow`，请用户 review；只有用户确认或明确要求继续时才进入 `to-implement`。
+1. 确定 runtime 配置：`SKY_FLOW_ROOT` 默认 `docs`，`SKY_FLOW_LANG` 默认跟随用户；判断当前是只做对齐，还是用户已授权创建 / 更新 spec。
+2. 只读检查相关代码、docs、schema、issue、现有 spec、近期变更和其他可信证据。
+3. 完成`底座对齐`，区分事实、冲突、未知与用户真正要保护的结果。
+4. 为每个实质分叉判断`决策归属`，只向用户询问真正属于人类的决策。
+5. 沿`决策前沿`逐个关闭会改变下游设计的问题；一次只问一个，并给出推荐、影响和它将解锁什么。
+6. 对真实分叉给出 2-3 个互斥方案及取舍；没有真实分叉时直接说明判断，不机械凑选项。
+7. 分段呈现设计并及时校准；只把稳定结论写入 spec，不记录问答过程或决策树。
+8. 用`就绪证明`判断是否可执行；ready 后让 Progress `Next` 指向目标级恢复入口。
+9. 创建或修改 spec 后运行 `validate-flow`。只要求设计产物时请用户 review；用户已明确要求继续实现且没有人类决策未关闭时，可直接进入 `to-implement`，不增加仪式性确认轮次。
 
-## Alignment Contract
+## 底座对齐
 
-首要交付物是共享理解，不是文件。
+先确认设计赖以成立的核心底座，而不是象征性问几个问题：
 
-- 能从仓库确认的事实不要问用户。
-- 用户陈述与代码、docs 或既有契约冲突时，指出证据和影响，再确认口径。
-- 不把初始解法直接写成最终 requirement；先确认它解决的真实问题。
-- 阻塞设计的问题一次只问一个高价值问题；非阻塞问题进入 `Open Questions`。
-- 不用完整模板掩盖未知；不确定内容使用 `[NEEDS CLARIFICATION: ...]`。
-- 如果一个 spec 覆盖多个可以独立演进的系统或互不共享成功标准的目标，拆成多个 spec；不要引入文件化执行层承载过大 scope。
+- `根因与动机`：为什么现在要做，现状在哪个可观察点失效。
+- `成功边界`：什么结果算成功，什么明确仍算失败。
+- `不变量`：无论采用哪种实现都必须保持什么。
+- `系统边界`：谁发起、谁拥有状态、谁做最终裁决、影响到哪里为止。
+- `关键契约`：外部行为、数据语义、权限、兼容、迁移和运维约束。
+- `非目标`：哪些合理但不属于本轮的扩展明确不做。
 
-最小对齐门禁：
+同时维护四类运行时视图：仓库已确认事实、无法从仓库确认的未知、证据之间的冲突、必须统一的关键术语。它们用于对齐，不要求成为固定 spec section。
 
-1. Context：仓库事实与用户目标没有未解释冲突。
-2. Intent：problem、outcome、audience、success 和 non-goals 足够清楚。
-3. Design：关键行为、边界、契约 / 数据影响和真实取舍已被展示并接受。
-4. Readiness：没有会改变架构方向、业务行为、数据口径、外部契约或验收标准的 blocking question。
+复杂设计至少检查正常路径、边界路径和反例路径。场景关注可见行为、业务不变量与系统边界，不写 mock、私有 helper 或调用顺序。
 
-未通过时保持 `draft` 和 `Ready: no`；不要让执行层替 spec 猜设计。
+## 决策归属
 
-## Ground Facts And Intent
+| 类别 | 处理方式 |
+| --- | --- |
+| 仓库事实 | Agent 从代码、docs、schema、历史或运行证据查明，不转问用户。 |
+| 人类决策 | 产品 / 业务口径、风险偏好、外部行为、权限边界、重大 scope 或不可逆选择由用户决定。 |
+| Agent 决策 | 已确认边界内的架构与工程选择由 Agent 取证、权衡并决定；重要结论写入 spec。 |
+| runtime 选择 | 工具、顺序、局部实现、调度和验证组合由执行时决定，不进入 spec。 |
+| 外部未知 | 当前任何一方都不能确认时，记录影响、owner 和解除条件；实质阻塞则保持未就绪。 |
 
-对齐时建立四类工作视图：
+实质性判断：如果答案不同会改变成功标准、外部行为、数据语义、权限、兼容 / 迁移、重大 scope、不可逆风险或验收口径，它才值得成为 spec 决策或问题。
 
-- `Confirmed Facts`：来自代码、docs、schema、证据或已确认讨论。
-- `Unknowns`：仓库无法确认且会影响行为、边界或验证的问题。
-- `Conflicts`：用户描述、docs、代码或历史决策互相矛盾的地方。
-- `Terms`：容易混用或需要 canonical term 的概念。
+## 决策前沿
 
-然后追到设计根部：
+`决策前沿`是当前最靠近根部、且会解锁多个下游判断的未决问题，只存在于对话或 runtime 中：
 
-- 为什么现在要做，现状哪里失效。
-- 什么可观察结果表示成功，什么表示失败。
-- 谁会读、实现、维护或验收。
-- 哪些兼容、权限、数据、运维和外部契约必须保护。
-- 哪些诱人的扩展明确不做。
+1. 先查仓库事实和已有约束。
+2. 找出仍会改变设计方向的根问题，并按依赖顺序处理。
+3. 若属于 Agent 决策，直接给出结论、依据和主要取舍。
+4. 若属于人类决策，一次只问一个：先给推荐，再说明其他选择的影响和此答案将解锁什么。
+5. 用户回答后立即检查哪些下游分叉已自动关闭，再推进新的前沿。
 
-复杂设计至少用正常路径、边界路径和反例路径各检查一次。场景关注用户可见行为、业务不变量和系统边界，不写 mock、私有 helper 或调用顺序。
+不要持久化问题树、问答时间线、被自动关闭的分支或“已经问过什么”。只写最终决策和仍然真实开放的问题。
+
+出现以下任一情况时，完整读取 [decision-alignment.md](references/decision-alignment.md)：用户要求 grill / stress test；存在多个相互依赖的实质决策；涉及跨系统、数据、外部契约、安全、权限、迁移或不可逆动作；仓库证据与用户口径仍冲突。
 
 ## Writing Rules
 
-- spec 是长期设计与稳定执行状态的真相源，不是代码步骤、命令清单或子代理调度记录。
-- requirements 必须可测试、无歧义；做不到就保留明确缺口。
+- spec 保存长期设计真相与紧凑 Progress，不保存代码步骤、命令清单、runtime 拓扑或子代理过程。
+- requirements 必须可测试、无歧义；未知内容使用 `[NEEDS CLARIFICATION: ...]`，不要用模板制造伪完整。
 - acceptance scenarios 保护行为、不变量或外部契约。
-- `Execution Constraints` 只在确有 no-touch、人类 gate、不可逆操作、独立 review、安全 / 兼容约束时添加；不要为了模板完整感制造约束。
-- `Progress` 是覆盖更新的恢复快照，不是 append-only 流水。
-- Progress 只保存语义结果和稳定恢复信息；不记录具体代码行号、逐文件 diff、完整命令过程、tool call 或子代理过程。必要时可以引用关键模块、类、函数、接口或测试套件名称。
-- runtime owner、依赖、并行批次、子代理消息和微步骤不进入 spec。
-- 设计变化更新 Requirements / Decisions；实现结果、证据、blocker 和下一步更新 Progress。
+- `Execution Constraints` 只写真实 no-touch、人类 gate、不可逆操作、独立 review、安全或兼容约束。
+- 设计变化更新 Requirements / Decisions；实现结果、证据、blocker 和下一恢复目标更新 Progress。
+- 一个 spec 覆盖多个可独立演进、没有共同成功边界的系统时拆分 spec，不用执行层 artifact 承载过大 scope。
 
-## Spec Template
+稳定决策可按需记录归属：
 
-只保留有价值的 section；可选 section 不适用时直接省略。
+```markdown
+## Decisions
+
+- 决策: <稳定结论>
+  - 归属: 人类 | Agent（已确认边界内）
+  - 理由: <结论赖以成立的核心依据>
+  - 放弃方案: <仅保留仍有解释价值的主要替代方向>
+```
+
+仍开放的实质问题应说明为什么必须回答，而不是只列问号：
+
+```markdown
+## Open Questions
+
+- 问题: <尚未解决的问题>
+  - 负责人: 人类 | 外部
+  - 重要性: <答案会改变什么>
+  - 推荐: <当前最佳建议；外部未知可写待证据>
+  - 解锁: <回答后可确认的设计范围>
+```
+
+字段按需使用；不要为了格式完整给每个普通决定添加元数据。
+
+## 推荐形状
+
+spec 不要求每个可选 section 都存在，但直接创建时至少保持可发现 frontmatter，并覆盖完成判断所需语义：
 
 ```markdown
 ---
 id: <spec-id>
 artifact_type: spec
-status: draft
+status: draft | not_started | in_progress | completed | abandoned
 ---
 
-# <Spec Title>
-
-最后更新：<YYYY-MM-DD>
+# <标题>
 
 ## Intent
-
-- Problem:
-- Outcome:
-- Audience:
-
 ## Context
-
-- Confirmed Facts:
-- Constraints:
-- Source Notes:
-
 ## Scope
-
-### In Scope
-
-- <覆盖内容>
-
-### Out of Scope
-
-- <明确不做>
-
 ## Acceptance Scenarios
-
-1. <场景>
-   - Given <初始状态>
-   - When <行为>
-   - Then <可观察结果>
-
 ## Requirements
-
-- R1: <可测试要求>
-- R?: [NEEDS CLARIFICATION: <具体缺口>]
-
 ## Decisions
-
-- Decision: <选择>
-  - Why: <理由>
-  - Alternatives: <放弃方向及原因>
-
 ## Verification Intent
-
-- Must Protect:
-- Suggested Evidence:
-
-## Execution Constraints
-
-仅在确有约束时保留。
-
-- No Touch:
-- Required Human Gates:
-- Independent Review:
-- Irreversible / External Actions:
-- Stop Conditions:
-
-## Open Questions
-
-- <非阻塞或阻塞问题及影响>
-
 ## Implementation Readiness
+## Progress
+```
 
-- Ready: yes / no
-- Blocking Questions: <none 或具体问题>
-- Notes: <执行前必须知道但不属于设计 requirement 的稳定说明>
+`Execution Constraints`、`Open Questions`、迁移、安全、运维、外部契约和风险 section 只在确有内容时增加。section 名称不是执行前置 schema；高可读、可测试和语义完整比模板一致更重要。
+
+## 就绪证明
+
+`Ready: yes` 表示执行层不需要重新决定“到底要什么”，至少能够证明：
+
+- Intent、Scope、Requirements、Acceptance Scenarios 和 Verification Intent 互相一致。
+- 底座中的成功边界、不变量、系统边界和关键契约已经足够清楚。
+- 没有未关闭的实质人类决策或 blocking `[NEEDS CLARIFICATION: ...]`。
+- 重要 Agent 决策已有可信依据；runtime 选择没有泄漏进 spec。
+- 正常路径、边界路径和反例路径遵循同一组不变量。
+- 实现者无需猜测产品口径、数据语义、权限边界或如何判断完成。
+- 必要 Execution Constraints 已表达，Progress `Next` 是清楚的目标级恢复入口。
+
+不满足时保持 `draft`、`Ready: no`，并明确 blocking question 或外部未知的解除条件。
 
 ## Progress
 
-- Checkpoint: <当前已经成立的稳定状态>
-- Completed:
-  - <完成的语义结果及必要证据>
-- Next: <下一轮优先推进的目标级恢复入口>
-- Blockers:
-  - <none，或阻塞原因与恢复条件>
-- Last verified:
-  - <YYYY-MM-DD；验证入口、结论和残余风险>
-```
+Progress 是覆盖更新的语义恢复快照，只回答：当前稳定成立什么、已经完成哪些能力或行为、下一目标级恢复入口、真实 blocker 及解除条件、最近验证结论与残余风险。
 
-常见可选 section：
+不得记录执行时间线、具体代码行号、逐文件 diff、完整命令、tool call 或子代理过程。必要定位可引用稳定模块、类、函数、公开接口或测试套件。新内容合并或替换过期状态，不持续追加。
 
-- `Glossary`：关键术语容易混用时。
-- `Compatibility / Migration`：涉及旧行为、数据或协议演进时。
-- `Security / Privacy`：涉及权限、敏感数据、审计或合规时。
-- `Operational Notes`：涉及部署、监控、回滚或 SLO 时。
-- `External Contracts`：涉及第三方 API、WS、文件格式或平台协议时。
-- `Risks`：有明确高影响风险且不能自然放入 constraints 时。
-
-## Progress Rules
-
-`Progress` 只回答恢复执行所需的五个问题：
-
-- `Checkpoint`：当前已经稳定成立什么。
-- `Completed`：哪些能力、行为或稳定结果已经成立，证据在哪里。
-- `Next`：下一轮优先推进的目标级恢复入口是什么；不是代码微任务。
-- `Blockers`：为什么不能继续，什么条件解除。
-- `Last verified`：最近一次验证何时完成、结论和残余风险是什么。
-
-规则：
-
-- `draft` spec 可以只写设计对齐状态；ready 时必须让 `Next` 可执行。
-- `not_started` 表示设计已确认但尚未开始。
-- `in_progress` 表示正在执行；短期阻塞仍保持该状态并写入 Blockers。
-- `completed` 只在整个 scope、验证和必要人类 gate 都结束后使用。
-- 完成时压缩旧 checkpoint 和过程记录，只保留 final outcome、关键 evidence、residual risk 和 follow-up。
-- 不记录执行时间线、具体代码行号、逐文件变更、完整命令过程、tool call、子代理身份 / 消息或调度过程。
-- 必要定位优先使用稳定模块、类、函数、公开接口或测试套件名称；新写回必须合并或替换过期内容，不持续追加。
-- 工作长期延期或退出当前执行队列时，转 `to-backlog`；易失本地接力状态才转 `to-handoff`。
-
-## Implementation Readiness
-
-`Ready: yes` 只表示执行层不需要重新决定“到底要什么”。至少满足：
-
-- Intent、Scope、Requirements 和 Acceptance Scenarios 互相一致。
-- 关键设计选择已确认。
-- 没有 blocking `[NEEDS CLARIFICATION: ...]`。
-- Verification Intent 足以判断完成。
-- 必要 Execution Constraints 已表达。
-- Progress `Next` 是清楚的目标级恢复入口。
-
-不满足时写 `Ready: no`，继续对齐；不要创建中间文件来代替澄清。
-
-## 推荐关系
-
-- ready spec 需要执行或继续：`to-implement`。
-- 需要从一个或多个 spec 选择、恢复或生成 portable runtime goal：`pick-goal`。
-- 尚未进入设计、只需记录问题和证据：`to-issue`。
-- bug、异常或 root cause：`to-debug`。
-- 测试策略、BDD 场景或验证 ROI：`to-test`。
-- 真正人类 gate：`to-acceptance`。
-- 工作长期退出当前执行队列：`to-backlog`。
-- 易失状态跨会话接力：`to-handoff`。
+长期延期或退出活动队列转 `to-backlog`；只有易失本地状态跨会话接力时转 `to-handoff`。
 
 ## Self-Review
 
-- Placeholder：是否还有无意义空 section、TBD 或伪完整内容。
-- Consistency：Intent、Scope、Requirements、Decisions、Readiness 是否一致。
-- Scope：是否大到应拆成多个 spec。
-- Language：关键术语是否清楚。
-- Requirements：每条是否可测试、无歧义。
-- Scenarios：是否保护行为而非实现细节。
-- Constraints：是否只保留真实约束，没有预设 runtime 调度。
-- Progress：是否是紧凑语义快照，Next 是否保持目标级，证据是否可追溯且没有代码行 / 命令 / Agent 流水。
-- Leakage：是否写入代码步骤、命令或子代理拓扑。
+- 底座：根问题、成功边界、不变量、系统边界和非目标是否清楚。
+- 归属：仓库事实是否被误问用户，Agent / runtime 决策是否被误升级，人类决策是否被遗漏。
+- 前沿：根问题是否先于依赖问题，是否还有会推翻下游设计的未决项。
+- 一致性：Intent、Scope、Requirements、Scenarios、Decisions、Readiness 是否互相支持。
+- 可验证性：要求和证据是否足以判断完成，且没有绑定脆弱实现细节。
+- 约束：只保留真实约束，没有预设 runtime 调度。
+- Progress：是否高可读、语义化、可恢复，且没有代码行 / 命令 / Agent 流水。
 
-## User Review Gate
+## 推荐关系
 
-创建或更新 spec 后，请用户 review 设计与执行口径。确认后才进入 `to-implement`；用户要求修改时更新 spec、重新 self-review，并运行 `validate-flow`。
+- ready spec 执行或继续：`to-implement`；从多个 spec 选择 / 恢复目标：`pick-goal`。
+- 尚未进入设计的问题证据：`to-issue`；bug / root cause 与事故回归：`to-debug`；普通测试策略和验证组合由 native runtime 决定。
+- 真正人类 gate：`to-acceptance`；长期离队：`to-backlog`；易失接力：`to-handoff`。
+
+创建或更新 spec 后运行校验并明确就绪状态。是否停下来等 review 取决于用户当前请求和仍存在的人类决策，不设置额外固定 gate。

@@ -85,7 +85,7 @@ LLM 只判断：
 - 只读检查，不自动修复。
 - 不做代码 review；实现风险交给 `to-review`。
 - 不收敛 pending diff；交给 `to-consolidation`。
-- 不选择测试策略；交给 `to-test`。
+- 不选择或执行普通测试；由 native runtime 根据风险完成。
 - 不用另一个严格 schema 取代已经删除的执行拓扑。
 - `html_interactive` 仍是保留枚举，默认 warning。
 
@@ -95,7 +95,7 @@ LLM 只判断：
 - acceptance 来源、证据或反馈轮次不清：`to-acceptance` / `to-next-acceptance`。
 - backlog 阻塞或恢复条件不清：`to-backlog`。
 - handoff 缺少可执行接力状态：`to-handoff`。
-- 结构通过但实现风险、测试缺口或交付质量仍不确定：`to-review` / `to-test`。
+- 结构通过但实现风险、测试缺口或交付质量仍不确定：回到 native runtime 定向验证；用户明确要求专项 review 时使用 `to-review`。
 
 ## Dependencies
 

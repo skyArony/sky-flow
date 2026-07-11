@@ -1,6 +1,6 @@
 ---
 name: to-next-acceptance
-description: 'Derive the next concise human acceptance round from an existing acceptance artifact, human feedback, source spec Progress, and current runtime evidence; preserve only unresolved items that still require a real human gate.'
+description: 'Derive the next concise human acceptance round only when the user explicitly invokes $to-next-acceptance for an existing acceptance artifact; preserve only unresolved items that still require a real human gate.'
 ---
 
 # to-next-acceptance

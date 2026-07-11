@@ -1,0 +1,6 @@
+interface:
+  display_name: "To Agent Review"
+  short_description: "显式复盘 Agent 决策链、工具调用效率、上下文管理和编排质量"
+  default_prompt: "使用 $to-agent-review 复盘指定会话或执行记录的 Agent 决策。"
+policy:
+  allow_implicit_invocation: false

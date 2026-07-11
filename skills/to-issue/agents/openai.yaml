@@ -1,0 +1,6 @@
+interface:
+  display_name: "To Issue"
+  short_description: "沉淀需要先理解的 Sky Flow 持久问题与证据"
+  default_prompt: "使用 $to-issue 创建或更新一个持久的 Sky Flow issue。"
+policy:
+  allow_implicit_invocation: false

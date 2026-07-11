@@ -1,4 +1,6 @@
 interface:
   display_name: "Pick Goal"
-  short_description: "从 Sky Flow spec 选择并派生运行时目标"
-  default_prompt: "使用 $pick-goal 从 unfinished Sky Flow spec 中选择一个，并派生简洁的 runtime goal。"
+  short_description: "从未完成 Sky Flow spec 选择并派生轻量运行时目标"
+  default_prompt: "使用 $pick-goal 从未完成的 Sky Flow spec 派生一个轻量 runtime goal。"
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,6 @@
+interface:
+  display_name: "To Spec"
+  short_description: "对齐并维护 Sky Flow 长期设计、约束与 Progress"
+  default_prompt: "使用 $to-spec 对齐并更新当前 Sky Flow spec。"
+policy:
+  allow_implicit_invocation: false

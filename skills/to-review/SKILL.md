@@ -1,202 +1,100 @@
 ---
 name: to-review
-description: 'Review code diffs and active Sky Flow artifacts such as spec, issue, acceptance, backlog, or handoff outputs. Use to find bugs, regression risks, missing verification, scope drift, artifact boundary problems, and implementation/design alignment issues. Default to read-only review; use independent reviewers when risk justifies them.'
+description: 'Run a dedicated read-only review only when the user explicitly invokes $to-review for code diffs or active Sky Flow artifacts. Find bugs, regression risks, missing verification, scope drift, artifact boundary problems, and implementation/design misalignment; routine diff sanity stays in the native runtime.'
 ---
 
 # to-review
 
-`to-review` 是 Sky Flow 内的通用 review 入口。它检查实现风险、行为回归、设计对齐、测试缺口、安全 / 可靠性问题，以及 Sky Flow artifact 的边界和输出质量。默认只读，不修代码、不改 artifact。高风险或大范围变更可以进入 multi-review lane：多个 reviewer 独立发现问题，再 synthesize 成一份可人工 triage 的清单。
-
-它不替代：
-
-- `validate-flow`：结构化校验 artifact schema、单向来源和状态一致性。
-- `to-consolidation`：收敛 pending diff 中的临时代码、重复逻辑和 fan-in 残留。
-- `to-implement`：执行 ready spec 或其派生的 implementation-ready goal，动态调度 runtime 并维护稳定 Progress。
+`to-review` 只在用户显式调用时运行，默认只读，检查实现风险、行为回归、设计对齐、测试缺口、安全 / 可靠性问题，以及 artifact 边界。普通任务的 diff sanity 和定向验证由 native runtime 直接完成。它不替代 `validate-flow`、`to-consolidation` 或 `to-implement`。
 
 ## Quick Path
 
-1. 确认 review 范围：默认审当前 pending diff；用户指定文件、目录、artifact、commit range 或实现输出时，以指定范围为准。
-2. 整理 `review_context`：需求 / artifact 来源、预期行为、已知偏离、已跑验证、非目标、base / head 或输入输出路径。
-3. 选择 `review_focus`：`spec-compliance`、`code-quality` 或 `general`；artifact 输出优先看 scope、边界、依赖、验收和验证证据。
-4. 选择深度和 lane：小范围低风险走 `fast`；非平凡 diff 或 artifact 输出走 `medium`；命中共享边界或系统性风险才走 `deep`；大 diff、跨模块、高 blast radius 或用户要求多 Agent review 时进入 `multi-review` lane。
-5. 单 reviewer lane 按深度加载对应内部 profile：`medium` 读取 `reviewers/review-by-somestay/PROFILE.md`；只有 `medium` 明确建议深挖时读取 `reviewers/review-by-sanyuan/PROFILE.md`。这些 profile 不是可安装 skill。
-6. `multi-review` lane 必须让 reviewer 独立产出 findings，再 synthesize 为一份排序清单；不要让后一个 reviewer 继承前一个 reviewer 的结论。
-7. 如果目标是验证修复是否解决已选 review findings，进入 verifier stage；至少使用两个独立 verifier，模型必须不同。
-8. 输出 findings-first 报告；无问题时明确写 `no findings`、检查范围和未验证点。
+1. 确认具体范围：默认 pending diff；也可使用用户指定的文件、artifact、commit range 或实现输出。
+2. 获取 source spec / runtime goal、预期行为、known deviations、non-goals 和已跑验证。意图只能从 diff 推断时明确标注。
+3. 选择最小充分深度：小而低风险用 `fast`；非平凡变更默认 `medium`；有系统性高风险线索才进入 `deep`。
+4. 默认只使用当前 reviewer；只有用户明确要求，或 source spec 明确要求且一个结论不足时才使用多个独立 reviewer。
+5. 同一个 reviewer 同时给出`设计 / spec 符合性`与`代码质量`两个结论，并列出无法验证项；不要机械拆成两轮 review。
+6. findings-first 输出；无 finding 时说明检查范围、证据、未验证范围与残余风险。
 
-## Scope Rules
+同一稳定 diff 默认只做一轮完整 review。finding 修复后只验证对应 hunk、真实触发路径和必要测试 / 静态证据；只有修复改变公共契约、资金 / 状态机语义、显著扩大 scope、引入新的跨模块路径，或首次 review 明确留下系统性未知时，才重开完整 review。
 
-- Review scope 必须具体到文件、目录、artifact、commit range、实现输出或 pending diff；不要只写模糊摘要。
-- 只能基于用户请求、artifact 内容、diff、commit message 和相邻代码推断意图。需求不明时标注 `intent inferred from diff/artifact`，不要把推断写成已确认事实。
-- artifact review 可以读取 source spec、issue、acceptance、backlog 或 handoff 作为背景，但不直接修改它们。
-- 发现 scope drift、write scope 越界、no-touch 违规、状态和产物不匹配时，按 review finding 报告；结构字段校验交给 `validate-flow`。
-- 默认只读。只有父级 workflow 明确切到修复环节，才可以把 findings 交给实现或 `to-review-loop`。
+## Review Context
 
-## Depth Routing
+小范围 review 直接读文件和 diff。大 diff 可先用 stat / numstat 建立 change map，按领域和风险选择文件；模型根据复杂度和证据需要自行决定读取范围。用户显式要求多个 reviewer 时，默认避免重复覆盖同一文件组，确需独立裁决时除外。
 
-### fast
+只有 diff 很大、多个 reviewer 需要相同上下文，或明确需要跨会话复审时，才运行：
 
-用于小 diff、单文件、低风险 artifact 文案或明显局部变更。
+```bash
+python3 skills/to-review/scripts/prepare_review_context.py --output-dir <临时目录> --spec <source-spec>
+```
 
-- 当前会话本地 review 即可。
-- 仍然按 findings-first 输出。
-- 不默认加载内部 reviewer profile。
+脚本在仓库外的临时目录生成可复用 `review-context.md` 与 `changes.diff`。也可用 `--base` / `--head` 指定范围，使用 `--goal` 代替 `--spec`，并重复传入 `--known-deviation`、`--non-goal`、`--evidence`。context 必须引用 source spec 或 runtime goal，不能只给 diff；优先让 reviewer 读取文件，不在消息中粘贴大段内容。
 
-### medium
+该目录是 runtime 临时输入，不是 Sky Flow artifact，不得写入 spec Progress。
 
-默认主力路径，用于非平凡 diff、实现完成后的阶段 review、runtime fan-in 输出、artifact 边界 review 或验证缺口检查。
+## Depth And Independence
 
-- 加载 `reviewers/review-by-somestay/PROFILE.md`。
-- 优先高信号、低误报、具体修复建议。
-- 必须判断是否需要升级 `deep`，并说明理由。
+- `fast`：小 diff、单文件或低风险文案，本地 review 即可。
+- `medium`：默认主力路径；按需读取 `reviewers/review-by-somestay/PROFILE.md`，追求高信号和低误报。
+- `deep`：仅在 medium 暴露跨模块 / 共享契约 / 状态机 / 安全 / 并发 / 权限 / 数据 / 迁移等系统性线索时，读取 `reviewers/review-by-sanyuan/PROFILE.md` 深挖该线索，不重做整轮 medium。
 
-### deep
+多个 reviewer 必须拿到相同 source、known deviations、验证和 non-goals，但优先按不重叠文件组分配 scope。只有需要独立裁决同一高风险结论时才重复覆盖相同代码。合成时只合并语义相同的问题；独有 finding 仍按触发路径、影响、信心和修复成本判断，不能因缺少共识而丢弃。
 
-只在 medium 发现高价值线索或不确定性时进入。
+## Review Focus
 
-典型触发：
+- 行为是否满足 source spec / goal 的 intent、requirements、scenarios 和 constraints。
+- 错误路径、边界状态、数据 / 权限 / 安全 / 并发 / 兼容风险是否有真实触发路径。
+- 实现是否越过 scope、no-touch 或 authority，是否遗漏必要验证。
+- artifact 是否保持设计、readiness、Progress 和来源一致，且没有 runtime topology 泄漏。
+- 多来源产物是否存在冲突、重复、临时残留或相互矛盾的假设。
 
-- 跨模块、共享契约、公共 schema、共享状态或状态机风险。
-- 安全、并发、事务、权限、数据迁移、回滚或删除风险。
-- spec Progress / Execution Constraints / acceptance 之间存在可能影响执行或验收的边界错配。
-- medium findings 分布在多个区域，或高影响 finding 需要系统级证据。
+结构字段问题交 `validate-flow`；补丁式实现和 diff 熵值交 `to-consolidation`；目标、外部契约、数据语义或验收行为变化回 `to-spec`。
 
-`deep` 不是重做 medium；它只验证线索、深挖系统性风险并纠偏误报。
+## Finding Quality
 
-## Multi-Review And Synthesis
+- 按严重度排序，给出紧凑定位、真实触发场景、影响、证据、建议修复、修复成本和信心。
+- 只有能说明真实触发路径与影响时才升为 P0-P2；理论风险降为 P3 / Suggestion 或 residual risk。
+- 修复建议优先局部且明确，不为低概率风险引入复杂状态、fallback、兼容层或抽象。
+- known deviation 先判断是否合理；日志措辞、mock 次数和私有 helper 路径通常不构成 blocking finding。
 
-`multi-review` 不是 `deep` 的替代品。`deep` 深挖系统性风险；`multi-review` 用独立 reviewer 扩大覆盖面并交叉验证发现。只有风险或范围值得付出额外成本时才使用。
+严重度：`P0` 破坏关键行为或数据 / 资金 / 权限 / 隐私 / 安全边界；`P1` 高概率或高影响回归；`P2` 真实局部问题；`P3` 低概率、低影响或证据不足；`Suggestion` 为改进建议；`Nit` 不影响结果。
 
-触发倾向：
+## Verification
 
-- 单次 diff 横跨多个模块、应用、数据库 schema、状态机、权限边界或外部契约。
-- 变更影响 P0 / P1 行为、资金 / 隐私 / 权限 / 数据完整性、部署或迁移路径。
-- 多 Agent fan-in 后需要独立视角检查整合风险。
-- 用户要求多模型 / 多 Agent review，或 review 结果将进入人工 triage / acceptance。
+Verifier 只验收已选择 finding 是否修复，不用于重新发现需求或重做完整 review。能够用聚焦测试、静态检查或明确代码路径确定修复时，由当前执行者定点验证即可。只有 P0、证据冲突、高风险安全 / 资金 / 权限 / 迁移且定点证据不足，或用户明确要求独立验收时，才启动一个独立 verifier；严重度为 P1 本身不构成强制独立复审理由。
 
-执行规则：
+只有独立 verifier 仍存在证据冲突、P0 安全边界需要双重确认，或用户明确要求时，才使用两个不同模型 / 供应商。
 
-- 每个 reviewer 必须拿到相同的 review scope、context、known deviations、已跑验证和非目标。
-- reviewer 之间尽量使用不同模型或不同 reviewer profile；如果运行时只能使用同一模型，也必须保持独立上下文，并在输出中标注 `model_diversity: limited`。
-- reviewer 原始报告可存在临时上下文、子代理输出或调用方 artifact 中；`to-review` 的最终输出必须包含 synthesize 后的清单。
-- synthesize 只合并语义相同的 finding，不把不同触发路径粗暴归并。多个 reviewer 命中同一真实问题时，提高 `reviewer_agreement` 和 confidence。
-- 单 reviewer 独有 finding 不能因为没有共识就丢弃；必须根据真实触发路径、影响和修复成本排序。
-- 合成清单是 decision input，不是自动修复指令；进入修复前由调用方、`to-review-loop` 或当前对话直接 triage，不写 `acceptance` artifact。
+没有文件变化、没有 confirmed finding，或只需核对现有证据时，不启动 verifier；由当前 review 给出可追溯结论。运行时无法满足所需独立性时如实标注，不能宣称 gate 已完成。
 
-Synthesis 排序优先级：
+## Output
 
-1. 已有真实触发路径、用户可见影响或数据 / 权限 / 安全影响的问题。
-2. 多 reviewer 独立命中的高影响问题。
-3. 修复成本低且能保护 P0 / P1 行为的问题。
-4. 证据不足但影响很高、需要补证据的问题。
-5. 低概率、低影响或修复成本明显高于收益的问题。
-
-## Verifier Stage
-
-Verifier stage 用于验收已选 review findings 是否被修复，不用于发现新需求。典型入口是 review-fix-rereview、修复后复审或 review closure。
-
-规则：
-
-- 至少运行两个独立 verifier；二者必须使用不同模型。优先不同供应商；如果只有一个供应商，使用该供应商最新模型和次新模型。
-- 如果运行时无法实际选择模型或派发第二 verifier，必须在输出中写明 `dual_verifier: unavailable`，不能宣称完成双 verifier 验收。
-- verifier 只检查 selected findings、相关回归面、验证证据和修复后 diff；不要重新扩大 scope 成普通 review。
-- 两个 verifier 都确认 cleared，且验证证据匹配，才把 finding 标为 `cleared`。
-- verifier 意见不一致时，保留为 `disputed`，写清分歧、证据缺口和下一步；不要用多数投票掩盖真实不确定性。
-- verifier 发现新的 blocking 问题时，作为新 finding 输出，但要标注 `found_during_verification`。
-
-## Review Heuristics
-
-- Findings 必须按严重度排序，先问题后摘要。
-- 每条 finding 必须有文件 / 行或 artifact section 定位、触发场景、影响面、真实 bug 风险、修复成本、推荐修复和 confidence。
-- 能说明真实触发路径和影响时才升为 `P0 / P1 / P2`；纯理论风险降级为 `P3 / Suggestion` 或放入 `residual_risks`。
-- 修复建议优先小而明确：几行 guard、补验证、补注释、收窄 scope、修正 artifact 边界。不要为了低概率边界建议复杂状态机、兼容层或额外抽象。
-- 对已声明的 `known_deviations` 先判断是否合理；不要直接当 bug。
-- 不把日志措辞、mock 调用次数、私有 helper 路径等低价值细节当阻塞项，除非它们承载对外契约、安全或真实事故回归。
-
-## Artifact Review Focus
-
-审查 Sky Flow artifact 或执行输出时，重点看：
-
-- spec 是否把目标、非目标、术语、外部契约和验收口径说清楚。
-- spec 是否保持 intent / scope / requirements / readiness / Progress 一致，并避免记录 runtime topology。
-- runtime fan-in 是否遵守 spec scope、no-touch、验证意图和 stop conditions。
-- acceptance 是否有可复核证据，不把未验证内容写成已通过。
-- handoff / backlog 是否能恢复上下文，且没有替代原 artifact 的状态真相。
-- 实现输出是否符合对应 artifact，不扩大 scope，不遗漏 P0 / P1 验证。
-
-## 推荐关系
-
-`to-review` 默认只读，不直接修复。发现问题后按归口推荐，不强制跳转：
-
-- review 发现 artifact frontmatter、source 或状态问题：推荐 `validate-flow`。
-- review 发现补丁式实现、临时代码、重复逻辑、debug 残留或 fan-in 半成品：推荐 `to-consolidation`。
-- synthesize 后需要人类决定哪些 finding 值得修、哪些接受风险或延后：直接在对话或 review 报告中输出 triage 清单和两个 ROI 问题，不创建 `acceptance` artifact。
-- review 发现 blocking 或高 ROI finding：只输出 finding、证据、影响和建议修复方向；不推荐、不自动进入 `to-review-loop`。`to-review-loop` 只能由用户显式触发。
-- review 发现测试策略、BDD 场景、测试 ROI、stable seam 或替代验证不清：推荐 `to-test`。
-- review 发现真实事故回归需要固化：推荐 `to-bdd-regression`。
-- review 发现目标、scope、契约、数据口径或 requirements 需要变化：推荐 `to-spec`；只涉及执行顺序、拆解或并行方式时由 `to-implement` 在 runtime 动态调整。
-
-## Severity
-
-- `P0`：已确认会破坏关键行为、数据安全、资金 / 权限 / 隐私、安全边界或阻断交付。
-- `P1`：高概率或高影响回归，必须在当前轮修复或明确阻塞。
-- `P2`：真实可触发问题，但影响局部或有合理缓解；建议当前轮修。
-- `P3`：低概率、低影响或证据不足；记录但不阻塞。
-- `Suggestion`：改进建议、测试补强或可维护性提升。
-- `Nit`：细小一致性问题，不影响结果。
-
-## Output Contract
-
-输出应保持 findings-first。用户可见标题和字段 label 默认使用中文，必要术语、枚举值、模型名、finding id 和 mode 保留英文。字段 label 用 `**加粗**`，主要区块用二级标题，单个 finding 用三级标题。每个 finding 最前面必须放 `#### 决策核心`，用显眼的加粗问题句回答“这个问题在实际场景下会出 Bug 吗？”和“修它的代价是什么？”。单 reviewer 可以省略不适用字段；`multi-review` 或 verifier stage 必须使用扩展结构。
+每个 finding 先回答两个 ROI 问题：实际场景会不会出 Bug，修复代价是什么。推荐结构：
 
 ```markdown
-## 待决策问题
+## Findings
 
-### RV-001 [P1] <标题> - <file:line 或 artifact section>
+### RV-001 [P1] <标题> - <定位>
 
-#### 决策核心
-
-> **这个问题在实际场景下会出 Bug 吗？** high|medium|low - <实际触发场景和判断依据>
+> **实际会出 Bug 吗？** high|medium|low - <触发路径>
 >
-> **修它的代价是什么？** low|medium|high - <预计修复范围 / 风险>
+> **修复代价？** low|medium|high - <范围与风险>
 
-- **Reviewer 共识**：<1/3|2/3|3/3>（<reviewer ids>）
-- **证据**：<触发路径 / 证据>
+- **证据**：<证据>
 - **影响**：<影响面>
-- **建议修复**：<小而具体的修复>
-- **建议决策**：fix-now|ask-human-in-dialogue|needs-evidence|defer|reject-false-positive
+- **建议修复**：<小而具体的方向>
 - **信心**：high|medium|low
-- **来源 finding**：<reviewer ids / finding ids>
 
-## Verifier 结果
+## 综合结论
 
-- **双 Verifier 状态**：complete|unavailable|not-applicable
-- **Verifier 模型**：<model A>, <model B>
-- **RV-001**：cleared|not-cleared|disputed|not-checked
-- **证据**：<测试、命令、diff 检查或 artifact 证据>
-
-## 已检查范围
-
-- <已检查范围>
-
-## 未验证范围
-
-- <未验证或证据不足范围>
-
-## 残余风险
-
-- <低 ROI 或需后续确认风险>
-
-## 结论
-
-- **Review 深度**：fast|medium|deep
-- **Review 模式**：single-review|multi-review|verifier
-- **Review 重点**：spec-compliance|code-quality|general
-- **Reviewer 数量**：<n>
-- **模型多样性**：full|limited|unknown
-- **Deep review 状态**：not-requested|recommended-but-disabled|in-progress|completed
-- **建议结果**：pass|no-change|blocked|failed|scope-violation
+- **设计 / spec 符合性**：pass|fail|unknown - <依据>
+- **代码质量**：pass|fail|unknown - <依据>
+- **检查范围**：<范围>
+- **未验证范围**：<缺口>
+- **残余风险**：<风险>
 - **文件改动**：no file changes
 ```
 
-无 findings 时第一行写 `No findings.`，并用中文标题列出 `已检查范围`、`未验证范围`、`残余风险` 和 `结论`。不要把 “看起来没问题” 当作替代证据。
+无 findings 时第一行写 `No findings.`，再给出上述综合结论。多个 reviewer 或 verifier 场景可增加 reviewer agreement、模型独立性和 finding closure 状态，但不要求所有单 reviewer 输出固定长模板。
+
+`to-review` 不自动修复，也不自动升级 `to-review-loop`。用户明确要求 review-fix-rereview 时才进入循环。

@@ -1,0 +1,6 @@
+interface:
+  display_name: "To Review"
+  short_description: "显式审查代码或 Sky Flow artifact 的高风险问题"
+  default_prompt: "使用 $to-review 对指定范围做一次只读专项审查。"
+policy:
+  allow_implicit_invocation: false

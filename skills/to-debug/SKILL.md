@@ -1,17 +1,16 @@
 ---
 name: to-debug
-description: Sky Flow 通用 Debug 诊断入口。定位问题、复现异常、分析 root cause、本地测试失败、线上异常、性能退化、间歇性 bug、用户描述坏了 / 报错 / 不稳定时必须使用；先建立可信反馈环，再复现、列假设、按 prediction 取证、修复、验证和清理。需要基础设施 / 数据源查询或操作时转项目级 to-infra；真实事故回归固化时转 to-bdd-regression。
+description: Sky Flow 通用 Debug 诊断入口。定位问题、复现异常、分析 root cause、本地测试失败、线上异常、性能退化、间歇性 bug、用户描述坏了 / 报错 / 不稳定时使用；先建立可信反馈环，再从最小充分假设集按 prediction 取证、修复、固化真实事故回归、验证和清理。需要基础设施 / 数据源查询或操作时转项目级 to-infra。
 ---
 
 # to-debug
 
-`to-debug` 是 Sky Flow 的通用诊断循环。它负责把“坏了”转成可重复、可证伪、可验证的调查过程：先建立反馈环，再复现同一个现象，列出假设矩阵，按 prediction 取证，修复源头，验证并清理临时 instrumentation。
+`to-debug` 是 Sky Flow 的通用诊断循环。它负责把“坏了”转成可重复、可证伪、可验证的调查过程：先建立反馈环，再复现同一个现象，从最小充分假设集按 prediction 取证，修复源头，验证并清理临时 instrumentation。
 
-它不替代项目级基础设施 / 数据源查询能力，也不替代事故回归测试固化：
+它不替代项目级基础设施 / 数据源查询能力；普通回归与真实事故固化都属于本诊断循环：
 
 - 查询或操作环境、日志、数据库、缓存、Metrics、Grafana、AlertManager、部署、网络或外部系统时，转项目级 `to-infra`。
-- 线上 bug、客户反馈、日志 / 数据异常、时序或状态机问题需要固化成回归测试时，转下级 `to-bdd-regression`。
-- 普通测试 ROI、BDD 场景、stable seam、Red / Green / Refactor 或替代验证判断，转 `to-test`。
+- 测试 ROI、stable seam、普通回归和事故回归由 runtime 直接判断；`Given / When / Then` 只在能提高场景可读性时作为命名方式使用，不构成独立流程。
 - 项目没有定义 `to-infra` 时，只能使用已知本地制品、公开文档或通用工具型 Skill；不能猜测环境命令、凭据、数据口径或外部契约。
 
 ## 入口边界
@@ -25,7 +24,7 @@ description: Sky Flow 通用 Debug 诊断入口。定位问题、复现异常、
 
 - 反馈环第一。没有可运行、可重复、可验证的 pass / fail 信号时，不继续猜根因。
 - 复现用户描述的同一个现象，不修附近另一个错误。
-- 先列 3-5 个可证伪假设，再按概率和影响排序取证。
+- 从最小充分假设集开始：明显、确定性、本地化的问题可以先验证一个最高概率假设；首个 prediction 失败、问题间歇、跨组件或证据冲突时，再扩展为 3-5 个排序假设。
 - 每个 probe 必须对应一个 hypothesis 和 prediction。
 - 一次只改变一个变量。
 - 先修源头，不在下游症状点堆补丁；只有入口或关键边界几行轻量保护能明显收住风险时才加保护。
@@ -70,9 +69,9 @@ description: Sky Flow 通用 Debug 诊断入口。定位问题、复现异常、
 
 这些变化只作为假设来源，不等于根因；仍必须用 prediction 和 evidence 验证。
 
-### 4. 假设矩阵
+### 4. 自适应假设集
 
-测试假设前，先列出 3-5 个排序后的假设。人类暂时不在线时可以按当前排序推进，但输出中保留矩阵。
+明显、确定性且本地化的问题，先记录最高概率假设及其 prediction 并立即验证。若首个 prediction 失败，或问题具有间歇性、跨组件、高 blast radius、证据冲突等复杂特征，再扩展为 3-5 个排序假设。复杂调查在输出中保留矩阵；简单调查只需保留最终成立的假设和关键证据。
 
 ```text
 H1: [具体假设]
@@ -106,8 +105,8 @@ Evidence: [实际观察]
 ### 6. 修复与回归
 
 - 有正确测试 seam 时，先把最小复现转成失败测试，再修复。
-- P0 / P1 行为才测试优先；普通测试 ROI、seam 或替代验证判断转 `to-test`。
-- 真实事故、客户反馈、状态机、时序或线上数据异常转 `to-bdd-regression` 固化 BDD-style 回归。
+- 真实事故在 expected behavior 与稳定 seam 可确认时，先把最小复现固化成能命中 incorrect path 的失败测试；修复后用同一测试验证 correct path。只断言可观察行为，不硬编码事故 ID、不测试日志 / mock 次数 / 私有 helper，也不引入 test-only 生产分支。
+- 没有稳定 seam 时保留可重复 replay、smoke evidence 和 residual risk，不为形式完整强行造测试。
 - 同一问题连续 2 次修复尝试失败时，停止继续打补丁，回到假设矩阵并标记被证伪的假设。
 - 连续 3 次失败时暂停，说明缺失证据、测试 seam 或架构边界；必要时转 `to-spec` 或记录 issue。
 
@@ -135,23 +134,9 @@ Read/write intent: read-only / requested operation
 Expected evidence shape: [...]
 ```
 
-## `to-bdd-regression` 交接格式
-
-转入 `to-bdd-regression` 前，复用当前诊断信息，避免重复取证：
-
-```text
-Observed: [...]
-Expected: [...]
-Reproduction: [...]
-Confirmed hypothesis: [...]
-Evidence: [...]
-Incorrect path: [...]
-Correct path: [...]
-Observable assertions: [...]
-Residual risk: [...]
-```
-
 ## 输出格式
+
+简单、确定性的调查可压缩为 root cause、fix、verification 和 residual risk；只有复杂或未闭环调查才使用完整结构：
 
 ```text
 Feedback Loop
@@ -181,8 +166,8 @@ Residual Risk
 - [ ] 已建立可信反馈环，或已停止并说明缺少什么制品。
 - [ ] 已确认复现的是用户描述的同一现象。
 - [ ] 已检查 Recent Changes，并只把它们作为可证伪假设来源。
-- [ ] 已列 3-5 个可证伪假设。
+- [ ] 已使用与复杂度匹配的最小充分假设集；复杂调查已扩展并排序可证伪假设。
 - [ ] 跨组件问题已记录关键边界的 input / output / config / state。
 - [ ] 需要基础设施 / 数据源查询或操作时已转 `to-infra`。
-- [ ] 真实事故回归已转 `to-bdd-regression`。
+- [ ] 真实事故在 expected behavior 与稳定 seam 可确认时已用同一测试完成 incorrect path → correct path；否则已保留替代证据与 residual risk。
 - [ ] 临时 debug instrumentation 已清理。

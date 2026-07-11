@@ -1,13 +1,13 @@
 ---
 name: to-agent-review
-description: 'Review agent decision-making inside Sky Flow by analyzing visible transcripts, execution records, tool calls, subagent ROI, fan-in, context management, runtime plan maintenance, and artifact writeback; output decision-chain issues, inefficiencies, and actionable workflow improvements.'
+description: 'Review agent decision-making only when the user explicitly invokes $to-agent-review. Analyze visible transcripts, execution records, tool calls, subagent ROI, fan-in, context management, runtime planning, and artifact writeback; report evidence-backed workflow improvements.'
 ---
 
 # to-agent-review
 
-`to-agent-review` 是 Sky Flow 内部的 Agent 决策复盘入口。它分析可见会话、执行记录、工具调用、子代理产物、fan-in 结果、runtime plan 和 Sky Flow artifact 维护情况，定位决策链路问题、低效点和可落地改进项。
+`to-agent-review` 是用户显式触发的 Agent 决策复盘入口。它分析可见会话、执行记录、工具调用、子代理产物、fan-in 结果、runtime plan 和 Sky Flow artifact 维护情况，定位决策链路问题、低效点和可落地改进项。
 
-它不是普通代码 review，也不是项目私有复盘流程。默认产物写入 `${SKY_FLOW_ROOT}/backlog/agent-reivew/`，这是 Agent 复盘报告目录约定，不等同于调用 `to-backlog`，也不要求生成 `backlog` artifact。发现的改进可以进一步转入 Sky Flow `spec`、`issue` 或明确标记为暂不落地。
+它不是普通代码 review，也不是项目私有复盘流程。默认在对话中返回报告；只有用户明确要求保存报告，或显式 automation 已提供输出目标时，才写入 `${SKY_FLOW_ROOT}/backlog/agent-reivew/`。该目录不等同于调用 `to-backlog`，也不要求生成 `backlog` artifact。
 
 ## Quick Path
 
@@ -20,8 +20,8 @@ description: 'Review agent decision-making inside Sky Flow by analyzing visible 
 7. 建立证据地图：按时间线整理目标、关键决策、工具调用、失败 / 重试、等待、子代理派发、fan-in、验证、runtime plan 更新和 artifact 写回。
 8. 按分析维度归类问题，区分必要等待、人类决策等待、基础设施等待、工具延迟和 Agent 低效；不要把 `expected no-match`、存在性探测、`git diff --no-index` 或轮询等待直接当作低效。
 9. 填写固定量化信号清单；没有证据的项写 `unknown`，不要估算成事实。
-10. 输出或更新 `${SKY_FLOW_ROOT}/backlog/agent-reivew/<yyyy-mm-dd>-<scope>.md`，默认采用 plain-language brief-first 结构：先用人话解释“问题是什么、为什么重要、下一步做什么”，再给指标和证据；每条建议必须有 ROI、落点、done-when 和 non-goal。
-11. 需要改变长期 workflow 规则时转 `to-spec`；需要记录独立改进候选时转 `to-issue`；执行拆解由 runtime 动态决定。
+10. 默认在对话中输出 plain-language brief-first 报告；只有用户要求保存或 automation 明确提供输出目标时，才更新 `${SKY_FLOW_ROOT}/backlog/agent-reivew/<yyyy-mm-dd>-<scope>.md`。先用人话解释“问题是什么、为什么重要、下一步做什么”，再给指标和证据；每条建议必须有 ROI、落点、done-when 和 non-goal。
+11. 需要改变长期 workflow 规则时建议 `$to-spec`；需要记录独立改进候选时建议 `$to-issue`；除非用户同时显式调用，否则只报告建议，不创建 artifact。
 
 ## Preflight Helper
 
@@ -52,7 +52,7 @@ description: 'Review agent decision-making inside Sky Flow by analyzing visible 
 - Fan-in：是否检查写入范围、冲突、验证证据、spec alignment、blocker 和状态回写。
 - Runtime checklist：是否在复杂度值得时及时维护，是否记录 fan-in、blocker、next action 和动态调整，且没有过度打点。
 - Artifact 写回：spec Progress / handoff / acceptance / backlog 是否只记录稳定事实，而不是聊天或调度流水。
-- 验证与收敛：是否在合适阶段触发验证、`to-review`、`to-consolidation` 和 `validate-flow`。
+- 验证与收敛：是否由 native runtime 直接完成日常验证，是否只在用户显式要求时使用 `$to-review` / `$to-consolidation`，以及 artifact 变更后是否运行 `validate-flow`。
 - 决策质量：是否存在过早实现、过度设计、补丁式返工、未说明的 pushback 或低价值自动化。
 
 ## Quantitative Signals
@@ -166,9 +166,9 @@ description: 'Review agent decision-making inside Sky Flow by analyzing visible 
 
 ## Output / Follow-up Rules
 
-- 默认报告目录：`${SKY_FLOW_ROOT}/backlog/agent-reivew/`。
-- 该目录只是复盘报告落点，不代表调用 `to-backlog`，也不自动创建 `backlog` artifact。
-- 需要改变 Sky Flow 契约或 artifact schema 语义：进入 `to-spec`，不要在复盘报告里直接改规则。
+- 默认输出到当前对话，不自动写文件。
+- 用户要求保存报告或 automation 明确提供输出目标时，使用 `${SKY_FLOW_ROOT}/backlog/agent-reivew/`；该目录不代表调用 `to-backlog`，也不自动创建 `backlog` artifact。
+- 需要改变 Sky Flow 契约或 artifact schema 语义：建议用户显式调用 `$to-spec`，不要在复盘报告里直接改规则。
 - 需要实施已确认的长期改进：更新 ready spec 后由 `to-implement` 动态调度。
 - 明确小修且不需要长期设计：直接 runtime 执行。
 - 复盘只形成观察和建议：保留在 `agent-review-report`。
@@ -176,8 +176,8 @@ description: 'Review agent decision-making inside Sky Flow by analyzing visible 
 
 ## Boundaries
 
-- 不做普通代码风险 review；实现风险交给 `to-review`。
-- 不收敛 pending diff；补丁式实现和 fan-in 残留交给 `to-consolidation`。
+- 不做普通代码风险 review；需要专项实现风险审查时建议 `$to-review`。
+- 不收敛 pending diff；需要专项处理补丁式实现和 fan-in 残留时建议 `$to-consolidation`。
 - 不替代 `validate-flow` 检查 artifact/status 一致性。
 - 除 `${SKY_FLOW_ROOT}/backlog/agent-reivew/` 这个通用复盘报告目录外，不写死项目路径、项目角色称呼、业务术语或运行时专属命令。
 - 不自动修改 workflow 规则、routing、spec 或 issue；复盘只给建议，除非用户明确要求落地。

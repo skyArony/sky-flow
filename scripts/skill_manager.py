@@ -44,7 +44,7 @@ TARGET_LABELS = {
     "codex": "Codex",
 }
 
-# These top-level names were callable in earlier releases but no longer exist
+# These names were callable in earlier releases but no longer exist
 # in the active registry. Keep sources explicit because the reviewer profiles
 # remain as internal files, while archive/skills/to-implement stores an old
 # implementation whose top-level name is still active.
@@ -53,8 +53,10 @@ RETIRED_SKILL_SOURCES = {
     "review-by-sanyuan": Path("skills/to-review/reviewers/review-by-sanyuan"),
     "review-by-somestay": Path("skills/to-review/reviewers/review-by-somestay"),
     "to-archive": Path("skills/to-archive"),
+    "to-bdd-regression": Path("skills/to-debug/skills/to-bdd-regression"),
     "to-plan": Path("skills/to-plan"),
     "to-task": Path("skills/to-task"),
+    "to-test": Path("skills/to-test"),
 }
 RETIRED_SKILL_NAMES = tuple(RETIRED_SKILL_SOURCES)
 

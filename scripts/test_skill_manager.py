@@ -49,6 +49,15 @@ class RetiredInstallTests(unittest.TestCase):
                 target_is_directory=True,
             )
 
+            owned_test = claude / "to-test"
+            owned_test.symlink_to(repo / "skills" / "to-test", target_is_directory=True)
+
+            owned_bdd = codex / "to-bdd-regression"
+            owned_bdd.symlink_to(
+                repo / "skills" / "to-debug" / "skills" / "to-bdd-regression",
+                target_is_directory=True,
+            )
+
             copied = codex / "to-task"
             copied.mkdir()
             (copied / "SKILL.md").write_text("---\nname: to-task\n---\n", encoding="utf-8")
@@ -70,10 +79,12 @@ class RetiredInstallTests(unittest.TestCase):
 
             self.assertFalse(owned.is_symlink())
             self.assertFalse(owned_profile.is_symlink())
+            self.assertFalse(owned_test.is_symlink())
+            self.assertFalse(owned_bdd.is_symlink())
             self.assertTrue((copied / "SKILL.md").is_file())
             self.assertTrue(foreign.is_symlink())
             self.assertEqual(
-                {"review-by-somestay", "to-plan"},
+                {"review-by-somestay", "to-bdd-regression", "to-plan", "to-test"},
                 {item["name"] for item in result["cleaned"]},
             )
             self.assertEqual(
@@ -175,6 +186,12 @@ class RetiredInstallTests(unittest.TestCase):
             (repo / "SKILL.md").write_text("suite\n", encoding="utf-8")
             (repo / "scripts").mkdir()
             (repo / "scripts" / "validator.ts").write_text("export {};\n", encoding="utf-8")
+            explicit_metadata = repo / "skills" / "to-review" / "agents" / "openai.yaml"
+            explicit_metadata.parent.mkdir(parents=True)
+            explicit_metadata.write_text(
+                "policy:\n  allow_implicit_invocation: false\n",
+                encoding="utf-8",
+            )
             (repo / "archive").mkdir()
             (repo / "archive" / "SKILL.archived.md").write_text("history\n", encoding="utf-8")
             (repo / ".git").mkdir()
@@ -194,6 +211,9 @@ class RetiredInstallTests(unittest.TestCase):
             self.assertEqual("copied", result)
             self.assertTrue((dest / "SKILL.md").is_file())
             self.assertTrue((dest / "scripts" / "validator.ts").is_file())
+            self.assertTrue(
+                (dest / "skills" / "to-review" / "agents" / "openai.yaml").is_file()
+            )
             self.assertFalse((dest / "archive").exists())
             self.assertFalse((dest / ".git").exists())
 
@@ -335,6 +355,35 @@ class RetiredInstallTests(unittest.TestCase):
                 stale_state = skill_manager.inspect_install_state(child, registry)
             self.assertEqual("stale-suite-copy", stale_state["targets"]["codex"])
             self.assertEqual("broken", stale_state["status"])
+
+
+class InvocationPolicyTests(unittest.TestCase):
+    EXPLICIT_SKILL_DIRS = (
+        "skills/pick-goal",
+        "skills/to-spec",
+        "skills/to-issue",
+        "skills/to-knowledge",
+        "skills/to-review",
+        "skills/to-review-loop",
+        "skills/to-agent-review",
+        "skills/to-acceptance",
+        "skills/to-acceptance/skills/to-next-acceptance",
+        "skills/to-backlog",
+        "skills/to-handoff",
+        "skills/to-consolidation",
+        "skills/to-claude-review",
+    )
+
+    def test_explicit_skills_disable_implicit_invocation(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        for relative_dir in self.EXPLICIT_SKILL_DIRS:
+            with self.subTest(skill=relative_dir):
+                metadata = repo / relative_dir / "agents" / "openai.yaml"
+                self.assertTrue(metadata.is_file(), f"missing {metadata}")
+                self.assertIn(
+                    "allow_implicit_invocation: false",
+                    metadata.read_text(encoding="utf-8"),
+                )
 
 
 if __name__ == "__main__":
