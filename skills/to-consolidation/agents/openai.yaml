@@ -1,6 +1,6 @@
 interface:
   display_name: "To Consolidation"
-  short_description: "显式收敛补丁式实现、重复逻辑与 fan-in 残留"
-  default_prompt: "使用 $to-consolidation 对当前稳定 diff 做行为保持的专项收敛。"
+  short_description: "审计稳定 diff 的职责接管并清理旧设计与 fan-in 残留"
+  default_prompt: "使用 $to-consolidation 审计当前稳定 diff 的职责接管，并执行行为保持的专项收敛。"
 policy:
   allow_implicit_invocation: false

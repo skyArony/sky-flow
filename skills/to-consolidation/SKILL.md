@@ -1,138 +1,112 @@
 ---
 name: to-consolidation
-description: 'Consolidate a stable completed-stage diff only when the user explicitly invokes $to-consolidation. Check the target scope for patchy implementation, temporary code, duplicate logic, dead leftovers, and fan-in residue while preserving behavior.'
+description: 'Consolidate a stable completed-stage diff only when the user explicitly invokes $to-consolidation. Verify that the new implementation fully owns its responsibilities, find superseded entries, fields, states, scheduling, side effects, tests, and documentation, and remove only behavior-preserving residue.'
 ---
 
 # to-consolidation
 
-## 核心原则
+## Purpose
 
-收敛必须保持行为不变。这是 `to-consolidation` 的 P0 原则；任何可能改变外部行为、错误处理、兼容逻辑、数据口径、日志 / 指标语义或用户可见结果的“简化”，都不允许作为自动收敛处理，必须先询问人类。
+检查稳定阶段产物是否已经由新实现完整接管职责，并清理本次变更暴露出的旧设计残留、补丁式实现和 fan-in 熵值。目标是让结果像一次成型的实现，而不只是让局部代码更短。
 
-`to-consolidation` 用于阶段产物完成后的代码收敛检查，让目标范围呈现为干净、统一、可交付的一体化结果。
+它不同于：
 
-它不是普通 code review，也不是架构重构入口；它只回答一个问题：当前目标 diff 是否像一次成型的清晰实现。收敛优先提升可读性、显式性和一致性，不以“更少行数”为目标。Sky Flow artifact 结构、状态、依赖、验收证据和 backlog / handoff 归宿由 `validate-flow` 负责，不在这里检查或修正。
+- `to-review`：判断实现是否正确、是否有回归风险。
+- 架构审计：寻找当前 diff 之外的长期重构机会。
+- `validate-flow`：检查 Sky Flow artifact 结构和状态。
 
-默认范围是当前工作区 pending diff，明确包括 unstaged diff、staged diff 和 untracked files。用户指定路径、模块、文件、提交、提交区间或 source spec 时，只检查指定范围对应的代码 / 产物 diff；不检查 artifact 状态。
+## P0 Boundary
 
-`to-consolidation` 不作为 `to-implement`、`to-review-loop` 或 `to-commit` 的固定前置步骤，也不因 fan-in 或 diff 熵值自动触发。只有用户显式调用 `$to-consolidation` 时才运行；其他流程直接做最小 diff sanity 并报告明显收敛迹象。
+自动收敛必须保持行为不变。任何可能改变外部行为、错误处理、数据口径、兼容逻辑、状态机、并发顺序、持久化格式、日志 / 指标语义或用户可见结果的处理，都只能作为候选报告并先询问人类。
 
-## 重复使用策略
+审计可以发现行为相关候选；不能因为它们无法自动修改就省略。遵循：**发现可以深入，自动修改必须保守。**
 
-第一次使用、上下文压缩后恢复、规则不确定、复杂 fan-in、跨模块大 diff 或用户明确要求时，必须读取本文件必要部分。
+默认范围为当前工作区的 staged、unstaged 和 untracked changes。用户也可指定路径、模块、提交、提交区间或 source spec。只检查代码和具体产物，不检查 artifact 状态。
 
-如果本文件正文已经在当前可见上下文中读过，且只是简单交付前检查或同会话重复检查，不要为了形式再次读取全文。直接执行实际收敛检查：
+允许从目标 diff 向外做有界追踪：只针对 diff、source intent 或 replacement map 暴露出的精确符号、调用方、消费者和持久化边界搜索必要相邻代码；禁止无目标的全仓死代码清理。
 
-检查工作区状态、空白错误、目标 diff 和未跟踪文件。
+## Load Detailed Method
 
-然后按本 Skill 已加载的规则判断是否有临时代码、无关 diff、重复实现、debug 残留或需要人类确认的问题。复用规则只减少重复读文档，不减少 diff / status 检查。
+以下情况必须完整读取 [references/audit-method.md](references/audit-method.md)：
 
-同一稳定阶段最多执行一轮完整收敛。finding 修复后默认只复查相关 hunk、调用链、工作区状态和必要验证；只有修复改变公共契约、资金 / 状态机语义、重新发生 fan-in、显著扩大 scope，或原收敛留下系统性未知时，才重开完整收敛。fan-in、最终交付、提交前等 gate 如果重合，合并为一次。
+- 新设计替代旧设计；
+- 涉及多个入口、模块或执行阶段；
+- 涉及字段、状态、缓存、队列、重试、并发或持久化；
+- 大 diff、复杂 fan-in、上下文恢复；
+- 用户要求收敛审计、兼容清理或分阶段计划。
+
+小而局部的命名、wrapper、debug 或临时代码整理，可以只使用本文件。
 
 ## Workflow
 
-1. 建立范围事实：用只读 Git / 文件命令确认 unstaged、staged、untracked 三类 pending diff，以及目标路径、模块或提交区间。大 diff 先用 stat / numstat 建立按领域和风险分组的 change map。
-2. 从目标 diff、新增符号和调用点开始探索，由模型根据复杂度和证据需要自行决定读取范围；避免无收益地重复读取已由可信 lane 覆盖的文件组。
-3. 默认由当前 Agent 检查；只有用户显式要求 delegation / subagent 时才拆成最少量的只读 lane。共享核心文件只能并行分析、串行修改。
-4. Fan-in 发现，分类为可直接收敛、需要人类确认、保留但说明原因。
-5. 只修无歧义低风险整理，例如当前目标 diff 引入的临时代码、重复实现、非公共错误抽象、浅层 wrapper、过深嵌套、旧注释、debug 残留、无用配置，以及目标范围内明确的 format / lint 问题。
-6. guard / fallback、错误处理、职责分布只在本次 diff 引入重复、叠加、遮蔽或风格漂移且证据明确时收敛；涉及行为口径、兼容逻辑或公共契约时先询问人类。
-7. 检查目标 diff 和必要相邻代码后停止；不要为了理论上的历史问题做全仓搜索式清理。
-8. 复查实际修改的 hunk 和受影响调用链，确认没有引入目标文件外的无关格式化、额外重构、临时代码或扩大范围；不因局部修复重跑完整收敛。
-9. 如果实际修改了可执行代码，运行与改动相关的最小验证；无法验证时说明原因。
+1. **建立范围事实**：确认 staged、unstaged、untracked 和用户指定范围。大 diff 先用 stat / numstat 建立 change map，并按业务切片和风险分组。
+2. **恢复目标意图**：从 source spec、用户确认、diff 和相邻代码提取新实现必须接管的职责。证据不足且会影响产品或数据语义时询问人类。
+3. **建立 replacement map**：记录被替代的旧入口、字段、状态、缓存、调度、配置、测试口径和文档口径，以及对应新 owner。不要只依靠文本相似性推断替代关系。
+4. **纵向追踪能力**：从 trigger / entry 追到 domain decision、scheduler、IO / persistence、state transition、consumer、side effects 和 observability。不能只按文件逐个扫。
+5. **检查职责接管**：确认入口、数据模型、并发调度、副作用和证据口径没有新旧并存、重复 owner、重复控制或未消费结果。详细检查矩阵见 `audit-method.md`。
+6. **建立删除证明**：删除或内联符号前，确认声明、生产者、消费者、持久化、外部边界、反射 / 注册、测试 / 运维引用和替代职责。证据不完整则不得自动处理。
+7. **分类 finding**：分为可直接删除、可直接合并 / 内联、需要人类确认、明确保留。保留项必须说明其领域、契约、测试 seam 或观测价值。
+8. **执行低风险收敛**：只处理证据充分且行为不变的目标范围问题。新增抽象排在最后；第一次文本重复通常保留清晰重复。
+9. **定点复查与验证**：复查修改 hunk、真实调用链和工作区状态。运行与实际修改匹配的最小验证；无法验证时说明缺口。
 
-## 收敛判定
+同一稳定阶段最多执行一轮完整收敛。修复后只复查相关 hunk、调用链和必要验证；只有公共契约、资金 / 状态机语义、fan-in 或 scope 再次显著变化时才重开完整检查。
 
-收敛只处理目标 diff 暴露出的实现熵值：临时代码、重复业务知识、错误抽象、过度跳转、命名口径漂移、debug 残留和 fan-in 半成品。Code smell 只是调查信号，不是自动修改理由；如果无法证明修改会降低目标 diff 的阅读成本或维护成本，就保留现状。
+## Consolidation Priorities
 
-优先顺序是：删除无用残留 > 内联过度抽象 > 统一无歧义命名 / 注释 > 扁平化局部控制流 > 合并稳定重复知识。新增抽象放在最后，只有同一业务知识已经稳定、调用方语义一致、且不会引入 mode / flag / caller 特例时才做。
+按以下优先级判断 ROI：
 
-任何 helper、wrapper、类型或分支在删除、内联、拆分前，先确认它不是公共 API、测试 seam、领域命名、可观测性边界或多调用方契约；确认不了就列为需确认，不要猜。
+1. 删除无用残留和失效入口。
+2. 消除新旧职责并存、重复调度和重复并发控制。
+3. 合并重复表达同一事实的字段、状态、参数和返回值候选。
+4. 内联无领域价值的浅层 wrapper 和错误抽象。
+5. 统一无歧义命名、注释、测试与现行文档口径。
+6. 扁平化局部控制流。
+7. 最后才考虑抽象稳定且语义一致的重复业务知识。
 
-外部 code-simplifier / refactoring 资料只提供“保持行为不变、提升清晰度、避免错误抽象”的原则，不导入外部项目风格规则；具体代码风格以本仓库规则和目标模块规则为准。
+Code smell 只是调查信号。无法证明会降低目标实现的阅读成本、状态空间或维护成本时，保留现状。
 
-## 关注点
+## Safe Automatic Changes
 
-- 当前范围新增但已无引用的 helper、分支、类型、fixture、mock 或导出。
-- 临时命名、试验变量、过渡文件名和口径不一致的命名。
-- 同一业务知识或行为被重复实现，或多个执行 lane 各写了一套近似逻辑；不要因为第一次文本相似就急着抽象。
-- 几行简单逻辑只被一处引用，却被抽成函数、helper 或 wrapper，导致阅读跳转成本大于复用收益。
-- 本次目标 diff 引入或明显变形的非公共 helper，是否为了 DRY 过早抽象并开始携带 mode、flag、type 分支或调用方特例。
-- 只做透传、不隐藏复杂度、也不承载领域命名价值的浅层 wrapper / layer。
-- 过深嵌套、嵌套三元、密集 one-liner 或 clever 写法是否让代码难读难调试。
-- 本次 diff 引入的 guard / fallback 是否重复、叠加、互相遮蔽，且有证据表明已过期或可合并。
-- 关键函数、状态流转、数据转换或错误处理里是否存在比较绕的逻辑，却缺少必要注释说明意图。
-- 当前需求不再需要的配置、参数、flag、类型字段、测试数据和一次性验证脚本。
-- 旧注释、旧文档、旧测试描述是否还在描述已被推翻的方案。
-- 注释掉的旧代码、永远关闭的 feature flag、保留但不执行的分支是否仍留在目标 diff。
-- 测试专用绕路是否进入生产代码，或生产代码是否为 mock 调用顺序变形。
-- 遗留 `debug`、`probe`、临时日志、打印、断点和手动验证残留。
-- 本次 diff 是否把同类职责散入 controller、service、job、gateway、helper 等多个入口。
-- 同一链路内本次 diff 引入的错误处理风格是否和既有模块风格不一致。
-- 未提交文件之间是否存在互相依赖但未统一收口的半成品。
-- 本次已经触达的目标文件中，是否仍有一眼明确、局部可修的 format / lint 警告。
+可以直接处理：
 
-判断标准是“这个 diff 是否像一次成型的清晰实现”，不是追求代码洁癖。
+- 当前目标引入且经删除证明确认无消费者的 private / compile-time-only 符号、fixture、mock、测试数据和导出。
+- 已被新实现完整接管、没有持久化或外部兼容边界的旧入口和不可达分支。
+- 单次纯透传且不承担领域命名、契约、测试 seam 或观测边界的 wrapper。
+- 同层重复、行为等价且无顺序差异的局部组装、guard 或错误包装。
+- 临时日志、probe、断点、一次性验证代码和注释掉的旧代码。
+- 无歧义的旧注释、测试描述、局部命名和已失效配置。
+- 目标文件内明确的局部 format / lint 问题；不得制造大面积 churn。
 
-## 自动修复边界
+## Human Gate
 
-可以直接修复：
+以下情况必须先问人：
 
-- 删除当前目标范围新增但已无引用的临时代码、fixture、测试数据和导出。
-- 合并同一业务知识的重复实现；如果只是第一次文本相似，优先保留清晰重复，不急着抽象。
-- 内联当前目标范围内过度抽离的简单单引用函数、helper 或 wrapper。
-- 拆掉当前目标范围内本次 diff 引入或明显变形的非公共错误抽象：内联、拆分调用方特例，或退回更直接的局部实现。
-- 内联只做透传且没有领域命名价值的浅层 wrapper。
-- 扁平化无歧义的过深嵌套，替换嵌套三元和难调试的密集 one-liner。
-- 移除临时日志、断点、probe 和一次性验证代码。
-- 统一无歧义的临时命名、测试描述、旧注释和字段口径。
-- 为关键函数或比较绕的逻辑补充最小必要注释，说明业务意图、状态前提或取舍原因；不要写显而易见的逐行解释。
-- 删除当前需求不再使用的参数、配置、flag、注释掉的旧代码和永远不可达分支。
-- 修复本次目标范围内已经触达文件的 format / lint 警告；可以顺手格式化这些文件，但如果会产生大面积 format churn，就只做局部修复，不扩展到未触达文件或全仓清扫。
+- 公共 API、DB schema / enum、迁移、外部协议、消息、Redis / 文件持久化格式或部署配置。
+- 状态合并、字段统一、事实签名、错误行为、重试 / timeout / 并发顺序或副作用时机变化。
+- 删除大块逻辑，或无法证明新 owner 已覆盖全部旧职责。
+- helper / wrapper 有多个调用方，或承担领域命名、测试 seam、观测边界、框架注册或公共契约。
+- 多个收敛方向都成立，且会影响未来维护方式。
+- 修改会扩大需求边界、覆盖其他 lane 工作或触碰历史无关代码。
 
-必须先问人：
+## Parallelism
 
-- 涉及业务语义、产品口径、数据口径或用户可见行为取舍。
-- 删除大块逻辑，且无法从 diff 和相邻代码确认其已废弃。
-- 影响公共接口、数据库 schema、迁移、部署配置或生产行为。
-- 内联或拆分的 helper 已有多个调用方、承担公共 API、测试 seam、领域命名或可观测性边界。
-- 多个合理收敛方向都成立，且会影响后续维护方式。
-- 整理会扩大 diff、改变原需求边界，或可能覆盖其他执行 lane 的工作。
-
-## 并行策略
-
-默认由当前 Agent 直接检查。只有用户显式要求 delegation / subagent 时才拆成少量只读 lane；按不重叠文件组分配，避免多个 lane 用不同“风险视角”重复读取同一实现。子代理只输出 findings、证据和未验证项，不复述无问题区域；主会话负责一次 fan-in、ROI 判断和最终修改。
-
-如果 runtime 没有子代理，就按同样视角串行执行，不因此扩大 scope。
+默认由当前 Agent 完成。只有用户显式要求 delegation / subagent 时，才按不重叠业务切片或文件组拆少量只读 lane；共享核心文件只允许并行分析、串行修改。子代理只返回 findings、证据和未验证项，主会话负责 fan-in 和最终判断。
 
 ## No Goals
 
-- 不检查或修正 Sky Flow artifact/status 一致性；需要时交给 `validate-flow`。
-- 不清理历史无关死代码。
-- 不顺手重构相邻模块。
-- 不把 code smell 当作必须修改项；没有明确收益或证据不足时不改。
-- 不为了第一次重复强行抽象；DRY 只针对同一业务知识，不针对表面相似文本。
-- 不为了风格偏好扩大到未触达文件；但允许在本次目标文件内顺手修复明确 format / lint 警告。
-- 不为了运行 formatter 产生大面积无关 format churn。
-- 不把代码压缩成更短但更难读的 clever 写法。
-- 不替代正式 review、安全审计、业务验收或测试设计。
-- 不把主任务正常实现、优化、测试或文档更新包装成收敛成果。
+- 不替代正式 review、测试设计、安全审计、业务验收或架构重构。
+- 不检查 Sky Flow artifact 状态；交给 `validate-flow`。
+- 不清理与目标变更无关的历史死代码。
+- 不因第一次重复强行 DRY，不制造 mode / flag / caller 特例抽象。
+- 不把代码压成更短但更难读的 clever 写法。
+- 不把主任务正常实现、行为优化或新能力包装成收敛成果。
+- 不重写历史文档；历史证据需要保留时标记 superseded 并指向现行真相源。
 
-## 参考资料
+## Output
 
-以下资料只用于校准“行为不变、减少补丁感、提升清晰度”的判断，不作为强制风格规则，也不覆盖本仓库模块规则：
+只输出收敛专门发现或完成的熵减结果。每个 finding 必须包含位置、问题、证据、建议、行为影响、风险和验证；不能只报 smell 名称。
 
-- Claude Code Simplifier / code-simplifier 类资料：关注 agent 产物里的补丁式实现、绕路 helper、临时残留和过度抽象。
-- Martin Fowler, *Refactoring: Improving the Design of Existing Code*：参考 code smells、行为保持式重构和小步整理原则。
-- Kent Beck, *Tidy First?*：参考先做低风险局部整理、把结构性整理和行为修改分开的原则。
-- John Ousterhout, *A Philosophy of Software Design*：参考降低复杂度、避免浅模块和信息泄漏的判断。
-- Steve McConnell, *Code Complete*：参考命名、控制流、复杂度和构造质量的基础实践。
-- Google Engineering Practices, Code Review Developer Guide：参考可维护性、复杂度、范围控制和 review 反馈分级。
-- Refactoring.Guru Code Smells catalog：作为 smell 名称和排查方向索引；不得因为命中 smell 就自动修改。
-
-## 输出
-
-只输出收敛阶段专门做的熵减结果。没有实际收敛或需要确认的问题时，不输出固定区块。
+小范围且只有自动整理时，可以使用：
 
 ```text
 ### 收敛 - 已完成
@@ -142,4 +116,4 @@ description: 'Consolidate a stable completed-stage diff only when the user expli
 1. ...
 ```
 
-不要固定罗列命令过程。验证、扫描范围或跳过原因只有在影响判断时才说明。
+深度审计使用 `audit-method.md` 中的完整输出结构，区分：建议立即收敛、只能 deprecated / 留待后续、明确保留、最小分阶段实施。没有实际 finding 时说明检查范围、职责接管结论和未验证边界，不输出空模板。
