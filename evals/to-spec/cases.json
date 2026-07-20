@@ -59,7 +59,7 @@
       "expected": [
         "先找共同成功边界和真正根目标",
         "指出独立演进且验收标准不同的部分应拆分 spec",
-        "不创建 plan/task DAG 来承载过大 scope"
+        "不以 thin plan 代替 spec 拆分，也不恢复 task DAG"
       ]
     }
   ]

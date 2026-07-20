@@ -10,7 +10,7 @@ description: 'Run a dedicated read-only review only when the user explicitly inv
 ## Quick Path
 
 1. 确认具体范围：默认 pending diff；也可使用用户指定的文件、artifact、commit range 或实现输出。
-2. 获取 source spec / runtime goal、预期行为、known deviations、non-goals 和已跑验证。意图只能从 diff 推断时明确标注。
+2. 获取 source spec / runtime goal、可选 source-linked active thin plan、预期行为、known deviations、non-goals 和已跑验证。plan 只提供实施上下文，不能覆盖 spec。意图只能从 diff 推断时明确标注。
 3. 选择最小充分深度：小而低风险用 `fast`；非平凡变更默认 `medium`；有系统性高风险线索才进入 `deep`。
 4. 默认只使用当前 reviewer；只有用户明确要求，或 source spec 明确要求且一个结论不足时才使用多个独立 reviewer。
 5. 同一个 reviewer 同时给出`设计 / spec 符合性`与`代码质量`两个结论，并列出无法验证项；不要机械拆成两轮 review。
@@ -29,7 +29,7 @@ description: 'Run a dedicated read-only review only when the user explicitly inv
 python3 skills/to-review/scripts/prepare_review_context.py --output-dir <临时目录> --spec <source-spec>
 ```
 
-脚本在仓库外的临时目录生成可复用 `review-context.md` 与 `changes.diff`。也可用 `--base` / `--head` 指定范围，使用 `--goal` 代替 `--spec`，并重复传入 `--known-deviation`、`--non-goal`、`--evidence`。context 必须引用 source spec 或 runtime goal，不能只给 diff；优先让 reviewer 读取文件，不在消息中粘贴大段内容。
+脚本在仓库外的临时目录生成可复用 `review-context.md` 与 `changes.diff`。也可用 `--base` / `--head` 指定范围，使用 `--goal` 代替 `--spec`，并重复传入 `--known-deviation`、`--non-goal`、`--evidence`。context 必须引用 source spec 或 runtime goal，不能只给 diff；active plan 如有则作为独立只读上下文一并提供。优先让 reviewer 读取文件，不在消息中粘贴大段内容。
 
 该目录是 runtime 临时输入，不是 Sky Flow artifact，不得写入 spec Progress。
 
@@ -44,9 +44,10 @@ python3 skills/to-review/scripts/prepare_review_context.py --output-dir <临时�
 ## Review Focus
 
 - 行为是否满足 source spec / goal 的 intent、requirements、scenarios 和 constraints。
+- active plan 的 approach、局部 decisions 和 Progress 是否仍与 spec / code 一致，是否存在应提升到 spec 的 durable semantics、失效 code context 或 legacy topology。
 - 错误路径、边界状态、数据 / 权限 / 安全 / 并发 / 兼容风险是否有真实触发路径。
 - 实现是否越过 scope、no-touch 或 authority，是否遗漏必要验证。
-- artifact 是否保持设计、readiness、Progress 和来源一致，且没有 runtime topology 泄漏。
+- artifact 是否保持设计、readiness、spec / plan Progress 和来源一致，且没有 runtime topology 泄漏；plan 是否确有恢复价值且没有变成规范性真相源。
 - 多来源产物是否存在冲突、重复、临时残留或相互矛盾的假设。
 
 结构字段问题交 `validate-flow`；补丁式实现和 diff 熵值交 `to-consolidation`；目标、外部契约、数据语义或验收行为变化回 `to-spec`。

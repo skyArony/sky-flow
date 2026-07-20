@@ -5,9 +5,9 @@ description: 'Create or update a Sky Flow handoff artifact only when the user ex
 
 # to-handoff
 
-`to-handoff` 保存下一轮无法从仓库和 spec Progress 重建的易失状态。它不是聊天摘要、长期真相源或默认恢复入口。
+`to-handoff` 保存下一轮无法从仓库、spec Progress 和 active thin plan 重建的易失状态。它不是聊天摘要、长期真相源或默认恢复入口。
 
-长期设计、稳定 checkpoint、关键决策、blocker 和验证结论必须先回写 spec；只有未提交 diff、当前终端、临时环境、短生命周期 evidence 或接手动作才进入 handoff。
+长期设计、稳定 checkpoint、durable decision、blocker 和目标级验证结论必须先回写 spec；有恢复价值的当前 slice、code context、局部 decision 和验证入口留在 active plan；只有未提交 diff、当前终端、临时环境、短生命周期 evidence 或接手动作才进入 handoff。
 
 handoff 默认写入 `${SKY_FLOW_ROOT}/handoff/`，并应由项目 `.gitignore` 排除。需要长期共享的事实不能只留在这里。
 
@@ -15,7 +15,7 @@ handoff 默认写入 `${SKY_FLOW_ROOT}/handoff/`，并应由项目 `.gitignore` 
 
 1. 确定 `SKY_FLOW_ROOT` / `SKY_FLOW_LANG`。
 2. 确认来源：conversation、spec、issue、acceptance、backlog 或已有 handoff。
-3. 先判断信息是否已在 spec Progress、仓库文件或持久证据中；能重建的内容不要复制。
+3. 先判断信息是否已在 spec Progress、source-linked active plan、仓库文件或持久证据中；能重建的内容不要复制。
 4. 收集易失事实：未提交范围、终端 / 进程、临时环境、短期凭据状态、未保存 evidence、接手动作和 stop conditions。
 5. 创建或更新 `${SKY_FLOW_ROOT}/handoff/<id>.md`。
 6. 如果 handoff 目录未被忽略，提醒用户；不要默认提交。
@@ -37,6 +37,7 @@ resume_from: <checkpoint-or-current-session>
 - conversation 来源使用 `source_id: current-session`，正文补足上下文。
 - spec 来源只引用 spec path / id 和 checkpoint，不复制整个 Progress。
 - acceptance / backlog 来源保留当前人类反馈或恢复条件。
+- thin plan 不是 handoff 的权威 source；存在 active plan 时仍让 `source_type` 指向 durable spec，并在 `Read First` 引用 plan path。
 - `resume_from` 必须是下一轮可定位的 checkpoint、文件、终端或当前会话入口。
 
 ## Body Template
@@ -81,7 +82,7 @@ resume_from: <checkpoint-or-current-session>
 
 ## Recovery Rules
 
-- 下一轮先读 source spec 和其 Progress，再使用 handoff 补充易失信息。
+- 下一轮先读 source spec 和其 Progress；存在 source-linked active plan 时再读 plan，最后使用 handoff 补充易失信息。
 - 更新已有 handoff 时删除已失效的临时状态，不累积历史流水。
 - 验证证据已经稳定落盘时只引用路径，不复制长输出。
 - 多个并行 lane 只有共享同一个 resume goal 且确有易失状态时才放同一 handoff。

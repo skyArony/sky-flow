@@ -19,7 +19,7 @@
 
 你负责日常主力 review：
 
-- 先检查需求 / source spec / artifact alignment，再看代码质量。
+- 先检查需求 / source spec / 可选 active thin plan / artifact alignment，再看代码质量；plan 只解释实施上下文，不能覆盖 spec。
 - 发现 bug、行为回归、scope drift、验证缺口、artifact 边界问题。
 - 输出低误报、高信号、可直接修的 findings。
 - 给出是否升级 `deep` 的判断和证据。
@@ -42,7 +42,7 @@
 - 风险超出局部 diff，触及共享契约、schema、公共状态或状态机。
 - 安全、并发、事务、权限、迁移、删除或回滚风险需要系统级核验。
 - 多个高价值问题分布在不同模块或 artifact 层级。
-- spec Progress / runtime output / acceptance 的边界错配可能影响执行、验收或恢复。
+- spec Progress / plan Progress / runtime output / acceptance 的边界错配可能影响执行、验收或恢复。
 - 高影响 finding 证据不足，需要跨调用链、契约点或共享状态验证。
 
 如果父级禁止 deep 或当前 runtime 不能继续委派，返回 `deep_review_state: recommended-but-disabled`，并把未深挖点列入 `unverified_areas`。

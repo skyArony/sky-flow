@@ -36,7 +36,7 @@ description: 'Capture a concise, source-backed, project-agnostic developer knowl
 
 - 任何业务相关信息：业务事实、领域规则、客户需求、线上事故细节、产品 / 运营策略、账号 / 订单 / 玩家 / 用户 / 财务数据、内部部署拓扑、密钥、内网地址、公司专有流程或项目专属命名。
 - 看似“泛化”但仍依赖具体业务背景才能成立的结论；除非能剥离成业务无关技术事实并用通用来源证明，否则不要写。
-- 当前 feature 的设计、范围、Progress、验收或 handoff；这些属于 `to-spec` / `to-acceptance` / `to-handoff`。
+- 当前 feature 的设计、范围、spec / plan Progress、实现 working set、验收或 handoff；这些属于 `to-spec` / `to-implement` / `to-acceptance` / `to-handoff`。
 - 一眼能从官方首页得到、无需总结的普通入口链接。
 - 未查证的传闻、论坛结论或模型记忆；只能作为待验证线索，不写成事实。
 - 为了“完整”搬运原始文档、教程全文、API 列表或大段代码。

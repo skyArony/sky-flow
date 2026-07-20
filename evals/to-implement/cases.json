@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "purpose": "评估 to-implement 是否准确采用 runtime-first、plan-on-demand，并让 thin plan 提升长周期恢复质量而不恢复旧执行拓扑。",
+  "cases": [
+    {
+      "id": "simple-local-runtime-only",
+      "title": "简单局部修改不建 plan",
+      "prompt": "根据 ready spec，把一个已有错误提示改成统一术语并跑相关测试。",
+      "expected": [
+        "直接由 runtime 实现和验证",
+        "不因存在 spec 而创建 plan",
+        "只把稳定语义结果和证据写回 spec Progress"
+      ]
+    },
+    {
+      "id": "complex-continuous-runtime-only",
+      "title": "复杂但可连续完成",
+      "prompt": "修改三个相邻模块完成一次内部重构，当前会话可连续完成，代码入口清楚且重新推导成本低。",
+      "expected": [
+        "按需使用 runtime checklist",
+        "不把 checklist 步骤数当成 plan 物化理由",
+        "不创建 task、step、owner、dependency 或 parallel graph"
+      ]
+    },
+    {
+      "id": "long-running-cross-session",
+      "title": "长周期跨会话恢复",
+      "prompt": "实现一项跨多个模块和验证环境的迁移，预计分三次会话完成，入口关系和兼容事实重新梳理成本较高。",
+      "expected": [
+        "创建或复用 source-linked active thin plan",
+        "plan 聚焦 current slice、code context、局部 decisions、Progress 和验证入口",
+        "spec 仍是规范性真相源，plan 不复制长期需求"
+      ]
+    },
+    {
+      "id": "midway-materialization",
+      "title": "任务中途变复杂",
+      "prompt": "开始时只是局部修改，但执行中发现需要跨会话继续，且后续依赖刚确认的多个代码入口和失败路线。",
+      "expected": [
+        "不中断或重启 workflow，直接中途 materialize thin plan",
+        "只迁入当前仍有效且有恢复价值的上下文",
+        "覆盖更新 snapshot，不复制完整聊天或 runtime checklist"
+      ]
+    },
+    {
+      "id": "decision-promotion",
+      "title": "局部决定升级为外部契约变化",
+      "prompt": "active plan 中的实现选择后来被证明会改变外部返回语义和兼容窗口。",
+      "expected": [
+        "暂停实现并回到 to-spec",
+        "把 external behavior 和兼容决定提升到 spec Decisions / Requirements",
+        "更新 plan 使其重新服从 spec，而不是让 plan 覆盖 spec"
+      ]
+    },
+    {
+      "id": "volatile-transfer-boundary",
+      "title": "区分 plan 与 handoff",
+      "prompt": "实现会长期继续，同时当前会话还有未提交 diff、临时终端状态和一次性环境凭证需要换 Agent 接力。",
+      "expected": [
+        "thin plan 只保存可复用实施 working set",
+        "易失本地接力状态在用户显式要求时进入 handoff，handoff source 仍指向 durable spec",
+        "不把凭证、终端流水或未提交 diff 细节写进 plan"
+      ]
+    },
+    {
+      "id": "direct-plan-resume",
+      "title": "直接从 active plan 恢复",
+      "prompt": "继续 docs/plan/checkout-recovery.md。",
+      "expected": [
+        "把 plan 当作 resume locator，先解析 source spec",
+        "只允许 not_started / in_progress plan，并确认 source spec 仍 ready、unfinished 且 status 与 plan 一致，再进入 to-implement",
+        "目标、scope、constraints 和完成标准仍来自 spec，不把 plan 当作独立 goal"
+      ]
+    },
+    {
+      "id": "plan-closure-with-open-spec",
+      "title": "当前 plan 收口但 spec 仍开放",
+      "prompt": "当前 implementation slice 和验证已经完成，但 source spec 还有后续 durable scope。",
+      "expected": [
+        "先把 durable decision、semantic outcome、evidence 和 residual risk 提升到 spec",
+        "不因为 plan 完成而自动完成 spec",
+        "把 plan 压缩为最小 completed 摘要或删除，不移动到 plan/done"
+      ]
+    }
+  ]
+}

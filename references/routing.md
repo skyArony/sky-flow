@@ -16,7 +16,7 @@
 | --- | --- | --- | --- |
 | `to-spec` | 显式 `$` | 长期设计、需求澄清、spec / readiness / Progress 更新 | 底座对齐、决策归属、决策前沿、就绪证明；不记录对齐流水或 runtime 拓扑 |
 | `pick-goal` | 显式 `$` | 从一个或多个 spec 选择、恢复、生成或启动 runtime goal | 选择只读；ready 交 `to-implement`，alignment 交 `to-spec`，blocked 不启动 |
-| `to-implement` | 自动 | 用户要求执行 / 继续 ready spec 或其派生的 implementation-ready goal | 动态执行并压缩写回 Progress；不接收 alignment 或 blocked goal |
+| `to-implement` | 自动 | 用户要求执行 / 继续 ready spec、implementation-ready goal，或给出 active thin plan 作为 resume locator | runtime-first；按恢复价值决定是否维护 plan；不接收 alignment 或 blocked goal |
 | `to-issue` | 显式 `$` | 记录值得长期保留的问题、证据、机会或 unresolved finding | 不是执行 slice；不创建外部 tracker |
 | `to-debug` | 自动 | 定位问题、复现异常、分析 root cause、固化真实事故回归 | infra 取证转项目 adapter；回归测试复用当前诊断证据，不另开工作流 |
 | `to-infra` | 自动 | 环境、日志、数据库、缓存、Metrics、告警、部署或外部系统 | project-provided adapter |
@@ -30,28 +30,27 @@
 | `to-handoff` | 显式 `$` | 易失本地状态需要换会话 / Agent 接力 | 不复制 spec Progress |
 | `to-commit` | 自动 | stage、commit、message 或拆分提交 | staged artifact 先 validate-flow |
 | `to-consolidation` | 显式 `$` | 用户要求对稳定 diff 做专门熵值收敛 | 普通最终检查由 runtime 直接完成 |
-| `validate-flow` | 自动 | 创建 / 修改 artifact、稳定 Progress 写回或提交前 | 只检查轻量结构和来源 |
+| `validate-flow` | 自动 | durable artifact 变更、thin plan 结构 / 恢复边界或提交前 | 先确定性预检，语义 pass 按风险进入 |
 | `to-claude-review` | 显式 `$` | 用户要求 Claude Code 第二意见或供应商独立复审 | Codex-only bridge |
 
 ## Native Runtime Execution
 
-ready spec 或其派生的 implementation-ready goal 由 `to-implement` 直接交给原生 runtime：
+ready spec、其派生的 implementation-ready goal，或已解析回 ready source spec 的 active plan locator，由 `to-implement` 交给原生 runtime：
 
-- 工作简单时主代理直接执行，不创建额外 checklist。
-- 复杂工作可以使用 runtime checklist；只有用户显式要求多 Agent，或 spec 明确要求独立评估时才派发子代理，不预设角色、packet 或固定流水线。
-- 多消费者或上下文容易失真时，可在 runtime 内一次投影`目标 / 成功边界 / 关键约束 / 相关契约 / 当前事实`并复用；它不是 artifact 或固定 packet。
+- 简单工作直接执行；复杂但连续且低恢复成本的工作只用 runtime checklist。只有恢复价值成立时，`to-implement` 才按需或中途 materialize thin plan，具体门槛与内容边界由该 Skill 维护。
+- 多消费者需要共享边界时，可复用紧凑 runtime 投影；它本身不是 artifact。多 Agent 只按用户或 source spec 的独立评估要求进入，不预设固定流水线。
 - 同一文件 / 共享状态避免并发多写；交接后可以动态更换 writer。
 - 测试 ROI、stable seam、验证模式和普通测试实现由 runtime 按风险决定；真实事故的回归固化留在 `to-debug`，`Given / When / Then` 只是可选表达方式。
-- 只有语义级 checkpoint、outcome、blocker、evidence、risk 或 resume target 写回 spec Progress。
-- scope 内 implementation strategy 由 runtime 自主调整；material goal、external behavior、contract 或 data semantics 变化时暂停实现并建议 `$to-spec`。
+- 目标级稳定状态写回 spec；有恢复价值的实施 working set 写回 active plan。任何改变 source spec 规范性边界的事实或决定先回 `$to-spec`。
 
-runtime checklist 不是 artifact，不接受 `validate-flow`，也不应被复制进 spec、handoff 或 backlog。
+runtime checklist 不是 artifact，也不因步骤多就复制成 plan。thin plan 不是 readiness gate 或 runtime controller。
 
 用户显式调用 `$pick-goal` 时，只读派生 portable runtime goal；`Progress.Next` 只是恢复入口，不是 goal 本身。若用户同时要求启动，ready goal 交给 `to-implement`，alignment goal 交给 `to-spec`，仍有 blocker 时只报告解除条件。原生 goal 创建后，执行和稳定状态写回由接收方负责。
 
 ## Real Boundary Routing
 
-- 临时执行阻塞：写入 spec Progress `Blockers`。
+- 当前 slice 的局部实施阻塞可留在 active plan；会阻塞整体 goal、涉及外部条件 / authority / durable constraint 的 blocker 写入 spec Progress，plan 只引用它。
+- 实现上下文需要跨会话恢复，但仍属于同一 active workstream：由 `to-implement` 维护 thin plan；不要误用 handoff。
 - 长期延期或退出当前执行队列：用户明确要求记录时使用 `$to-backlog`。
 - 未提交 diff、终端、临时环境或易失证据需要接力：用户明确要求交接时使用 `$to-handoff`。
 - 人类 approval、真实设备 / 账号 / 环境、体验或风险接受：先在对话停止并询问；只有用户显式要求 durable gate 时使用 `$to-acceptance`。
@@ -59,4 +58,4 @@ runtime checklist 不是 artifact，不接受 `validate-flow`，也不应被复�
 
 ## Retired Skills
 
-历史文件化执行拓扑与已被 native runtime / `to-debug` 吸收的测试工作流保存在仓库根 `archive/skills/`，不被 active installer 发现，也不得从 routing 推荐。迁移时把长期设计、稳定状态和证据压入 spec；只把真实边界分流到 acceptance、backlog 或 handoff。
+历史 plan/task/step 拓扑、`to-plan` / `pick-plan` / `to-task` / `to-archive` 与已被 native runtime / `to-debug` 吸收的测试工作流保存在仓库根 `archive/skills/`，不被 active installer 发现，也不得从 routing 推荐。当前 thin plan 只是 `to-implement` 的按需 working set，不恢复旧 skill 或拓扑。迁移时把长期设计、稳定状态和证据压入 spec，把仍有恢复价值的实施上下文改写成 thin plan，只把真实边界分流到 acceptance、backlog 或 handoff。

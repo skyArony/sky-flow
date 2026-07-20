@@ -9,6 +9,7 @@ import {
   DEFAULT_SKY_FLOW_ROOT,
   REQUIRED_FIELDS,
   RETIRED_ARTIFACT_TYPES,
+  RETIRED_PLAN_FIELDS,
   RETIRED_TOPOLOGY_FIELDS,
   STATUSES,
   type ArtifactRecord,
@@ -28,6 +29,15 @@ function isPathWithin(childPath: string, parentPath: string): boolean {
     relative === '' ||
     (!!relative && !relative.startsWith('..') && !path.isAbsolute(relative))
   );
+}
+
+function canonicalPath(inputPath: string): string {
+  const resolved = path.resolve(inputPath);
+  try {
+    return fs.realpathSync.native(resolved);
+  } catch {
+    return resolved;
+  }
 }
 
 function parseScalar(raw: string): unknown {
@@ -95,7 +105,9 @@ function readRuntimeConfig(projectRoot: string): {
   const skyFlowRootEnv = process.env.SKY_FLOW_ROOT;
   const skyFlowLangEnv = process.env.SKY_FLOW_LANG;
   return {
-    skyFlowRoot: path.resolve(projectRoot, skyFlowRootEnv || DEFAULT_SKY_FLOW_ROOT),
+    skyFlowRoot: canonicalPath(
+      path.resolve(projectRoot, skyFlowRootEnv || DEFAULT_SKY_FLOW_ROOT),
+    ),
     skyFlowLang: skyFlowLangEnv || DEFAULT_SKY_FLOW_LANG,
     report: {
       source: 'runtime-env',
@@ -112,6 +124,11 @@ function asList(value: unknown): unknown[] {
 
 function hasValue(value: unknown): boolean {
   return value !== null && value !== undefined && value !== '';
+}
+
+function hasRequiredValue(field: string, value: unknown): boolean {
+  if (Array.isArray(value)) return field === 'depends_on' || value.length > 0;
+  return hasValue(value);
 }
 
 function addIssue(
@@ -139,7 +156,7 @@ function collectMarkdown(inputs: string[], skyFlowRoot: string): string[] {
   const files: string[] = [];
 
   for (const input of roots) {
-    const resolved = path.resolve(input);
+    const resolved = canonicalPath(input);
     if (!fs.existsSync(resolved)) continue;
     const stat = fs.statSync(resolved);
     if (stat.isFile() && resolved.endsWith('.md')) files.push(resolved);
@@ -167,9 +184,23 @@ function validateFields(
   projectRoot: string,
 ) {
   const type = String(artifact.artifact_type || '');
+  for (const field of REQUIRED_FIELDS.base) {
+    if (field in artifact && hasValue(artifact[field]) && typeof artifact[field] !== 'string') {
+      addIssue(
+        errors,
+        'BASE_FIELD_TYPE_INVALID',
+        'error',
+        artifact,
+        filePath,
+        field,
+        `${field} must be a scalar string`,
+        projectRoot,
+      );
+    }
+  }
   const required = [...REQUIRED_FIELDS.base, ...(REQUIRED_FIELDS[type] || [])];
   for (const field of required) {
-    if (!(field in artifact)) {
+    if (!(field in artifact) || !hasRequiredValue(field, artifact[field])) {
       addIssue(
         errors,
         'MISSING_REQUIRED_FIELD',
@@ -192,9 +223,41 @@ function validateFields(
         artifact,
         filePath,
         field,
-        `${field} belongs to the retired plan/task topology; keep stable state in spec Progress instead`,
+        `${field} belongs to the retired file-backed execution topology; keep durable semantics in spec and implementation working state in a thin plan`,
         projectRoot,
       );
+    }
+  }
+
+  if (type === 'plan') {
+    for (const field of ['source_type', 'source_id']) {
+      const value = artifact[field];
+      if (hasValue(value) && typeof value !== 'string') {
+        addIssue(
+          errors,
+          'PLAN_SOURCE_FIELD_TYPE_INVALID',
+          'error',
+          artifact,
+          filePath,
+          field,
+          `${field} must be a scalar string in a thin plan`,
+          projectRoot,
+        );
+      }
+    }
+    for (const field of RETIRED_PLAN_FIELDS) {
+      if (field in artifact) {
+        addIssue(
+          errors,
+          'RETIRED_PLAN_FIELD',
+          'error',
+          artifact,
+          filePath,
+          field,
+          `${field} belongs to the archived plan workflow; thin plans use source_type/source_id and a compact body snapshot`,
+          projectRoot,
+        );
+      }
     }
   }
 
@@ -241,6 +304,18 @@ function validateEnums(
       filePath,
       'status',
       `Invalid status: ${String(artifact.status)}`,
+      projectRoot,
+    );
+  }
+  if (type === 'plan' && String(artifact.status) === 'draft') {
+    addIssue(
+      errors,
+      'PLAN_DRAFT_STATUS_NOT_ALLOWED',
+      'error',
+      artifact,
+      filePath,
+      'status',
+      'thin plans materialize only after recovery value is established; use not_started or in_progress instead of a pre-readiness draft stage',
       projectRoot,
     );
   }
@@ -321,6 +396,34 @@ function validateNaming(
     );
   }
 
+  if (type === 'plan') {
+    if (/^\d{3}[a-z]?-/.test(stem)) {
+      addIssue(
+        errors,
+        'PLAN_MUST_NOT_USE_LEGACY_NUMERIC_PREFIX',
+        'error',
+        artifact,
+        filePath,
+        'id',
+        'thin plan filenames must not use legacy numeric ordering prefixes',
+        projectRoot,
+      );
+    }
+    const doneDir = path.join(skyFlowRoot, 'plan', 'done');
+    if (isPathWithin(filePath, doneDir)) {
+      addIssue(
+        errors,
+        'PLAN_DONE_DIRECTORY_RETIRED',
+        'error',
+        artifact,
+        filePath,
+        'path',
+        'thin plans are compacted or removed after durable semantics are promoted; plan/done is retired',
+        projectRoot,
+      );
+    }
+  }
+
   if (type === 'issue') {
     const fixedDir = path.join(skyFlowRoot, 'issue', 'fixed');
     const inFixedDir = isPathWithin(filePath, fixedDir);
@@ -352,6 +455,39 @@ function validateNaming(
   }
 }
 
+function validatePlanBody(
+  artifact: Frontmatter,
+  body: string,
+  filePath: string,
+  errors: ValidationIssue[],
+  projectRoot: string,
+) {
+  if (String(artifact.artifact_type || '') !== 'plan') return;
+
+  const retiredSections = [
+    'Progress Log',
+    'Agent Lanes',
+    'Dependencies / Parallelism',
+    'Task Topology',
+  ].filter((heading) => {
+    const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`^##\\s+${escaped}\\s*$`, 'im').test(body);
+  });
+
+  if (retiredSections.length) {
+    addIssue(
+      errors,
+      'RETIRED_PLAN_BODY_SECTION',
+      'error',
+      artifact,
+      filePath,
+      'body',
+      `Legacy plan topology or append-only sections are retired: ${retiredSections.join(', ')}; rewrite the content as a compact, overwrite-oriented working-set snapshot`,
+      projectRoot,
+    );
+  }
+}
+
 function registryKey(type: string, id: string): string {
   return `${type}:${id}`;
 }
@@ -366,19 +502,65 @@ function validateRelationships(
   warnings: ValidationIssue[],
   llmHints: Record<string, string>[],
   projectRoot: string,
+  partialScope: boolean,
 ) {
   const records = [...registry.values()];
   const byType = (type: string) => records.filter((item) => item.artifact_type === type);
   const specs = byType('spec');
+  const plans = byType('plan');
   const issues = byType('issue');
   const acceptances = byType('acceptance');
   const backlogs = byType('backlog');
   const handoffs = byType('handoff');
   const sourceLinks: Record<string, string>[] = [];
+  const activePlanStatuses = new Set(['not_started', 'in_progress']);
 
-  for (const artifact of [...acceptances, ...backlogs, ...handoffs]) {
+  for (const artifact of [...plans, ...acceptances, ...backlogs, ...handoffs]) {
     const sourceType = String(artifact.data.source_type || '');
     const sourceId = String(artifact.data.source_id || '');
+
+    if (artifact.artifact_type === 'plan') {
+      if (sourceType !== 'spec') {
+        addIssue(
+          errors,
+          'PLAN_SOURCE_MUST_BE_SPEC',
+          'error',
+          artifact.data,
+          artifact.path,
+          'source_type',
+          'thin plans must derive authority from exactly one source spec',
+          projectRoot,
+        );
+        continue;
+      }
+      if (sourceId === 'current-session') {
+        addIssue(
+          errors,
+          'PLAN_SOURCE_ID_INVALID',
+          'error',
+          artifact.data,
+          artifact.path,
+          'source_id',
+          'thin plans require a stable source spec id; current-session is not allowed',
+          projectRoot,
+        );
+        continue;
+      }
+      if (!sourceId) continue;
+    } else if (sourceType === 'plan') {
+      addIssue(
+        errors,
+        'PLAN_CANNOT_BE_BOUNDARY_SOURCE',
+        'error',
+        artifact.data,
+        artifact.path,
+        'source_type',
+        'plan is a disposable implementation working set; acceptance, backlog, and handoff must point to a durable source such as spec',
+        projectRoot,
+      );
+      continue;
+    }
+
     if (!sourceId || sourceId === 'current-session' || sourceType === 'conversation') continue;
 
     if (RETIRED_ARTIFACT_TYPES.includes(sourceType as never)) {
@@ -410,17 +592,62 @@ function validateRelationships(
 
     const source = registry.get(registryKey(sourceType, sourceId));
     if (!source) {
+      if (artifact.artifact_type === 'plan' && !partialScope) {
+        addIssue(
+          errors,
+          'PLAN_SOURCE_SPEC_MISSING',
+          'error',
+          artifact.data,
+          artifact.path,
+          'source_id',
+          `thin plan source spec/${sourceId} is missing from the full Sky Flow artifact set`,
+          projectRoot,
+        );
+      } else {
+        addIssue(
+          warnings,
+          'SOURCE_ARTIFACT_MISSING',
+          'warning',
+          artifact.data,
+          artifact.path,
+          'source_id',
+          `${artifact.artifact_type} source ${sourceType}/${sourceId} is not present in checked artifacts`,
+          projectRoot,
+        );
+      }
+      continue;
+    }
+    if (
+      artifact.artifact_type === 'plan' &&
+      activePlanStatuses.has(artifact.status) &&
+      !['not_started', 'in_progress'].includes(source.status)
+    ) {
       addIssue(
-        warnings,
-        'SOURCE_ARTIFACT_MISSING',
-        'warning',
+        errors,
+        'PLAN_SOURCE_SPEC_NOT_EXECUTABLE',
+        'error',
         artifact.data,
         artifact.path,
         'source_id',
-        `${artifact.artifact_type} source ${sourceType}/${sourceId} is not present in checked artifacts`,
+        `active thin plan requires a ready, unfinished source spec; spec/${sourceId} has status ${source.status}`,
         projectRoot,
       );
-      continue;
+    }
+    if (
+      artifact.artifact_type === 'plan' &&
+      artifact.status === 'in_progress' &&
+      source.status === 'not_started'
+    ) {
+      addIssue(
+        errors,
+        'PLAN_SOURCE_SPEC_STATUS_BEHIND',
+        'error',
+        artifact.data,
+        artifact.path,
+        'source_id',
+        `in-progress thin plan requires source spec/${sourceId} to be in_progress`,
+        projectRoot,
+      );
     }
     sourceLinks.push({
       from: `${source.artifact_type}/${source.id}`,
@@ -428,8 +655,35 @@ function validateRelationships(
     });
   }
 
+  const activePlansBySpec = new Map<string, ArtifactRecord[]>();
+  for (const plan of plans) {
+    if (!activePlanStatuses.has(plan.status)) continue;
+    if (String(plan.data.source_type || '') !== 'spec') continue;
+    const sourceId = String(plan.data.source_id || '');
+    if (!sourceId || sourceId === 'current-session') continue;
+    const siblings = activePlansBySpec.get(sourceId) || [];
+    siblings.push(plan);
+    activePlansBySpec.set(sourceId, siblings);
+  }
+  for (const [sourceId, activePlans] of activePlansBySpec) {
+    if (activePlans.length < 2) continue;
+    for (const plan of activePlans) {
+      addIssue(
+        warnings,
+        'MULTIPLE_ACTIVE_PLANS_FOR_SPEC',
+        'warning',
+        plan.data,
+        plan.path,
+        'source_id',
+        `spec ${sourceId} has ${activePlans.length} active thin plans; converge them or split the spec instead of creating a plan graph`,
+        projectRoot,
+      );
+    }
+  }
+
   for (const artifact of records) {
     if (artifact.status !== 'abandoned') continue;
+    if (artifact.artifact_type === 'plan') continue;
     const linkedBacklog = backlogs.some(
       (backlog) =>
         String(backlog.data.source_type || '') === artifact.artifact_type &&
@@ -483,6 +737,40 @@ function validateRelationships(
     });
   }
 
+  for (const plan of plans) {
+    const hasProgress = /^## Progress\s*$/im.test(plan.body);
+    if (['not_started', 'in_progress'].includes(plan.status) && !hasProgress) {
+      addIssue(
+        warnings,
+        'PLAN_PROGRESS_MISSING',
+        'warning',
+        plan.data,
+        plan.path,
+        'body',
+        'active thin plan should keep a compact Done / Active / Next / Blockers snapshot',
+        projectRoot,
+      );
+    }
+    llmHints.push({
+      artifact_id: plan.id,
+      check: 'thin_plan_materialization',
+      reason:
+        'Verify this work is complex, long-running, interruption-prone, or expensive to reconstruct enough to justify a file-backed plan; simple or reliably single-session work should stay runtime-only.',
+    });
+    llmHints.push({
+      artifact_id: plan.id,
+      check: 'thin_plan_boundary',
+      reason:
+        'Verify the plan references a ready unfinished spec rather than duplicating or overriding it, remains non-normative, contains only useful implementation context and reversible local decisions, and promotes any material scope, stable constraint, no-touch, external behavior, contract, data, authority, acceptance, or durable architecture change back to spec.',
+    });
+    llmHints.push({
+      artifact_id: plan.id,
+      check: 'thin_plan_snapshot',
+      reason:
+        'Verify Progress is an overwrite snapshot with concrete resume context and reusable verification entry points. Slice-local implementation blockers may stay here; goal-level, external, authority, or durable-constraint blockers belong in spec Progress and should only be referenced. Reject task graphs, owner/dependency/parallel lane models, tool or agent transcripts, microstep scripts, and chronological logs.',
+    });
+  }
+
   for (const issue of issues) {
     llmHints.push({
       artifact_id: issue.id,
@@ -527,7 +815,9 @@ function main(): number {
     return 2;
   }
 
-  const projectRoot = rootFlag >= 0 ? path.resolve(String(args[rootFlag + 1])) : process.cwd();
+  const projectRoot = canonicalPath(
+    rootFlag >= 0 ? String(args[rootFlag + 1]) : process.cwd(),
+  );
   const inputs =
     rootFlag >= 0 ? args.filter((_, index) => index !== rootFlag && index !== rootFlag + 1) : args;
   const runtimeConfig = readRuntimeConfig(projectRoot);
@@ -537,6 +827,16 @@ function main(): number {
   const checkedArtifacts: Record<string, unknown>[] = [];
   const registry = new Map<string, ArtifactRecord>();
   const explicit = inputs.length > 0;
+  const fullScope =
+    !explicit ||
+    inputs.some((input) => {
+      const resolved = canonicalPath(input);
+      return (
+        fs.existsSync(resolved) &&
+        fs.statSync(resolved).isDirectory() &&
+        isPathWithin(runtimeConfig.skyFlowRoot, resolved)
+      );
+    });
 
   for (const filePath of collectMarkdown(inputs, runtimeConfig.skyFlowRoot)) {
     const parsed = parseFrontmatter(filePath);
@@ -578,7 +878,7 @@ function main(): number {
         parsed.data,
         filePath,
         'artifact_type',
-        `${artifactType} artifacts are retired; migrate durable state into spec Progress or a real acceptance/backlog/handoff boundary`,
+        `${artifactType} artifacts are retired; migrate durable semantics into spec, active implementation working state into a thin plan when justified, or real boundaries into acceptance/backlog/handoff`,
         projectRoot,
       );
       checkedArtifacts.push({
@@ -609,6 +909,7 @@ function main(): number {
     validateFields(parsed.data, filePath, errors, projectRoot);
     validateEnums(parsed.data, filePath, errors, warnings, projectRoot);
     validateNaming(parsed.data, filePath, runtimeConfig.skyFlowRoot, errors, projectRoot);
+    validatePlanBody(parsed.data, parsed.body, filePath, errors, projectRoot);
 
     const id = String(parsed.data.id || '');
     if (id) {
@@ -643,7 +944,14 @@ function main(): number {
     });
   }
 
-  const graph = validateRelationships(registry, errors, warnings, llmHints, projectRoot);
+  const graph = validateRelationships(
+    registry,
+    errors,
+    warnings,
+    llmHints,
+    projectRoot,
+    !fullScope,
+  );
   const report = {
     schema_version: 'sky-flow-validate-report/v2',
     project_root: projectRoot,

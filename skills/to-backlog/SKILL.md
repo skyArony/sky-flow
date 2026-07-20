@@ -11,7 +11,7 @@ description: 'Create or update a Sky Flow backlog artifact only when the user ex
 
 1. 确定 `SKY_FLOW_ROOT` / `SKY_FLOW_LANG`。
 2. 确认来源：conversation、spec、issue、acceptance、handoff 或已有 backlog。
-3. 读取来源与证据，提取 current state、已尝试动作、阻塞原因、外部依赖和恢复信号。
+3. 读取来源与证据；存在 active thin plan 时也读取其当前实施上下文，提取 current state、已尝试动作、阻塞原因、外部依赖和恢复信号。
 4. 判断是否真的需要长期回收；如果现在仍可安全推进，回到 runtime 或 `to-implement`。
 5. 创建 / 更新 `${SKY_FLOW_ROOT}/backlog/<id>.md`。
 6. abandoned 来源必须有事实或人类依据；不要单方面放弃。
@@ -33,6 +33,7 @@ recommended_resume: after-dependency-ready
 
 - `source_type`：`conversation`、`spec`、`issue`、`acceptance`、`backlog` 或 `handoff`。
 - `source_id`：当前会话使用 `current-session`；artifact 来源写稳定 id。
+- thin plan 不是 backlog 的 durable source。工作从 active queue 退出时，backlog 指向 source spec（或其他长期来源），迁入必要恢复状态，并按 `to-implement` closure 规则收口 active plan。
 - `depends_on`：恢复前必须满足的外部条件、决策、账号、环境、数据、权限或人工输入。
 - `recommended_resume`：必须可判定，例如 `after-human-decision`、`after-environment-evidence`。
 

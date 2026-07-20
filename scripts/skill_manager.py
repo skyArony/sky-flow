@@ -966,6 +966,39 @@ def link_or_copy_skill(src: Path, dest: Path, copy_mode: bool, force: bool, dry_
     return "linked"
 
 
+def copied_tree_matches(source: Path, installed: Path) -> bool:
+    """Compare all managed files copied for one skill, including references and scripts."""
+
+    omit_repo_history = source.resolve() == REPO_ROOT.resolve()
+
+    def managed_files(root: Path) -> dict[Path, Path]:
+        files: dict[Path, Path] = {}
+        ignored_dirs = {"__pycache__"}
+        if omit_repo_history:
+            ignored_dirs.update({".git", "archive"})
+        for current_root, directories, filenames in os.walk(root):
+            directories[:] = [name for name in directories if name not in ignored_dirs]
+            current = Path(current_root)
+            for filename in filenames:
+                candidate = current / filename
+                if filename == ".DS_Store" or candidate.suffix == ".pyc":
+                    continue
+                files[candidate.relative_to(root)] = candidate
+        return files
+
+    try:
+        source_files = managed_files(source)
+        installed_files = managed_files(installed)
+    except OSError:
+        return False
+    if source_files.keys() != installed_files.keys():
+        return False
+    return all(
+        filecmp.cmp(source_files[relative], installed_files[relative], shallow=False)
+        for relative in source_files
+    )
+
+
 def suite_entry(registry: dict[str, SkillMeta]) -> SkillMeta:
     return registry[suite_entry_name(registry)]
 
@@ -1083,7 +1116,7 @@ def inspect_install_state(
                 continue
             if dest.is_dir() and (dest / "SKILL.md").is_file():
                 try:
-                    current = filecmp.cmp(dest / "SKILL.md", skill.skill_doc, shallow=False)
+                    current = copied_tree_matches(skill.path, dest)
                 except OSError:
                     current = False
                 if logical_target == "codex" and not skill.is_suite_entry:
@@ -1109,12 +1142,11 @@ def inspect_install_state(
                 targets[logical_target] = "broken"
             continue
         if root_dest.is_dir():
-            installed_doc = root_dest / skill.skill_doc.relative_to(REPO_ROOT)
+            installed_skill = root_dest / skill.path.relative_to(REPO_ROOT)
             try:
-                current = installed_doc.is_file() and filecmp.cmp(
-                    installed_doc,
-                    skill.skill_doc,
-                    shallow=False,
+                current = (
+                    (installed_skill / "SKILL.md").is_file()
+                    and copied_tree_matches(skill.path, installed_skill)
                 )
             except OSError:
                 current = False

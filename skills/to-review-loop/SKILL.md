@@ -11,11 +11,11 @@ description: 'Run a Sky Flow review-fix-rereview loop only when the user explici
 
 ## Quick Path
 
-1. 明确 source spec / goal、pending diff 或用户指定范围，并保护无关 worktree 改动。
+1. 明确 source spec / goal、可选 source-linked active plan、pending diff 或用户指定范围，并保护无关 worktree 改动。plan 只提供实施决策与恢复上下文，不能覆盖 spec。
 2. 完成首轮一体化 review；默认由当前 executor 同时检查设计 / spec 符合性和代码质量，只有用户明确要求或出现真实高风险证据缺口时才增加独立 reviewer。
 3. 逐条核验 finding，回答“实际会不会出 Bug”和“修复代价”，分为 blocking、当前轮高 ROI、deferred / rejected。
 4. 只修 scope 内且证据充分的问题；优先一到两个聚焦 batch。
-5. 运行与改动风险匹配的最小验证；修改 Sky Flow artifact 时运行 `validate-flow`。
+5. 运行与改动风险匹配的最小验证；durable artifact 或 plan 结构 / 恢复边界变化时运行 `validate-flow`，plan body-only snapshot 遵循其批量时机。
 6. 直接检查重复 / 临时代码、补丁感和明显 diff 熵值；只有用户同时显式调用 `$to-consolidation` 时才进入专项收敛流程。
 7. 修复完成后做一次整合复审，同时给出设计 / spec 符合性与代码质量结论，避免为同一范围机械叠加重复 review。
 8. 默认用定向测试和修复后 diff 完成 closure；只有用户明确要求、P0 证据冲突或真实高风险证据缺口时才增加一个独立 verifier。
@@ -59,9 +59,9 @@ Verifier 只检查 selected findings、相关回归面和修复证据：
 
 - 不 revert 无关用户改动，不为了 review 建议做无关重构、格式化 sweep 或依赖升级。
 - 复审必须看修复后 diff 与行为证据，而不是只确认文件发生变化。
-- scope 内 implementation strategy 可动态调整；目标、外部行为、契约、数据语义或验收变化回 `to-spec`。
+- scope 内 implementation strategy 可动态调整；任何 source spec 规范性边界变化回 `to-spec`。
 - 循环开始扩散到无关工作时停止，建议新 issue 或独立 spec。
-- 除非 scope 包含 artifact maintenance，否则只向调用方报告建议写回，不直接改 spec Progress。
+- 除非 scope 包含 artifact maintenance，否则只向调用方报告建议写回，不直接改 spec / plan Progress。报告必须区分 durable outcome / decision / blocker（spec）与当前 slice、局部 decision、resume / verification context（active plan），避免修复后 plan 过期。
 
 ## Stop Conditions
 
@@ -78,6 +78,7 @@ Verifier 只检查 selected findings、相关回归面和修复证据：
 - 验证证据、独立 verifier 数量与适用理由。
 - 是否触发 consolidation、触发迹象及结果。
 - 最新整合复审的设计 / spec 符合性和代码质量结论。
+- 调用方需要执行的 spec / active plan 分层写回。
 - remaining blockers、residual risks 和下一动作。
 
 不处理 commit；stage / commit 使用 `to-commit`。不创建 acceptance artifact，除非另有真实人类 gate 需要 `to-acceptance`。

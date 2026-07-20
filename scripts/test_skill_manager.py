@@ -178,6 +178,37 @@ class RetiredInstallTests(unittest.TestCase):
             self.assertEqual("copied", current_state["targets"]["claude"])
             self.assertEqual("ready", current_state["status"])
 
+            source_reference = source / "references" / "thin-plan.md"
+            source_reference.parent.mkdir()
+            source_reference.write_text("current plan contract\n", encoding="utf-8")
+            with mock.patch.object(
+                skill_manager,
+                "TARGET_DIRS",
+                {"claude": claude, "codex": root / "codex"},
+            ):
+                missing_reference_state = skill_manager.inspect_install_state(skill)
+            self.assertEqual("stale-copy", missing_reference_state["targets"]["claude"])
+
+            installed_reference = copied / "references" / "thin-plan.md"
+            installed_reference.parent.mkdir()
+            installed_reference.write_text("current plan contract\n", encoding="utf-8")
+            with mock.patch.object(
+                skill_manager,
+                "TARGET_DIRS",
+                {"claude": claude, "codex": root / "codex"},
+            ):
+                current_reference_state = skill_manager.inspect_install_state(skill)
+            self.assertEqual("copied", current_reference_state["targets"]["claude"])
+
+            installed_reference.write_text("stale plan contract\n", encoding="utf-8")
+            with mock.patch.object(
+                skill_manager,
+                "TARGET_DIRS",
+                {"claude": claude, "codex": root / "codex"},
+            ):
+                stale_reference_state = skill_manager.inspect_install_state(skill)
+            self.assertEqual("stale-copy", stale_reference_state["targets"]["claude"])
+
     def test_root_copy_omits_repository_and_archive_history(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             root = Path(raw_tmp)
@@ -346,6 +377,26 @@ class RetiredInstallTests(unittest.TestCase):
                 copied_state = skill_manager.inspect_install_state(child, registry)
             self.assertEqual("copied-via-suite", copied_state["targets"]["codex"])
             self.assertEqual("ready", copied_state["status"])
+
+            source_reference = child_path / "references" / "thin-plan.md"
+            source_reference.parent.mkdir()
+            source_reference.write_text("current plan contract\n", encoding="utf-8")
+            with (
+                mock.patch.object(skill_manager, "REPO_ROOT", repo),
+                mock.patch.object(skill_manager, "TARGET_DIRS", {"claude": root / "claude", "codex": codex}),
+            ):
+                missing_reference_state = skill_manager.inspect_install_state(child, registry)
+            self.assertEqual("stale-suite-copy", missing_reference_state["targets"]["codex"])
+
+            installed_reference = installed_doc.parent / "references" / "thin-plan.md"
+            installed_reference.parent.mkdir()
+            installed_reference.write_text("current plan contract\n", encoding="utf-8")
+            with (
+                mock.patch.object(skill_manager, "REPO_ROOT", repo),
+                mock.patch.object(skill_manager, "TARGET_DIRS", {"claude": root / "claude", "codex": codex}),
+            ):
+                current_reference_state = skill_manager.inspect_install_state(child, registry)
+            self.assertEqual("copied-via-suite", current_reference_state["targets"]["codex"])
 
             installed_doc.write_text("legacy executor\n", encoding="utf-8")
             with (

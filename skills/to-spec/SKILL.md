@@ -5,7 +5,7 @@ description: 'Align, create, or maintain a durable Sky Flow spec only when the u
 
 # to-spec
 
-`to-spec` 先建立共同底座，再把已经稳定的设计真相写入 Sky Flow `spec`。spec 是长期设计与恢复状态的默认载体；ready 后由 `to-implement` 直接执行，不生成 plan/task 等中间 artifact。
+`to-spec` 先建立共同底座，再把已经稳定的设计真相写入 Sky Flow `spec`。spec 是长期设计与目标级恢复状态的规范性载体；ready 后由 `to-implement` 直接执行，不要求先创建 plan，也不生成 task / step。只有执行期出现真实恢复价值时，`to-implement` 才按需维护非规范性的 thin plan。
 
 简单、一次性且不需要长期设计沉淀的工作直接交给 runtime。
 
@@ -42,8 +42,8 @@ description: 'Align, create, or maintain a durable Sky Flow spec only when the u
 | --- | --- |
 | 仓库事实 | Agent 从代码、docs、schema、历史或运行证据查明，不转问用户。 |
 | 人类决策 | 产品 / 业务口径、风险偏好、外部行为、权限边界、重大 scope 或不可逆选择由用户决定。 |
-| Agent 决策 | 已确认边界内的架构与工程选择由 Agent 取证、权衡并决定；重要结论写入 spec。 |
-| runtime 选择 | 工具、顺序、局部实现、调度和验证组合由执行时决定，不进入 spec。 |
+| Agent 决策 | 已确认边界内的架构与工程选择由 Agent 取证、权衡并决定；影响长期架构或后续约束的重要结论写入 spec。 |
+| runtime 选择 | 工具、顺序、局部可逆实现、调度和验证组合由执行时决定，不进入 spec；需要跨会话恢复时可暂存于 thin plan。 |
 | 外部未知 | 当前任何一方都不能确认时，记录影响、owner 和解除条件；实质阻塞则保持未就绪。 |
 
 实质性判断：如果答案不同会改变成功标准、外部行为、数据语义、权限、兼容 / 迁移、重大 scope、不可逆风险或验收口径，它才值得成为 spec 决策或问题。
@@ -64,12 +64,12 @@ description: 'Align, create, or maintain a durable Sky Flow spec only when the u
 
 ## Writing Rules
 
-- spec 保存长期设计真相与紧凑 Progress，不保存代码步骤、命令清单、runtime 拓扑或子代理过程。
+- spec 保存长期设计真相与紧凑目标级 Progress，不保存代码步骤、文件 / symbol 级落地上下文、命令清单、runtime 拓扑或子代理过程；这些内容只有具备恢复价值时才进入 thin plan。
 - requirements 必须可测试、无歧义；未知内容使用 `[NEEDS CLARIFICATION: ...]`，不要用模板制造伪完整。
 - acceptance scenarios 保护行为、不变量或外部契约。
 - `Execution Constraints` 只写真实 no-touch、人类 gate、不可逆操作、独立 review、安全或兼容约束。
 - 设计变化更新 Requirements / Decisions；实现结果、证据、blocker 和下一恢复目标更新 Progress。
-- 一个 spec 覆盖多个可独立演进、没有共同成功边界的系统时拆分 spec，不用执行层 artifact 承载过大 scope。
+- 一个 spec 覆盖多个可独立演进、没有共同成功边界的系统时拆分 spec，不用 thin plan 或其他执行层 artifact 掩盖过大 scope。
 
 稳定决策可按需记录归属：
 
@@ -133,6 +133,7 @@ status: draft | not_started | in_progress | completed | abandoned
 - 正常路径、边界路径和反例路径遵循同一组不变量。
 - 实现者无需猜测产品口径、数据语义、权限边界或如何判断完成。
 - 必要 Execution Constraints 已表达，Progress `Next` 是清楚的目标级恢复入口。
+- readiness 不依赖 plan 是否存在；plan 是执行期按需 materialize 的 working set。
 
 不满足时保持 `draft`、`Ready: no`，并明确 blocking question 或外部未知的解除条件。
 
@@ -156,7 +157,7 @@ Progress 是覆盖更新的语义恢复快照，只回答：当前稳定成立�
 
 ## 推荐关系
 
-- ready spec 执行或继续：`to-implement`；从多个 spec 选择 / 恢复目标：`pick-goal`。
+- ready spec 执行或继续：`to-implement`，由它决定 runtime-only 或按需 thin plan；从多个 spec 选择 / 恢复目标：`pick-goal`。
 - 尚未进入设计的问题证据：`to-issue`；bug / root cause 与事故回归：`to-debug`；普通测试策略和验证组合由 native runtime 决定。
 - 真正人类 gate：`to-acceptance`；长期离队：`to-backlog`；易失接力：`to-handoff`。
 

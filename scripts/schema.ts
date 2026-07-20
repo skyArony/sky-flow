@@ -1,6 +1,8 @@
-// Sky Flow keeps only durable collaboration boundaries as file-backed artifacts.
+// Sky Flow keeps durable truth and real collaboration boundaries file-backed,
+// plus one optional implementation working set for long-running work.
 export const ARTIFACT_TYPES = [
   'spec',
+  'plan',
   'issue',
   'acceptance',
   'backlog',
@@ -9,7 +11,7 @@ export const ARTIFACT_TYPES = [
 
 // These artifact types are intentionally rejected by the current validator.
 // Their historical skills live under archive/ and are not installable.
-export const RETIRED_ARTIFACT_TYPES = ['plan', 'task', 'step'] as const;
+export const RETIRED_ARTIFACT_TYPES = ['task', 'step'] as const;
 
 export const STATUSES = ['draft', 'not_started', 'in_progress', 'completed', 'abandoned'] as const;
 
@@ -24,6 +26,7 @@ export const ACCEPTANCE_TYPES = [
 // the semantic pass so the schema does not recreate a rigid workflow.
 export const REQUIRED_FIELDS: Record<string, string[]> = {
   base: ['id', 'artifact_type', 'status'],
+  plan: ['source_type', 'source_id'],
   acceptance: ['acceptance_type', 'source_type', 'source_id', 'round'],
   backlog: ['source_type', 'source_id', 'depends_on', 'recommended_resume'],
   handoff: ['source_type', 'source_id', 'resume_from'],
@@ -52,6 +55,21 @@ export const RETIRED_TOPOLOGY_FIELDS = [
   'depended_by',
   'parallel_with',
   'external_depends_on',
+] as const;
+
+// These fields belonged to the archived plan workflow. The active thin plan
+// derives its authority from source_type/source_id and keeps execution context
+// in the body rather than rebuilding the old lifecycle in frontmatter.
+export const RETIRED_PLAN_FIELDS = [
+  'goal',
+  'spec',
+  'issues',
+  'acceptance',
+  'completed_at',
+  'owner',
+  'agent',
+  'lanes',
+  'agent_lanes',
 ] as const;
 
 export const DEFAULT_SKY_FLOW_ROOT = 'docs';

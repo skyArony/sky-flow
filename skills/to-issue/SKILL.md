@@ -13,7 +13,7 @@ issue 是问题记录，不是聊天摘要或实施脚本。后续如果需要�
 
 1. 确定 `SKY_FLOW_ROOT` / `SKY_FLOW_LANG`。
 2. 读取本地 docs 入口中的目录与 TOC 规则。
-3. 确认来源：conversation、spec、acceptance、backlog、handoff、review finding、debug evidence 或用户材料。
+3. 确认来源：conversation、spec、active thin plan、acceptance、backlog、handoff、review finding、debug evidence 或用户材料。plan 只作为实施证据上下文；issue 必须自包含 durable 问题与证据，并优先关联 source spec，不能依赖可能删除的 plan 才能理解。
 4. 一个独立 root cause 或决策问题对应一个 issue；不要按执行顺序、模块、owner 或依赖拆成工作图。
 5. 未完成 issue 写入 `${SKY_FLOW_ROOT}/issue/<id>.md`；completed issue 移入 `${SKY_FLOW_ROOT}/issue/fixed/<id>.md`。
 6. 同一 root cause 的完成结论被新证据推翻时移回 active 目录、改为 `in_progress` 或 `not_started`，并记录 `Reopen Evidence` / `Reopen Reason`。

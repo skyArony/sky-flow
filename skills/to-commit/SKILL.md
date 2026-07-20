@@ -35,7 +35,7 @@ description: 'Handle Sky Flow commit work: inspect the working tree, stage only 
 
 ## Workflow Artifact Gate
 
-只有 staged diff 中包含 Sky Flow artifact 时，`to-commit` 才在提交前推荐运行 `validate-flow`。workflow artifact 指 `artifact_type` 为 `spec`、`issue`、`acceptance`、`backlog` 或 `handoff` 的文件，通常位于 `${SKY_FLOW_ROOT}` 下。
+只有 staged diff 中包含 Sky Flow artifact 时，`to-commit` 才在提交前推荐运行 `validate-flow`。workflow artifact 指 `artifact_type` 为 `spec`、`plan`、`issue`、`acceptance`、`backlog` 或 `handoff` 的文件，通常位于 `${SKY_FLOW_ROOT}` 下。
 
 `to-commit` 不执行 `to-consolidation`。提交阶段由当前 runtime 直接做 staged diff sanity、artifact 校验和最小相关验证；只有用户显式调用 `$to-consolidation` 时才进入专项收敛。
 

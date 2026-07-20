@@ -27,7 +27,7 @@
 - 状态机、事务、幂等、并发、TOCTOU、重试和回滚路径。
 - 权限、安全、数据泄漏、输入校验和信任边界。
 - 删除、迁移、重命名、fallback、兼容层和发布顺序风险。
-- spec / runtime output / acceptance 的目标、scope、约束、验收证据和恢复入口是否互相支撑。
+- spec / optional thin plan / runtime output / acceptance 的目标、scope、约束、验收证据和恢复入口是否互相支撑；plan 是否仍非规范、无 legacy topology，且 durable decision 已提升到 spec。
 - medium findings 是否遗漏跨模块影响，或是否误把低 ROI 理论风险升成阻塞项。
 
 ## ROI Discipline

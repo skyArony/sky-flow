@@ -1,11 +1,11 @@
 ---
 name: to-agent-review
-description: 'Review agent decision-making only when the user explicitly invokes $to-agent-review. Analyze visible transcripts, execution records, tool calls, subagent ROI, fan-in, context management, runtime planning, and artifact writeback; report evidence-backed workflow improvements.'
+description: 'Review agent decision-making only when the user explicitly invokes $to-agent-review. Analyze visible transcripts, execution records, tool calls, subagent ROI, fan-in, context management, runtime planning, thin-plan materialization, and artifact writeback; report evidence-backed workflow improvements.'
 ---
 
 # to-agent-review
 
-`to-agent-review` 是用户显式触发的 Agent 决策复盘入口。它分析可见会话、执行记录、工具调用、子代理产物、fan-in 结果、runtime plan 和 Sky Flow artifact 维护情况，定位决策链路问题、低效点和可落地改进项。
+`to-agent-review` 是用户显式触发的 Agent 决策复盘入口。它分析可见会话、执行记录、工具调用、子代理产物、fan-in 结果、runtime checklist / native plan、thin plan materialization 和 Sky Flow artifact 维护情况，定位决策链路问题、低效点和可落地改进项。
 
 它不是普通代码 review，也不是项目私有复盘流程。默认在对话中返回报告；只有用户明确要求保存报告，或显式 automation 已提供输出目标时，才写入 `${SKY_FLOW_ROOT}/backlog/agent-reivew/`。该目录不等同于调用 `to-backlog`，也不要求生成 `backlog` artifact。
 
@@ -16,8 +16,8 @@ description: 'Review agent decision-making only when the user explicitly invokes
 3. 默认用本目录 preflight helper 按 runtime、日期、当前项目根目录、compact 摘要和 Top session 生成 manifest；项目复盘必须过滤当前项目根目录，只有用户明确要求跨项目 / 全局复盘时才取消根目录过滤。
 4. 先读 compact preflight 输出里的 `codex_cwd_filter`、`aggregate.decision_signals`、Top session 摘要、`candidate_bottlenecks` 和 `suggested_read_lines`，再决定需要精读哪些证据；只有诊断分歧或需要完整结构化输入时才去掉 `--compact`。
 5. 精读 JSONL 行窗时优先使用 preflight helper 的行窗摘要能力；该摘要会遮蔽 hidden fields，并保留 `exit_code`、`original_token_count`、输出字符数和截断片段。
-6. 确认输入范围：用户指定的 transcript、执行记录、日志片段、工具调用摘要、spec / handoff artifact、子代理输出或当前会话上下文；如果 preflight 后仍不足以复盘关键问题，先请求最小补充材料。
-7. 建立证据地图：按时间线整理目标、关键决策、工具调用、失败 / 重试、等待、子代理派发、fan-in、验证、runtime plan 更新和 artifact 写回。
+6. 确认输入范围：用户指定的 transcript、执行记录、日志片段、工具调用摘要、spec / plan / handoff artifact、子代理输出或当前会话上下文；如果 preflight 后仍不足以复盘关键问题，先请求最小补充材料。
+7. 建立证据地图：按时间线整理目标、关键决策、工具调用、失败 / 重试、等待、子代理派发、fan-in、验证、runtime checklist / native planning 更新和 artifact 写回。
 8. 按分析维度归类问题，区分必要等待、人类决策等待、基础设施等待、工具延迟和 Agent 低效；不要把 `expected no-match`、存在性探测、`git diff --no-index` 或轮询等待直接当作低效。
 9. 填写固定量化信号清单；没有证据的项写 `unknown`，不要估算成事实。
 10. 默认在对话中输出 plain-language brief-first 报告；只有用户要求保存或 automation 明确提供输出目标时，才更新 `${SKY_FLOW_ROOT}/backlog/agent-reivew/<yyyy-mm-dd>-<scope>.md`。先用人话解释“问题是什么、为什么重要、下一步做什么”，再给指标和证据；每条建议必须有 ROI、落点、done-when 和 non-goal。
@@ -34,7 +34,7 @@ description: 'Review agent decision-making only when the user explicitly invokes
 
 ## Evidence Rules
 
-- 只使用可见 transcript、工具调用、工具结果摘要、时间戳、子代理产物、runtime plan 状态和 Sky Flow artifact。
+- 只使用可见 transcript、工具调用、工具结果摘要、时间戳、子代理产物、runtime checklist / native planning 状态和 Sky Flow artifact。
 - 不引用、复述或重构隐藏 reasoning / thinking / encrypted 字段；如果日志中出现这类字段，只能作为事件计数或时间线锚点。
 - 大型 transcript 优先抽取相关窗口和结构化摘要，不整段粘贴。
 - 证据不足时写“证据不足”，并说明需要什么输入才能确认。
@@ -51,13 +51,14 @@ description: 'Review agent decision-making only when the user explicitly invokes
 - 子代理 ROI：派发是否过早 / 过晚，任务包是否包含 mission、scope、no-touch、verification intent、output contract 和 stop condition。
 - Fan-in：是否检查写入范围、冲突、验证证据、spec alignment、blocker 和状态回写。
 - Runtime checklist：是否在复杂度值得时及时维护，是否记录 fan-in、blocker、next action 和动态调整，且没有过度打点。
-- Artifact 写回：spec Progress / handoff / acceptance / backlog 是否只记录稳定事实，而不是聊天或调度流水。
+- Thin plan：是否对简单或低恢复成本工作保持 runtime-only；复杂长周期工作是否在恢复价值成立时及时 materialize（包括中途），是否复用已有 active plan、提升 durable decision，并在收口时压缩或删除。
+- Artifact 写回：spec Progress / plan Progress / handoff / acceptance / backlog 是否各守边界，而不是互相复制或记录聊天、tool / Agent、owner / dependency / lane 流水。
 - 验证与收敛：是否由 native runtime 直接完成日常验证，是否只在用户显式要求时使用 `$to-review` / `$to-consolidation`，以及 artifact 变更后是否运行 `validate-flow`。
 - 决策质量：是否存在过早实现、过度设计、补丁式返工、未说明的 pushback 或低价值自动化。
 
 ## Quantitative Signals
 
-复盘必须固定收集下面信号，但默认报告不逐项展开完整表。只使用可见 transcript、工具结果、runtime plan、子代理输出或 artifact 记录；不可见就写 `unknown`。默认只在 `Metrics Snapshot` 输出影响判断的 3-6 个指标，完整信号表只有在用户要求 full evidence mode、诊断分歧或后续自动化需要结构化输入时才展开到附录。
+复盘必须固定收集下面信号，但默认报告不逐项展开完整表。只使用可见 transcript、工具结果、runtime checklist / native planning、子代理输出或 artifact 记录；不可见就写 `unknown`。默认只在 `Metrics Snapshot` 输出影响判断的 3-6 个指标，完整信号表只有在用户要求 full evidence mode、诊断分歧或后续自动化需要结构化输入时才展开到附录。
 
 | Signal | Required Observation |
 | --- | --- |
@@ -70,7 +71,8 @@ description: 'Review agent decision-making only when the user explicitly invokes
 | `parallelism_efficiency` | 子代理是否真正并行、主会话等待时间、fan-in 是否阻塞关键路径。 |
 | `fan_in_rounds` | fan-in 轮数、冲突次数、遗漏补传次数、是否检查 changed files / scope / evidence。 |
 | `runtime_plan_updates` | runtime checklist 更新次数、是否在阶段开始 / 完成 / blocker / fan-in 后按需更新。 |
-| `artifact_writebacks` | spec / acceptance / handoff / backlog / report 写回次数和遗漏点。 |
+| `thin_plan_materializations` | thin plan 创建 / 复用 / 中途 materialize / 关闭次数，是否符合恢复价值门槛，是否出现重复 active plan。 |
+| `artifact_writebacks` | spec / plan / acceptance / handoff / backlog / report 写回次数、promotion 和遗漏点。 |
 | `validation_evidence` | 验证命令 / 检查项、pass / fail / skipped、跳过理由。 |
 | `blocker_and_question_count` | blocker、需要人类确认的问题、已解决 / 未解决数量。 |
 

@@ -1,8 +1,9 @@
 # Sky Flow
 
-Sky Flow is a lightweight workflow skill suite centered on durable specs with
-compact Progress snapshots and native runtime execution. File-backed artifacts
-are limited to specs, issues, acceptance, backlog, and handoff.
+Sky Flow is a lightweight workflow skill suite centered on durable specs,
+optional thin plans for long-running implementation, compact recovery
+snapshots, and native runtime execution. File-backed artifacts are specs,
+plans, issues, acceptance, backlog, and handoff.
 
 ## Setup
 
@@ -55,8 +56,19 @@ Useful commands:
   An explicit start hands a ready goal to `to-implement`, an alignment goal to
   `to-spec`, and leaves a blocked goal unstarted.
 - `to-implement` dynamically executes a ready spec or its derived ready goal.
-- Complex work may reuse a compact runtime-only projection of the goal, success
-  boundary, material constraints, relevant contracts, and current facts.
+- Simple work, and complex work that remains continuous with cheap recovery,
+  stays runtime-only. A runtime checklist is sufficient in those cases.
+- When implementation is likely to span sessions or compaction, depends on
+  costly-to-rediscover code facts, or must resume from concrete checkpoints,
+  `to-implement` may create or continue one source-linked thin plan. It may
+  materialize midway when those conditions appear.
+- A directly supplied active plan is only a resume locator: `to-implement`
+  resolves and validates its ready, unfinished source spec before continuing.
+  Completed or abandoned plans are background, not resumable goals.
+- A thin plan records only the current slice, useful code context, approach,
+  local reversible decisions, compact progress, and reusable verification
+  entry points. It is not authoritative and does not contain task graphs,
+  owners, dependencies, parallel lanes, or agent/tool history.
 - Only semantic outcomes, decisions, blockers, evidence, residual risk, and a
   goal-level resume target are written back to the spec `Progress` snapshot;
   code line numbers, per-file diffs, command/tool/agent history, and timelines
@@ -65,7 +77,9 @@ Useful commands:
   backlog, and handoff only when those boundaries genuinely apply.
 - Durable authoring and selection paths are explicit: use `$to-spec`,
   `$pick-goal`, `$to-issue`, `$to-backlog`, or `$to-handoff`; the runtime does
-  not create those artifacts opportunistically.
+  not create those artifacts opportunistically. Thin plan materialization is
+  the narrow exception owned by `to-implement` because it is execution working
+  memory, not a new authoring workflow.
 - Routine verification and test design stay in the native runtime: test ROI,
   stable seams, tests, static checks, builds, focused behavior checks, and diff
   sanity do not require workflow skills. Incident regressions stay inside
@@ -76,13 +90,16 @@ Useful commands:
   runtime satisfies that constraint with the smallest sufficient path instead
   of multiplying reviewers or repeating clean gates.
 
-This release intentionally removes the legacy file-backed execution topology.
+This release keeps the legacy file-backed execution topology retired while
+reintroducing only a thin `plan` artifact as optional implementation working
+memory. The old `to-plan`, task/step graph, owner/dependency/parallel topology,
+and `plan/done` lifecycle remain retired.
 `install` / `update` remove stale retired symlinks only when they provably point
 to this checkout. `doctor` and update readiness also detect retired copied or
 foreign installs and print their exact paths; those require explicit removal
 because the installer cannot prove ownership safely.
-For active copy-mode installs, `doctor` compares each installed `SKILL.md` with
-the current source and reports `stale-copy` instead of accepting legacy
-instructions as ready.
+For active copy-mode installs, `doctor` compares each managed skill subtree,
+including referenced guidance and scripts, and reports `stale-copy` rather than
+accepting incomplete or legacy instructions as ready.
 
 The design spec lives at `docs/spec/tooling/sky-flow.md`.

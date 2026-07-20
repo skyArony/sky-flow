@@ -11,7 +11,7 @@ description: 'Create or update a durable Sky Flow acceptance artifact only when 
 
 1. 确认用户显式要求 durable acceptance artifact；一次性 gate 直接在对话中处理。
 2. 确定 `SKY_FLOW_ROOT` / `SKY_FLOW_LANG`。
-3. 读取来源：优先 spec，也可以是 conversation、issue、backlog、handoff 或 existing acceptance。
+3. 读取来源：优先 spec，也可以是 conversation、issue、backlog、handoff 或 existing acceptance；active thin plan 只能作为实施 evidence 上下文读取，不能成为 acceptance source。
 4. 过滤候选项：只保留真实设备 / 账号 / 环境 / 体验、产品或风险决策、缺失人类输入、明确 sign-off。
 5. 如果所有内容都可由 Agent 自证，不创建 acceptance；直接报告并写回 spec Progress / evidence。
 6. 创建或更新 `${SKY_FLOW_ROOT}/acceptance/<id>.md`，不覆盖人工反馈。
@@ -25,6 +25,7 @@ description: 'Create or update a durable Sky Flow acceptance artifact only when 
 - spec：`source_type: spec`、`source_id: <spec-id>`。
 - conversation：`source_type: conversation`、`source_id: current-session`，正文必须自包含。
 - issue / backlog / handoff：写对应 source type 和稳定 id。
+- 实现从 active plan 到达人类 gate 时仍 source 到 durable spec；plan Progress 可指向 acceptance blocker，但 acceptance 不反向以 plan 为权威来源。
 
 ```yaml
 ---

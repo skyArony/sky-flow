@@ -5,11 +5,11 @@ This directory preserves retired workflow skills for historical reference only.
 - Archived skills are not callable Sky Flow capabilities.
 - The installer discovers only the repository root `SKILL.md` and `skills/**/SKILL.md`, so content under `archive/` is excluded from installation and readiness checks.
 - Do not link new workflow documentation or routing rules to archived skills.
-- Legacy `plan`, `task`, and `step` artifacts should be migrated into a spec's `Progress`, `Execution Constraints`, and evidence sections, or into `acceptance`, `backlog`, or `handoff` when those boundaries genuinely apply.
+- Legacy `plan`, `task`, and `step` topology should be dismantled. Durable design, constraints, outcomes, and evidence move into the source spec; still-active implementation context with real recovery value may be rewritten as a current thin plan; human gates, long-term waiting, and volatile transfer state move to `acceptance`, `backlog`, or `handoff` only when those boundaries genuinely apply.
 
 Archived entries:
 
-- `to-plan`: retired file-backed execution-plan creator.
+- `to-plan`: retired topology-driven execution-plan creator. Current thin plans are materialized only by active `to-implement`; this skill remains retired.
 - `to-task`: retired persisted work-graph creator.
 - `pick-plan`: retired selector and its collector / UI metadata.
 - `to-archive`: retired execution-record compressor.

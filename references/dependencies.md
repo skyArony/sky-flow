@@ -45,7 +45,7 @@ Installation layout:
   and each callable child skill as direct links.
 - Codex receives the suite entry once and discovers callable children through
   that root. `doctor` accepts current nested content through the suite symlink
-  and compares each nested `SKILL.md` when the suite was installed by copy.
+  and compares each managed child subtree when the suite was installed by copy.
 - Install/update removes redundant Codex child symlinks only when they point to
   the current checkout. Copied or foreign child paths fail readiness until the
   user explicitly replaces them with `--force`.
@@ -64,9 +64,10 @@ symlinks make readiness fail and are reported with exact paths and cleanup
 commands; they are never deleted implicitly because ownership cannot be proven
 safely.
 
-`doctor` also compares copied active `SKILL.md` files with current source. A
-`stale-copy` result is repaired explicitly with the command printed by doctor,
-for example `./install.sh to-implement --copy --force --no-deps`.
+`doctor` also compares copied active skill subtrees—including references and
+scripts—with current source. A `stale-copy` result is repaired explicitly with
+the command printed by doctor, for example
+`./install.sh to-implement --copy --force --no-deps`.
 
 ## Runtime Config
 
