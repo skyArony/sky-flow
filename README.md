@@ -49,9 +49,14 @@ Useful commands:
 
 - Simple work runs directly in the native runtime.
 - Long-lived work starts from a ready spec.
-- Spec alignment first establishes the foundation, classifies decision
-  authority, closes the current decision frontier, and proves readiness. Only
-  stable conclusions are persisted; the question tree stays in conversation.
+- Explicit `$to-align` owns sustained, multi-round alignment before coding:
+  it tracks requirement coverage, closes material decision frontiers, bounds
+  edge-case ROI, and stops as ready or explicitly blocked. It delegates stable
+  conclusions and readiness proof to `$to-spec`; no new artifact or Q&A log is
+  created.
+- `$to-spec` owns durable design, spec authoring, readiness, and Progress. Its
+  direct alignment path remains available when a separate multi-round
+  lifecycle is unnecessary.
 - `$pick-goal` derives a portable runtime goal without creating an artifact.
   An explicit start hands a ready goal to `to-implement`, an alignment goal to
   `to-spec`, and leaves a blocked goal unstarted.
@@ -75,11 +80,12 @@ Useful commands:
   stay out.
 - Human gates, long-term blockers, and volatile transfer state use acceptance,
   backlog, and handoff only when those boundaries genuinely apply.
-- Durable authoring and selection paths are explicit: use `$to-spec`,
-  `$pick-goal`, `$to-issue`, `$to-backlog`, or `$to-handoff`; the runtime does
-  not create those artifacts opportunistically. Thin plan materialization is
-  the narrow exception owned by `to-implement` because it is execution working
-  memory, not a new authoring workflow.
+- Pre-implementation alignment and durable authoring / selection paths are
+  explicit: use `$to-align`, `$to-spec`, `$pick-goal`, `$to-issue`,
+  `$to-backlog`, or `$to-handoff`; the runtime does not create those artifacts
+  opportunistically. Thin plan materialization is the narrow exception owned
+  by `to-implement` because it is execution working memory, not a new authoring
+  workflow.
 - Routine verification and test design stay in the native runtime: test ROI,
   stable seams, tests, static checks, builds, focused behavior checks, and diff
   sanity do not require workflow skills. Incident regressions stay inside

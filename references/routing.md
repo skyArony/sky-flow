@@ -6,7 +6,7 @@
 
 1. 普通工作默认直接使用 native runtime；测试、静态检查、build、diff sanity 和修复后定点验证不需要专门 Skill。
 2. 意图触发的核心能力只包括 ready spec execution、debug / infra、commit 和 artifact validation；用户提出相应动作时进入，不额外升级流程。
-3. 显式能力必须由用户点名 `$skill`：spec 设计、goal 选择、issue / backlog / handoff 写入、review、review loop、consolidation、knowledge、agent review、Claude 第二意见，以及 file-backed acceptance。多 Agent 同样必须由用户显式要求，或由 source spec 的独立评估 constraint 授权。
+3. 显式能力必须由用户点名 `$skill`：正式编码前的持续多轮对齐、spec 设计、goal 选择、issue / backlog / handoff 写入、review、review loop、consolidation、knowledge、agent review、Claude 第二意见，以及 file-backed acceptance。多 Agent 同样必须由用户显式要求，或由 source spec 的独立评估 constraint 授权。
 4. spec 中已有的 Independent Review、Required Human Gate 或其他 durable constraint 仍必须满足，但只使用最小充分路径，不自动扩展成多 reviewer 或重复 gate。
 5. artifact 操作前确定 `SKY_FLOW_ROOT` / `SKY_FLOW_LANG`；未设置时使用默认值。
 
@@ -14,6 +14,7 @@
 
 | Skill | 触发倾向 | 进入场景 | 边界 |
 | --- | --- | --- | --- |
+| `to-align` | 显式 `$` | 正式编码前持续多轮关闭实质需求、风险、兼容与验收决策 | runtime 覆盖表与停止条件；稳定结论和 readiness 委托 `to-spec`，不创建新 artifact |
 | `to-spec` | 显式 `$` | 长期设计、需求澄清、spec / readiness / Progress 更新 | 底座对齐、决策归属、决策前沿、就绪证明；不记录对齐流水或 runtime 拓扑 |
 | `pick-goal` | 显式 `$` | 从一个或多个 spec 选择、恢复、生成或启动 runtime goal | 选择只读；ready 交 `to-implement`，alignment 交 `to-spec`，blocked 不启动 |
 | `to-implement` | 自动 | 用户要求执行 / 继续 ready spec、implementation-ready goal，或给出 active thin plan 作为 resume locator | runtime-first；按恢复价值决定是否维护 plan；不接收 alignment 或 blocked goal |
@@ -41,7 +42,7 @@ ready spec、其派生的 implementation-ready goal，或已解析回 ready sour
 - 多消费者需要共享边界时，可复用紧凑 runtime 投影；它本身不是 artifact。多 Agent 只按用户或 source spec 的独立评估要求进入，不预设固定流水线。
 - 同一文件 / 共享状态避免并发多写；交接后可以动态更换 writer。
 - 测试 ROI、stable seam、验证模式和普通测试实现由 runtime 按风险决定；真实事故的回归固化留在 `to-debug`，`Given / When / Then` 只是可选表达方式。
-- 目标级稳定状态写回 spec；有恢复价值的实施 working set 写回 active plan。任何改变 source spec 规范性边界的事实或决定先回 `$to-spec`。
+- 目标级稳定状态写回 spec；有恢复价值的实施 working set 写回 active plan。任何改变 source spec 规范性边界的事实或决定先暂停实现；需要多轮关闭实质决策时回 `$to-align`，结论明确时回 `$to-spec`。
 
 runtime checklist 不是 artifact，也不因步骤多就复制成 plan。thin plan 不是 readiness gate 或 runtime controller。
 

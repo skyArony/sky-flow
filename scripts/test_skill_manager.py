@@ -411,6 +411,7 @@ class RetiredInstallTests(unittest.TestCase):
 class InvocationPolicyTests(unittest.TestCase):
     EXPLICIT_SKILL_DIRS = (
         "skills/pick-goal",
+        "skills/to-align",
         "skills/to-spec",
         "skills/to-issue",
         "skills/to-knowledge",

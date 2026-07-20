@@ -1,0 +1,6 @@
+interface:
+  display_name: "To Align"
+  short_description: "正式编码前持续多轮对齐需求、系统边界、风险、兼容、恢复与验收口径"
+  default_prompt: "使用 $to-align 在编码前完成多轮需求对齐，并把稳定结论写入 spec。"
+policy:
+  allow_implicit_invocation: false

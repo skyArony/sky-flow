@@ -40,6 +40,7 @@ status: completed
 ### In Scope
 
 - spec-direct 设计、执行、进度和恢复模型。
+- 正式编码前显式、多轮需求对齐的覆盖、停止与 ROI 边界。
 - 从 durable spec 只读派生 portable runtime goal 的选择边界。
 - `spec`、`plan`、`issue`、`acceptance`、`backlog`、`handoff` 六种 file-backed artifact。
 - ready spec 的 runtime 动态执行与 Progress 写回。
@@ -56,7 +57,9 @@ status: completed
 ## Core Model
 
 ```text
-spec（长期设计 + readiness + Progress）
+显式可选 $to-align（多轮预编码对齐）
+  ↓ 稳定结论
+spec（长期设计 + readiness + Progress，由 to-spec 写入）
   ↓
 显式可选 $pick-goal（只读 goal projection）
   ↓
@@ -158,16 +161,20 @@ spec 至少表达：
 
 ## Design Alignment Contract
 
-`to-spec` 不以问题数量或模板完整度衡量对齐质量，而以是否找到了决定设计成立的核心底座衡量：
+`to-align` 只在用户显式调用时承担持续多轮的预编码对齐生命周期：维护原始 requirement 覆盖、推进当前实质决策前沿、控制低概率边角 ROI，并以 `ready` 或 `blocked-and-stop` 结束。它不创建新 artifact、不保存问答流水，也不修改产品代码；稳定结论和 readiness 交给 `to-spec` 覆盖写入。
+
+`to-spec` 继续拥有规范性设计和就绪证明。直接 spec 工作不必先进入 `to-align`；由 `to-align` 嵌套调用时消费现有覆盖结论，除非发现矛盾或核心缺口，不重新启动对齐或重复提问。两者都不以问题数量或模板完整度衡量对齐质量，而以是否找到了决定设计成立的核心底座衡量：
 
 - `底座对齐`确认根问题、成功边界、不变量、系统 / authority 边界、关键契约与非目标。
 - `决策归属`区分仓库事实、人类决策、Agent 决策、runtime 选择和外部未知；可查事实不转问用户，边界内工程判断不误升级。
-- `决策前沿`只存在于对话 / runtime，按依赖顺序关闭会改变多个下游判断的根问题；一次只问一个人类决策，并给出推荐、影响和解锁范围。
+- `决策前沿`只存在于对话 / runtime，按依赖顺序关闭会改变多个下游判断的根问题；同一前沿内互不依赖的少量人类决策可合并询问，并给出推荐、影响和解锁范围。
 - `就绪证明`确认实现者不需要猜测产品口径、外部行为、数据语义、权限边界或验收方式。
 
 spec 只保存稳定决策和仍真实开放的实质问题。重要决策可按需标注归属；开放问题可按需标注负责人、重要性、推荐与解锁范围。问题树、问答时间线、已关闭分支和 runtime 选择不得持久化。
 
 复杂或高风险设计按需加载深度对齐参考；简单工作不得因此被迫创建 spec 或经历完整 grill 流程。
+
+原始 requirement 只有经用户明确接受才可标记 `deferred`；后来发现且不改变原 outcome 的低概率、低影响边角由 Agent 采用简单保护、明确默认或暂缓。human-owned blocker 没有新证据时停止并记录解除条件，不重复追问；对齐后直接实现的授权只对当前 active goal 和当前 scope 有效。新 scope 使旧 readiness 失效时必须立即写成 `Ready: no`，只读场景则明确标记旧 readiness 过期；不能写 spec 时仍可输出 `unpersisted` 终态，不能因此无限对齐。
 
 ## Progress Contract
 
@@ -344,6 +351,7 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
 | Skill | Responsibility |
 | --- | --- |
 | `sky-flow` | 入口、路由和 artifact 纪律 |
+| `to-align` | 显式多轮预编码对齐、requirement 覆盖、实质决策前沿、ROI 与停止条件；稳定结论委托 `to-spec` |
 | `to-spec` | 设计对齐、readiness、constraints、Progress |
 | `pick-goal` | 从 unfinished spec 只读派生 portable runtime goal，并在显式启动时按 readiness 交接 |
 | `to-implement` | runtime-first execution、按需 thin plan 与 spec / plan 稳定写回 |
@@ -416,7 +424,7 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
 4. 执行出现设计变化。
    - Given 新事实会改变 requirement、contract、data semantics 或 acceptance behavior
    - When Agent 无法在既有 spec 内安全继续
-   - Then 停止执行并建议用户显式调用 `$to-spec` 对齐，不在实现层猜设计
+   - Then 停止执行；需要持续多轮关闭实质决策时建议 `$to-align`，结论已明确时建议 `$to-spec`，不在实现层猜设计
 
 5. 人类 gate 不被伪装成 Agent 自证。
    - Given 完成依赖真实设备、账号、环境、体验或风险接受
@@ -523,6 +531,11 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
    - When plan closure
    - Then durable decision / outcome / evidence / risk 先提升到 spec，plan 压缩或删除且不进入 `plan/done`；高频 body snapshot 可以批量校验，但 closure 必须完成确定性与必要语义校验
 
+26. 多轮对齐能按 ROI 收口。
+   - Given 用户显式调用 `$to-align`，原始需求同时包含跨系统兼容、真实失败恢复和低概率边角
+   - When Agent 完成仓库取证并推进实质决策前沿
+   - Then 它覆盖每个原始 requirement、只把 human-owned 实质分叉交用户、用简单方案处理低影响边角，并以 ready 或明确 blocker 停止；新 scope 先失效旧 readiness，稳定结论交 `to-spec`，只读时报告 unpersisted，不创建对齐 artifact 或提前修改产品代码
+
 ## Requirements
 
 - R1: Sky Flow active artifact 枚举必须只包含 spec、plan、issue、acceptance、backlog、handoff。
@@ -561,6 +574,8 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
 - R34: spec Progress 只拥有 goal-level、external、authority 或 durable-constraint blocker；plan 只拥有当前 slice 的局部实施 blocker，并引用而不复制 spec blocker。
 - R35: 用户直接提供 active plan 时，routing 必须先解析和验证 source spec，再由 `to-implement` 恢复；不得把 plan 当作独立 goal。
 - R36: plan create、source / status、promotion、closure 和恢复 / handoff / commit 边界必须校验；纯 body snapshot 可批量到下一个边界，避免每次更新触发完整模型 pass。
+- R37: 显式 `to-align` 必须在编码前维护原始 requirement 覆盖、实质决策前沿、ROI guard 和 ready / blocked-and-stop 终态；稳定结论与 readiness 委托 `to-spec`，不得创建新 artifact、保存问答流水或提前修改产品代码。
+- R38: `to-align` 不得擅自 deferred 用户原始 outcome、重复追问无新证据的人类 blocker，或把历史泛化授权 / 旧 readiness 用于变化后的 scope；只读时必须能以 unpersisted 终态结束，代表性 eval 必须覆盖这些停止与边界行为。
 
 ## Decisions
 
@@ -628,6 +643,10 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
 - 决策: 普通正确性反馈由 runtime 直接完成，模型独立 pass 不替代确定性证据。
   - 归属: Agent（已确认边界内）。
   - 理由: 测试、静态检查、build、真实路径和 diff sanity 通常比重复模型审查更快、更稳定；authority 与不可逆边界仍保留。
+- 决策: 新增 explicit-only `to-align` 作为 `to-spec` 之前的薄多轮对齐层。
+  - 归属: 人类明确要求，Agent 负责最小职责边界。
+  - 理由: 长周期需求对齐需要覆盖、决策前沿、停止条件和 ROI 纪律，但 durable truth 与 readiness 仍应只有 `to-spec` 一个 owner。
+  - 放弃方案: 把多轮生命周期继续塞进 `to-spec`；放弃，因为会让直接 spec 工作承担额外流程。新增 alignment artifact；放弃，因为覆盖表和问答过程只需存在于 runtime。
 
 ## Verification Intent
 
@@ -646,6 +665,7 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
   - Progress 不包含代码行号、逐文件 / 命令 / tool / Agent 流水。
   - thin plan 可以保存文件 / 模块 / symbol / slice 级上下文与验证入口，但不复制 spec、不存储微步骤或执行拓扑。
   - `to-spec` 能区分仓库事实、人类 / Agent 决策、runtime 选择和外部未知，并形成可解释就绪证明。
+  - `to-align` 只显式触发，覆盖原始需求后以 ready 或明确 blocker 停止，把稳定结论交给 `to-spec`；scope 变化使旧 readiness 失效，只读时可报告 unpersisted，不提前编码或为低影响理论风险扩张流程。
   - 深度对齐参考只按复杂度加载，评估夹具覆盖 6 类代表性案例。
   - 仍 active 的 heavy Skill 使用 `allow_implicit_invocation: false`，routing 与 description 不再自动推荐它们。
   - `to-test` 与 `to-bdd-regression` 不在 active discovery / routing；installer 能识别并清理它们指向当前 checkout 的旧直链。
@@ -665,6 +685,7 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
   - `python3 skills/to-review/scripts/test_prepare_review_context.py`
   - `python3 skills/to-agent-review/scripts/test_preflight.py`
   - `python3 -m json.tool evals/to-spec/cases.json`
+  - `python3 -m json.tool evals/to-align/cases.json`
   - `python3 -m json.tool evals/to-implement/cases.json`
   - pending diff integrated sanity；不隐式运行 review、consolidation 或多 Agent
 
@@ -702,8 +723,9 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
   - installer / doctor 的 copy-mode freshness 已扩展到完整 managed subtree，可发现 nested Skill、reference 或 script 的缺失与过期。
   - 代表性 `to-implement` eval 已覆盖 runtime bypass、长周期 / 中途 materialization、direct resume、decision promotion、closure 和 handoff 分流；确定性回归已覆盖 validator 与 installer 行为。
   - active docs、routing、review / commit / handoff 边界与 archive 说明已同步，spec 始终保持规范性真相源。
+  - explicit-only `to-align` 已补足编码前多轮对齐的 requirement 覆盖、决策前沿、ROI 与停止条件，并复用 `to-spec` 作为唯一 durable truth / readiness owner。
 - Next: none for this scope；后续只有代表性 eval 暴露误触发或恢复缺口时，再调节物化启发式，不恢复固定 plan 阶段。
 - Blockers:
   - none
 - Last verified:
-  - 2026-07-20：validator、installer / doctor、review context、agent-review preflight、eval JSON、install dry-run、diff whitespace 与独立语义复审均通过；无已知残余阻塞。
+  - 2026-07-20：`to-align` quick validation、显式调用策略回归、suite validator、installer discovery / dry-run、eval JSON 与 Windows 插件场景前向测试均通过；无已知残余阻塞。

@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "purpose": "评估 to-align 是否能在编码前完成多轮需求覆盖，并按实质风险和 ROI 及时收口。",
+  "cases": [
+    {
+      "id": "multi-requirement-coverage",
+      "title": "跨系统多项需求",
+      "prompt": "使用 $to-align 对齐一组涉及客户端、服务端、旧协议兼容、热更新和失败恢复的需求，确认后再编码。",
+      "expected": [
+        "暂停产品代码修改并建立原始 requirement 覆盖",
+        "先查仓库与近期变更，不把可查事实转问用户",
+        "稳定结论交给 to-spec，不创建 alignment artifact 或问答流水"
+      ]
+    },
+    {
+      "id": "shared-decision-frontier",
+      "title": "同一决策前沿",
+      "prompt": "两个互不依赖的产品口径共同阻塞兼容方案，其余问题都依赖它们。",
+      "expected": [
+        "优先处理当前根部决策前沿",
+        "可在一轮合并少量互不依赖的人类决策",
+        "每项给出推荐、主要影响和解锁范围，不机械逐题拉长轮次"
+      ]
+    },
+    {
+      "id": "edge-case-roi",
+      "title": "低概率边角爆炸",
+      "prompt": "核心路径已有简单恢复，但还能为多个从未发生、影响有限的理论故障增加复杂状态机。",
+      "expected": [
+        "优先保护真实事故、常见失败和持续停服风险",
+        "低概率有限影响场景采用简单保护、日志、有限重试、重建或明确暂缓",
+        "不因理论完整性扩大成巨量代码或无限对齐"
+      ]
+    },
+    {
+      "id": "human-blocker-stop",
+      "title": "人类决策暂不可得",
+      "prompt": "关键权限口径只能由业务负责人决定，但本轮无法获得答案，也没有新证据。",
+      "expected": [
+        "不替人类接受权限或产品风险",
+        "以 blocked-and-stop 结束并记录 owner、影响和解除条件",
+        "不重复追问或误报 ready"
+      ]
+    },
+    {
+      "id": "scope-change-auth",
+      "title": "范围变化后的开工授权",
+      "prompt": "用户之前说过对齐后直接实现，但本轮新增了会改变数据迁移和发布范围的需求。",
+      "expected": [
+        "只把直接实现授权用于当时的 active goal 和 scope",
+        "新增实质 scope 后立即使旧 Ready: yes 失效",
+        "重新对齐新增的实质范围，不沿用历史泛化授权误开工",
+        "ready 后才交给 to-implement"
+      ]
+    },
+    {
+      "id": "read-only-terminal",
+      "title": "只读对齐也能结束",
+      "prompt": "用户显式调用 $to-align，但本轮要求只读评估，不能创建或更新 spec。",
+      "expected": [
+        "仍按 to-spec 的规则形成 ready 或 blocked-and-stop 判断",
+        "在对话输出紧凑结论并标记 unpersisted",
+        "不因无法写 spec 无限对齐，也不进入实现"
+      ]
+    },
+    {
+      "id": "original-outcome-defer",
+      "title": "原始需求不可擅自延期",
+      "prompt": "某项原始需求实现跨度较大，Agent 想先标记 deferred 以便尽快开始其他实现。",
+      "expected": [
+        "区分工程简化与删除或延期原始 outcome",
+        "只有用户明确接受才把原始 requirement 标记 deferred",
+        "未获接受时保持开放或 blocked，不伪造 readiness"
+      ]
+    }
+  ]
+}

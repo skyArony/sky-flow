@@ -13,7 +13,7 @@ Sky Flow 是轻量、runtime-first 的工作流套件。长期设计、稳定约
 
 1. 用户点名 Sky Flow 或子能力时进入；否则先判断是否真的需要长期 artifact。
 2. artifact 根目录 `SKY_FLOW_ROOT` 默认 `docs`，语言 `SKY_FLOW_LANG` 默认跟随用户。
-3. 用户显式调用 `$to-spec` 时维护长期设计和需求对齐：先做底座对齐与决策归属，再沿决策前沿关闭实质问题，用就绪证明判断能否实施。
+3. 用户显式调用 `$to-align` 时，在正式编码前持续多轮关闭实质决策、控制边角 ROI，并把稳定结论交给 `to-spec`；直接维护长期设计、spec、readiness 或 Progress 时使用 `$to-spec`。
 4. ready spec 直接交 `to-implement`；用户直接给出 active plan 时，把它作为 resume locator，先解析 source spec 再进入同一路径。只有用户显式调用 `$pick-goal` 时才从一个或多个 spec 选择 / 恢复并派生 goal。
 5. 普通测试、测试 ROI、静态检查和 diff sanity 由 runtime 直接判断与完成；重型 review、consolidation、知识沉淀和持久化验收只在用户显式调用时进入。
 6. durable artifact 变更后运行 `validate-flow`；thin plan snapshot 遵循 `to-implement` 的分层时机。项目本地 TOC 有要求时同步维护。
@@ -21,7 +21,9 @@ Sky Flow 是轻量、runtime-first 的工作流套件。长期设计、稳定约
 ## Core Model
 
 ```text
-spec（长期设计 + 就绪状态 + Progress）
+显式可选 $to-align（多轮预编码对齐）
+  ↓ 稳定结论
+spec（长期设计 + 就绪状态 + Progress，由 to-spec 写入）
   ↓ 可选 pick-goal（只读选择与目标投影）
 ready spec / implementation-ready goal
   ↓
@@ -51,14 +53,15 @@ native runtime execution ───────────────→ spec P
 - thin plan 只由 `to-implement` 在恢复价值成立时按需管理；简单和低恢复成本工作保持 runtime-only。plan 是非规范性 working set，不能恢复 task / step、owner / dependency / lane 等旧拓扑；详细合同只在该 Skill 的 thin-plan 参考中维护。
 - plan 与 spec 冲突时 spec 胜出；任何改变 source spec 规范性边界的事实或决定必须先提升回 spec。
 - 同一文件或共享状态避免并发多写；完成交接后可动态更换 writer，主会话负责 fan-in。
-- 设计与外部行为变化时暂停实现并建议 `$to-spec`；实现策略由 runtime 自主调整。
+- 设计与外部行为变化时暂停实现；需要持续多轮关闭实质决策时建议 `$to-align`，直接更新稳定设计时建议 `$to-spec`。实现策略由 runtime 自主调整。
 - artifact 结构问题交 `validate-flow`；普通代码风险、测试 ROI、stable seam、验证组合和 diff sanity 由 runtime 直接处理。专门 review、diff 收敛和持久化 acceptance 只有用户显式调用时才进入对应 Skill；durable constraint 由 runtime 使用最小充分路径满足，不隐式加载重型 Skill。
 
 ## Quick Routing
 
 | 场景 | 子能力 |
 | --- | --- |
-| 长期设计、需求澄清、spec / Progress | `$to-spec` |
+| 正式编码前持续多轮需求对齐 | `$to-align`（稳定结论调用 `$to-spec`） |
+| 长期设计、直接维护 spec / readiness / Progress | `$to-spec` |
 | 选择、恢复或启动 spec-derived goal | `$pick-goal` |
 | 执行 ready spec / goal，或从 active plan 恢复 | `to-implement` |
 | 问题证据 / 排障 / 事故回归 | `$to-issue` / `to-debug` |
