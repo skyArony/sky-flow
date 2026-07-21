@@ -26,7 +26,7 @@ description: 'Handle Sky Flow commit work: inspect the working tree, stage only 
 7. 用 `git diff --cached` review staged diff。
 8. 用 1-2 句话说明 staged change 的 what / why；如果说不清，回到提交边界拆分。
 9. 做 staged sanity check：无 secret、无临时 debug、无无关格式化、无误入文件。
-10. 如果 staged diff 包含 Sky Flow workflow artifact，先运行 `validate-flow` 检查这些 artifact；不包含 workflow artifact 时不运行。
+10. 如果 staged diff 包含 Sky Flow workflow artifact，直接运行 full-set deterministic validator；不进入 `validate-flow` Skill。不包含 workflow artifact 时不运行。
 11. 运行最小相关验证；无法验证时记录原因和风险。
 12. 如果 HEAD 未 push，只读上一条完整 commit message；若和当前批次明显同 scope，直接 amend。
 13. 按项目本地规则提交；写 message 时参考 `Commit message 模板`。
@@ -35,7 +35,7 @@ description: 'Handle Sky Flow commit work: inspect the working tree, stage only 
 
 ## Workflow Artifact Gate
 
-只有 staged diff 中包含 Sky Flow artifact 时，`to-commit` 才在提交前推荐运行 `validate-flow`。workflow artifact 指 `artifact_type` 为 `spec`、`plan`、`issue`、`acceptance`、`backlog` 或 `handoff` 的文件，通常位于 `${SKY_FLOW_ROOT}` 下。
+只有 staged diff 中包含 Sky Flow artifact 时，`to-commit` 才在提交前运行 `node .agents/skills/sky-flow/scripts/validate_flow.ts`（仓库内开发可用 `node scripts/validate_flow.ts`）做 full-set deterministic scan。workflow artifact 指 `artifact_type` 为 `spec`、`plan`、`issue`、`acceptance`、`backlog` 或 `handoff` 的文件，通常位于 `${SKY_FLOW_ROOT}` 下。该 gate 不进入 `validate-flow` Skill，也不附加通用语义 pass。
 
 `to-commit` 不执行 `to-consolidation`。提交阶段由当前 runtime 直接做 staged diff sanity、artifact 校验和最小相关验证；只有用户显式调用 `$to-consolidation` 时才进入专项收敛。
 

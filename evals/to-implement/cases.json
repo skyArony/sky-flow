@@ -58,7 +58,7 @@
       "prompt": "实现会长期继续，同时当前会话还有未提交 diff、临时终端状态和一次性环境凭证需要换 Agent 接力。",
       "expected": [
         "thin plan 只保存可复用实施 working set",
-        "易失本地接力状态在用户显式要求时进入 handoff，handoff source 仍指向 durable spec",
+        "易失本地接力状态在用户显式要求时进入 handoff，正文引用 durable spec，source provenance 可省略",
         "不把凭证、终端流水或未提交 diff 细节写进 plan"
       ]
     },
@@ -68,7 +68,7 @@
       "prompt": "继续 docs/plan/checkout-recovery.md。",
       "expected": [
         "把 plan 当作 resume locator，先解析 source spec",
-        "只允许 not_started / in_progress plan，并确认 source spec 仍 ready、unfinished 且 status 与 plan 一致，再进入 to-implement",
+        "只允许 not_started / in_progress plan，并确认 source spec 仍 ready、unfinished；不要求 status 与 plan 机械同步，再进入 to-implement",
         "目标、scope、constraints 和完成标准仍来自 spec，不把 plan 当作独立 goal"
       ]
     },

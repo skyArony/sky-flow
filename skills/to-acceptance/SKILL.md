@@ -11,21 +11,21 @@ description: 'Create or update a durable Sky Flow acceptance artifact only when 
 
 1. 确认用户显式要求 durable acceptance artifact；一次性 gate 直接在对话中处理。
 2. 确定 `SKY_FLOW_ROOT` / `SKY_FLOW_LANG`。
-3. 读取来源：优先 spec，也可以是 conversation、issue、backlog、handoff 或 existing acceptance；active thin plan 只能作为实施 evidence 上下文读取，不能成为 acceptance source。
+3. 读取足以让 gate 自包含的上下文：优先相关 spec，也可以来自 conversation、issue、plan、backlog、handoff 或 existing acceptance。
 4. 过滤候选项：只保留真实设备 / 账号 / 环境 / 体验、产品或风险决策、缺失人类输入、明确 sign-off。
 5. 如果所有内容都可由 Agent 自证，不创建 acceptance；直接报告并写回 spec Progress / evidence。
 6. 创建或更新 `${SKY_FLOW_ROOT}/acceptance/<id>.md`，不覆盖人工反馈。
 7. 每个验收组保持「问题 / 需求 → 验收步骤 → 验收结论（人类填）」。
-8. 修改 artifact 后运行 `validate-flow`。
+8. 修改 artifact 后由当前 Skill 直接对改动路径运行 deterministic validator，不进入 `validate-flow` Skill。
 
 ## Source And Metadata
 
-推荐来源：
+`source_type` / `source_id` 是可选 provenance，只在稳定上游能提高可发现性时写入：
 
 - spec：`source_type: spec`、`source_id: <spec-id>`。
-- conversation：`source_type: conversation`、`source_id: current-session`，正文必须自包含。
-- issue / backlog / handoff：写对应 source type 和稳定 id。
-- 实现从 active plan 到达人类 gate 时仍 source 到 durable spec；plan Progress 可指向 acceptance blocker，但 acceptance 不反向以 plan 为权威来源。
+- conversation 来源通常省略 metadata，由正文保持自包含。
+- issue / plan / backlog / handoff 可以作为 related context，但 provenance 不赋予 authority，也不进入全局关系校验。
+- 实现从 active plan 到达人类 gate 时，优先关联 durable spec；plan Progress 可指向 acceptance blocker。
 
 ```yaml
 ---
@@ -33,8 +33,6 @@ id: <acceptance-id>
 artifact_type: acceptance
 status: draft
 acceptance_type: interactive
-source_type: spec
-source_id: <source-id>
 round: 1
 ---
 ```
@@ -45,7 +43,7 @@ round: 1
 - `report`：无需逐步操作，但仍要求人类明确 acknowledgement、sign-off 或风险接受；纯 FYI 不创建 acceptance。
 - `html_report` / `html_interactive`：只有媒体或复杂布局明显提升真实 gate 的判断效率时使用；同样必须产生明确的人类结论。
 
-状态：draft 表示整理中；in_progress 表示等待或处理反馈；completed 表示所有 gate 已有明确结论；abandoned 必须有人工依据并建议关联 backlog。
+状态：draft 表示整理中；in_progress 表示等待或处理反馈；completed 表示所有 gate 已有明确结论；abandoned 必须有人工依据，长期保留时可在正文关联 backlog。
 
 ## Human Gate Filter
 
@@ -131,12 +129,12 @@ Agent 自证结果可以压缩到验收组 `证据`，不能拆成独立验收�
 - Agent gate 前的可验证工作继续由 `to-implement` 动态执行。
 - 到达人类 gate 时，spec Progress `Blockers` 指向 acceptance 和解除条件。
 - 人类反馈返回后由 `to-next-acceptance` 分类；设计变化回 `to-spec`，可继续执行时让 Progress `Next` 指向目标级恢复入口。
-- acceptance 完成后，关键结论和 evidence 回写 source spec，避免 acceptance 成为长期执行中心。
+- acceptance 完成后，有 related spec 时把关键结论和 evidence 回写，避免 acceptance 成为长期执行中心。
 
 ## Boundaries
 
 - 不替代 spec Progress 或 runtime 执行。
-- 不替代 native runtime 测试、`to-review` 或 `validate-flow`。
+- 不替代 native runtime 测试、`to-review` 或 deterministic artifact lint。
 - 不把普通 review triage 写成人工验收。
 - 不为纯 FYI、完成播报或无需人类输出的重大结论创建 acceptance；写入对话或 spec Progress / evidence。
 - 不把未验证内容包装成通过。
@@ -149,8 +147,8 @@ Agent 自证结果可以压缩到验收组 `证据`，不能拆成独立验收�
 - 步骤是否可观察、可判断。
 - Agent 可自证项是否已执行并只作为 evidence。
 - 人工反馈是否未被覆盖或代填。
-- source、round、links 和 status 是否一致。
-- artifact 修改后是否运行 `validate-flow`。
+- optional provenance、round、links 和 status 是否清楚。
+- artifact 修改后是否直接对改动路径运行 deterministic validator。
 
 ## Next Round
 

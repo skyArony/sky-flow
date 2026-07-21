@@ -16,7 +16,7 @@ Sky Flow 是轻量、runtime-first 的工作流套件。长期设计、稳定约
 3. 用户显式调用 `$to-align` 时，在正式编码前持续多轮关闭实质决策、控制边角 ROI，并把稳定结论交给 `to-spec`；直接维护长期设计、spec、readiness 或 Progress 时使用 `$to-spec`。
 4. ready spec 直接交 `to-implement`；用户直接给出 active plan 时，把它作为 resume locator，先解析 source spec 再进入同一路径。只有用户显式调用 `$pick-goal` 时才从一个或多个 spec 选择 / 恢复并派生 goal。
 5. 普通测试、测试 ROI、静态检查和 diff sanity 由 runtime 直接判断与完成；重型 review、consolidation、知识沉淀和持久化验收只在用户显式调用时进入。
-6. durable artifact 变更后运行 `validate-flow`；thin plan snapshot 遵循 `to-implement` 的分层时机。项目本地 TOC 有要求时同步维护。
+6. durable artifact 变更后由当前 owning Skill 直接对改动路径运行 deterministic validator，不再自动进入 `validate-flow` Skill；全量扫描只用于显式 audit、commit、CI 或 migration，项目本地 TOC 有要求时同步维护。
 
 ## Core Model
 
@@ -44,7 +44,7 @@ native runtime execution ───────────────→ spec P
 - `backlog`：工作退出活动队列后的长期等待与恢复条件。
 - `handoff`：未提交 diff、临时环境等易失接力状态。
 
-所有 artifact 文件 stem 等于 frontmatter `id`，关系默认只保存单向 `source_type` / `source_id`。通用状态枚举为 `draft`、`not_started`、`in_progress`、`completed`、`abandoned`；thin plan 没有 pre-readiness `draft` 阶段。
+所有 artifact 文件 stem 等于 frontmatter `id`。thin plan 保留单向 `source_type: spec` / `source_id` 作为恢复定位；acceptance、backlog、handoff 只有在来源能提高可发现性时才保存可选 provenance，不形成需要全局一致的文档图。通用状态枚举为 `draft`、`not_started`、`in_progress`、`completed`、`abandoned`；thin plan 没有 pre-readiness `draft` 阶段。
 
 ## Invariants
 
@@ -54,7 +54,7 @@ native runtime execution ───────────────→ spec P
 - plan 与 spec 冲突时 spec 胜出；任何改变 source spec 规范性边界的事实或决定必须先提升回 spec。
 - 同一文件或共享状态避免并发多写；完成交接后可动态更换 writer，主会话负责 fan-in。
 - 设计与外部行为变化时暂停实现；需要持续多轮关闭实质决策时建议 `$to-align`，直接更新稳定设计时建议 `$to-spec`。实现策略由 runtime 自主调整。
-- artifact 结构问题交 `validate-flow`；普通代码风险、测试 ROI、stable seam、验证组合和 diff sanity 由 runtime 直接处理。专门 review、diff 收敛和持久化 acceptance 只有用户显式调用时才进入对应 Skill；durable constraint 由 runtime 使用最小充分路径满足，不隐式加载重型 Skill。
+- artifact 结构问题由 owning Skill 直接运行 deterministic validator；用户明确要求全量 / migration audit 时才进入 `$validate-flow`。普通代码风险、测试 ROI、stable seam、验证组合和 diff sanity 由 runtime 直接处理。专门 review、diff 收敛和持久化 acceptance 只有用户显式调用时才进入对应 Skill；durable constraint 由 runtime 使用最小充分路径满足，不隐式加载重型 Skill。
 
 ## Quick Routing
 
@@ -67,7 +67,7 @@ native runtime execution ───────────────→ spec P
 | 问题证据 / 排障 / 事故回归 | `$to-issue` / `to-debug` |
 | 测试 / review / 收敛 | `native runtime` / `$to-review` / `$to-consolidation` |
 | 人类 gate / 长期等待 / 易失接力 | `$to-acceptance` / `$to-backlog` / `$to-handoff` |
-| commit / artifact 校验 / 通用知识 | `to-commit` / `validate-flow` / `$to-knowledge` |
+| commit / 显式 artifact 审计 / 通用知识 | `to-commit` / `$validate-flow` / `$to-knowledge` |
 
 完整触发和边界只维护在 `references/routing.md`；进入子能力时读取对应 `skills/<name>/SKILL.md`。安装与依赖见 `references/dependencies.md`，设计真相源见 `docs/spec/tooling/sky-flow.md`。
 

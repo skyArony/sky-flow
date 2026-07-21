@@ -14,12 +14,12 @@ handoff 默认写入 `${SKY_FLOW_ROOT}/handoff/`，并应由项目 `.gitignore` 
 ## Quick Path
 
 1. 确定 `SKY_FLOW_ROOT` / `SKY_FLOW_LANG`。
-2. 确认来源：conversation、spec、issue、acceptance、backlog 或已有 handoff。
-3. 先判断信息是否已在 spec Progress、source-linked active plan、仓库文件或持久证据中；能重建的内容不要复制。
+2. 确认相关上下文：conversation、spec、issue、acceptance、backlog、plan 或已有 handoff。
+3. 先判断信息是否已在 spec Progress、active plan、仓库文件或持久证据中；能重建的内容不要复制。
 4. 收集易失事实：未提交范围、终端 / 进程、临时环境、短期凭据状态、未保存 evidence、接手动作和 stop conditions。
 5. 创建或更新 `${SKY_FLOW_ROOT}/handoff/<id>.md`。
 6. 如果 handoff 目录未被忽略，提醒用户；不要默认提交。
-7. 修改 artifact 后运行 `validate-flow`。
+7. 修改 artifact 后由当前 Skill 直接对改动路径运行 deterministic validator，不进入 `validate-flow` Skill。
 
 ## Source And Naming
 
@@ -28,16 +28,13 @@ handoff 默认写入 `${SKY_FLOW_ROOT}/handoff/`，并应由项目 `.gitignore` 
 id: <handoff-id>
 artifact_type: handoff
 status: draft
-source_type: spec
-source_id: <source-id>
 resume_from: <checkpoint-or-current-session>
 ---
 ```
 
-- conversation 来源使用 `source_id: current-session`，正文补足上下文。
-- spec 来源只引用 spec path / id 和 checkpoint，不复制整个 Progress。
-- acceptance / backlog 来源保留当前人类反馈或恢复条件。
-- thin plan 不是 handoff 的权威 source；存在 active plan 时仍让 `source_type` 指向 durable spec，并在 `Read First` 引用 plan path。
+- `source_type` / `source_id` 是可选 provenance；只有稳定上游能提高可发现性时写入，不参与全局关系校验。
+- spec 只引用 path / id 和 checkpoint，不复制整个 Progress。
+- acceptance / backlog 只保留当前人类反馈或恢复条件；active plan 放在 `Read First`，不赋予 handoff 新的权威来源。
 - `resume_from` 必须是下一轮可定位的 checkpoint、文件、终端或当前会话入口。
 
 ## Body Template
@@ -82,7 +79,7 @@ resume_from: <checkpoint-or-current-session>
 
 ## Recovery Rules
 
-- 下一轮先读 source spec 和其 Progress；存在 source-linked active plan 时再读 plan，最后使用 handoff 补充易失信息。
+- 下一轮按 `Read First` 先读相关 spec 和其 Progress；存在 active plan 时再读 plan，最后使用 handoff 补充易失信息。
 - 更新已有 handoff 时删除已失效的临时状态，不累积历史流水。
 - 验证证据已经稳定落盘时只引用路径，不复制长输出。
 - 多个并行 lane 只有共享同一个 resume goal 且确有易失状态时才放同一 handoff。
@@ -99,8 +96,8 @@ resume_from: <checkpoint-or-current-session>
 ## Self-Review
 
 - 内容是否真的是易失状态，而不是重复 Progress。
-- source 与 resume_from 是否可定位。
+- Read First、optional provenance 与 resume_from 是否可定位。
 - 下一轮能否直接接手，且知道 allowed / no-touch。
 - 风险、stop conditions 和缺失证据是否明确。
 - handoff 是否保持本地、紧凑且无敏感数据。
-- artifact 修改后是否运行 `validate-flow`。
+- artifact 修改后是否直接对改动路径运行 deterministic validator。

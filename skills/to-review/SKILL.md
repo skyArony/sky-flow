@@ -5,7 +5,7 @@ description: 'Run a dedicated read-only review only when the user explicitly inv
 
 # to-review
 
-`to-review` 只在用户显式调用时运行，默认只读，检查实现风险、行为回归、设计对齐、测试缺口、安全 / 可靠性问题，以及 artifact 边界。普通任务的 diff sanity 和定向验证由 native runtime 直接完成。它不替代 `validate-flow`、`to-consolidation` 或 `to-implement`。
+`to-review` 只在用户显式调用时运行，默认只读，检查实现风险、行为回归、设计对齐、测试缺口、安全 / 可靠性问题，以及 artifact 边界。普通任务的 diff sanity 和定向验证由 native runtime 直接完成。它不替代 deterministic artifact lint、`to-consolidation` 或 `to-implement`。
 
 ## Quick Path
 
@@ -50,7 +50,7 @@ python3 skills/to-review/scripts/prepare_review_context.py --output-dir <临时�
 - artifact 是否保持设计、readiness、spec / plan Progress 和来源一致，且没有 runtime topology 泄漏；plan 是否确有恢复价值且没有变成规范性真相源。
 - 多来源产物是否存在冲突、重复、临时残留或相互矛盾的假设。
 
-结构字段问题交 `validate-flow`；补丁式实现和 diff 熵值交 `to-consolidation`；目标、外部契约、数据语义或验收行为变化回 `to-spec`。
+结构字段问题由 owning Skill 直接运行 deterministic validator；用户要求全量 / migration audit 时使用 `$validate-flow`。补丁式实现和 diff 熵值交 `to-consolidation`；目标、外部契约、数据语义或验收行为变化回 `to-spec`。
 
 ## Finding Quality
 

@@ -79,7 +79,8 @@ Useful commands:
   code line numbers, per-file diffs, command/tool/agent history, and timelines
   stay out.
 - Human gates, long-term blockers, and volatile transfer state use acceptance,
-  backlog, and handoff only when those boundaries genuinely apply.
+  backlog, and handoff only when those boundaries genuinely apply. Their source
+  metadata is optional provenance rather than a globally validated graph.
 - Pre-implementation alignment and durable authoring / selection paths are
   explicit: use `$to-align`, `$to-spec`, `$pick-goal`, `$to-issue`,
   `$to-backlog`, or `$to-handoff`; the runtime does not create those artifacts
@@ -92,6 +93,10 @@ Useful commands:
   `to-debug`. Review, review loops, consolidation, knowledge capture,
   second-opinion review, multi-agent work, and durable acceptance remain
   explicit `$skill` capabilities.
+- Routine artifact writes run the deterministic validator directly on changed
+  paths. Full-set scans are reserved for commit, CI, migration, or an explicit
+  `$validate-flow` audit; validator reports do not emit a source graph or
+  generic LLM review queue.
 - A source spec can still require independent review or a human gate. The
   runtime satisfies that constraint with the smallest sufficient path instead
   of multiplying reviewers or repeating clean gates.

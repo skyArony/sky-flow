@@ -5,8 +5,8 @@
 ## Trigger Order
 
 1. 普通工作默认直接使用 native runtime；测试、静态检查、build、diff sanity 和修复后定点验证不需要专门 Skill。
-2. 意图触发的核心能力只包括 ready spec execution、debug / infra、commit 和 artifact validation；用户提出相应动作时进入，不额外升级流程。
-3. 显式能力必须由用户点名 `$skill`：正式编码前的持续多轮对齐、spec 设计、goal 选择、issue / backlog / handoff 写入、review、review loop、consolidation、knowledge、agent review、Claude 第二意见，以及 file-backed acceptance。多 Agent 同样必须由用户显式要求，或由 source spec 的独立评估 constraint 授权。
+2. 意图触发的核心能力只包括 ready spec execution、debug / infra 和 commit；routine artifact lint 由当前 owning Skill 直接运行脚本，不额外拉起 capability。
+3. 显式能力必须由用户点名 `$skill`：正式编码前的持续多轮对齐、spec 设计、goal 选择、issue / backlog / handoff 写入、full-set / migration artifact audit、review、review loop、consolidation、knowledge、agent review、Claude 第二意见，以及 file-backed acceptance。多 Agent 同样必须由用户显式要求，或由 source spec 的独立评估 constraint 授权。
 4. spec 中已有的 Independent Review、Required Human Gate 或其他 durable constraint 仍必须满足，但只使用最小充分路径，不自动扩展成多 reviewer 或重复 gate。
 5. artifact 操作前确定 `SKY_FLOW_ROOT` / `SKY_FLOW_LANG`；未设置时使用默认值。
 
@@ -29,9 +29,9 @@
 | `to-next-acceptance` | 显式 `$` | 根据人类反馈推进下一轮 acceptance | 未提及项不默认通过 |
 | `to-backlog` | 显式 `$` | 工作长期退出当前执行队列、等待外部条件 | 短期 blocker 留在 spec Progress |
 | `to-handoff` | 显式 `$` | 易失本地状态需要换会话 / Agent 接力 | 不复制 spec Progress |
-| `to-commit` | 自动 | stage、commit、message 或拆分提交 | staged artifact 先 validate-flow |
+| `to-commit` | 自动 | stage、commit、message 或拆分提交 | staged artifact 存在时直接运行 full-set deterministic validator |
 | `to-consolidation` | 显式 `$` | 用户要求对稳定 diff 做专门熵值收敛 | 普通最终检查由 runtime 直接完成 |
-| `validate-flow` | 自动 | durable artifact 变更、thin plan 结构 / 恢复边界或提交前 | 先确定性预检，语义 pass 按风险进入 |
+| `validate-flow` | 显式 `$` | 用户要求 full-set、migration 或独立 artifact audit | 只做 artifact lint / audit；routine 写回不进入该 Skill |
 | `to-claude-review` | 显式 `$` | 用户要求 Claude Code 第二意见或供应商独立复审 | Codex-only bridge |
 
 ## Native Runtime Execution

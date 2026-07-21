@@ -424,6 +424,7 @@ class InvocationPolicyTests(unittest.TestCase):
         "skills/to-handoff",
         "skills/to-consolidation",
         "skills/to-claude-review",
+        "skills/validate-flow",
     )
 
     def test_explicit_skills_disable_implicit_invocation(self) -> None:

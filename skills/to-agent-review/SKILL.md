@@ -53,7 +53,7 @@ description: 'Review agent decision-making only when the user explicitly invokes
 - Runtime checklist：是否在复杂度值得时及时维护，是否记录 fan-in、blocker、next action 和动态调整，且没有过度打点。
 - Thin plan：是否对简单或低恢复成本工作保持 runtime-only；复杂长周期工作是否在恢复价值成立时及时 materialize（包括中途），是否复用已有 active plan、提升 durable decision，并在收口时压缩或删除。
 - Artifact 写回：spec Progress / plan Progress / handoff / acceptance / backlog 是否各守边界，而不是互相复制或记录聊天、tool / Agent、owner / dependency / lane 流水。
-- 验证与收敛：是否由 native runtime 直接完成日常验证，是否只在用户显式要求时使用 `$to-review` / `$to-consolidation`，以及 artifact 变更后是否运行 `validate-flow`。
+- 验证与收敛：是否由 native runtime 直接完成日常验证，是否只在用户显式要求时使用 `$to-review` / `$to-consolidation` / `$validate-flow`，以及 artifact 变更后是否由 owning Skill 直接运行 deterministic lint。
 - 决策质量：是否存在过早实现、过度设计、补丁式返工、未说明的 pushback 或低价值自动化。
 
 ## Quantitative Signals
@@ -174,13 +174,13 @@ description: 'Review agent decision-making only when the user explicitly invokes
 - 需要实施已确认的长期改进：更新 ready spec 后由 `to-implement` 动态调度。
 - 明确小修且不需要长期设计：直接 runtime 执行。
 - 复盘只形成观察和建议：保留在 `agent-review-report`。
-- 只有创建或修改 Sky Flow artifact 时才运行 `validate-flow`；单纯写复盘报告不要求 artifact 校验。
+- 只有创建或修改 Sky Flow artifact 时才直接运行 deterministic lint；单纯写复盘报告不要求 artifact 校验。`$validate-flow` 只在用户显式要求 full-set / migration audit 时进入。
 
 ## Boundaries
 
 - 不做普通代码风险 review；需要专项实现风险审查时建议 `$to-review`。
 - 不收敛 pending diff；需要专项处理补丁式实现和 fan-in 残留时建议 `$to-consolidation`。
-- 不替代 `validate-flow` 检查 artifact/status 一致性。
+- 不替代 owning Skill 的 routine artifact lint，也不替代用户显式要求的 `$validate-flow` audit。
 - 除 `${SKY_FLOW_ROOT}/backlog/agent-reivew/` 这个通用复盘报告目录外，不写死项目路径、项目角色称呼、业务术语或运行时专属命令。
 - 不自动修改 workflow 规则、routing、spec 或 issue；复盘只给建议，除非用户明确要求落地。
 

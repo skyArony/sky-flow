@@ -9,12 +9,12 @@ description: 'Derive the next concise human acceptance round only when the user 
 
 ## Quick Path
 
-1. 读取 existing acceptance、人工反馈、source spec Progress 和当前验证证据。
+1. 读取 existing acceptance、人工反馈、related spec Progress（如有）和当前验证证据。
 2. 把上一轮每项分类：pass、explicit fail、unmentioned、scope change、needs evidence。
 3. 先过滤 Agent 可自行完成的验证；这些回 runtime 执行或作为 evidence，不继续占用人类 gate。
 4. 只保留失败、争议、缺信息、需要风险决策或明确未完成的人类门控项。
-5. `round` +1，旧轮次压缩到 Archive，更新 source spec 的 blocker / next / evidence。
-6. 修改 artifact 后运行 `validate-flow`。
+5. `round` +1，旧轮次压缩到 Archive；有 related spec 时更新其 blocker / next / evidence。
+6. 修改 artifact 后由当前 Skill 直接对改动路径运行 deterministic validator，不进入 `validate-flow` Skill。
 
 ## Feedback Classification
 
@@ -27,7 +27,7 @@ description: 'Derive the next concise human acceptance round only when the user 
 ## Inputs
 
 - acceptance 当前轮次、反馈、未关闭项和 Archive。
-- source spec Requirements、Acceptance Scenarios、Execution Constraints、Progress。
+- related spec Requirements、Acceptance Scenarios、Execution Constraints、Progress（如有）。
 - runtime 新证据、失败验证、blocker 和残余风险。
 - 人类新增范围或明确风险接受。
 
@@ -38,9 +38,9 @@ description: 'Derive the next concise human acceptance round only when the user 
 - 当前轮只保留下一次需要人类判断、明确确认、接受风险、补信息或决策的内容。
 - 已关闭项 Archive 保留：摘要、反馈结论、处理结果、关键证据、关闭日期。
 - 未关闭项重写成可执行、可判断的简洁步骤，不复制长上下文。
-- ordinary resume target 写回 spec Progress，不放在 acceptance；保持目标级，不写代码微任务。
+- ordinary resume target 在 related spec 存在时写回其 Progress，不放在 acceptance；保持目标级，不写代码微任务。
 - 能明确关联的 spec / commit 放在对应验收组；不能确认时省略。
-- 所有 gate 关闭且无下一轮时设置 `completed`，关键结论回写 source spec。
+- 所有 gate 关闭且无下一轮时设置 `completed`；有 related spec 时回写关键结论。
 
 ## Next Round Template
 
@@ -96,7 +96,7 @@ description: 'Derive the next concise human acceptance round only when the user 
 
 - 不把未提及项默认通过。
 - 不把 Agent 可自证项继续包装成人工验收。
-- 不把纯 FYI 或无需人类输出的结论带入下一轮；写入对话或 source spec Progress / evidence。
+- 不把纯 FYI 或无需人类输出的结论带入下一轮；写入对话或 related spec Progress / evidence。
 - 不在 acceptance 中修改长期设计；scope / contract 变化回 `to-spec`。
 - 不把普通后续动作、runtime checklist 或调度状态写入 acceptance。
 - 不把证据缺口包装成通过。
@@ -106,6 +106,6 @@ description: 'Derive the next concise human acceptance round only when the user 
 - 每个旧项是否已分类。
 - 下一轮每组是否仍是真实人类 gate。
 - 失败和证据缺口是否先区分 Agent 可补与人类必须补。
-- source spec Progress、acceptance round 和证据是否一致。
+- related spec Progress（如有）、acceptance round 和证据是否一致。
 - 旧轮次是否压缩而不是复制。
-- artifact 修改后是否运行 `validate-flow`。
+- artifact 修改后是否直接对改动路径运行 deterministic validator。

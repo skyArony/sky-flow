@@ -88,7 +88,7 @@ source_id: {source_id}
         self.assertEqual([], report["warnings"])
         self.assertEqual(1, report["summary"]["checked_artifacts"])
 
-    def test_valid_plan_links_to_spec_and_emits_semantic_hints(self) -> None:
+    def test_valid_plan_uses_lightweight_report(self) -> None:
         result, report = self.run_validator(
             {
                 "docs/spec/checkout-flow.md": self.spec(),
@@ -99,19 +99,9 @@ source_id: {source_id}
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual([], report["errors"])
         self.assertEqual([], report["warnings"])
-        self.assertIn(
-            {"from": "spec/checkout-flow", "to": "plan/checkout-recovery"},
-            report["graph"]["source_links"],
-        )
-        hint_checks = {
-            item["check"]
-            for item in report["llm_review_hints"]
-            if item["artifact_id"] == "checkout-recovery"
-        }
-        self.assertEqual(
-            {"thin_plan_materialization", "thin_plan_boundary", "thin_plan_snapshot"},
-            hint_checks,
-        )
+        self.assertEqual("sky-flow-validate-report/v3", report["schema_version"])
+        self.assertNotIn("graph", report)
+        self.assertNotIn("llm_review_hints", report)
 
     def test_plan_requires_stable_spec_source(self) -> None:
         cases = {
@@ -153,14 +143,14 @@ source_id: {source_id}
         self.assertEqual(1, result.returncode)
         self.assertIn("PLAN_SOURCE_SPEC_MISSING", self.codes(report, "errors"))
 
-    def test_missing_source_in_partial_artifact_set_is_a_warning(self) -> None:
+    def test_partial_plan_lint_does_not_resolve_source(self) -> None:
         result, report = self.run_validator(
             {"docs/plan/checkout-recovery.md": self.plan(source_id="external-spec")},
             inputs=["docs/plan/checkout-recovery.md"],
         )
 
         self.assertEqual(0, result.returncode, result.stderr)
-        self.assertIn("SOURCE_ARTIFACT_MISSING", self.codes(report, "warnings"))
+        self.assertEqual([], report["warnings"])
 
     def test_explicit_sky_flow_root_is_still_a_full_scan(self) -> None:
         result, report = self.run_validator(
@@ -182,7 +172,7 @@ source_id: {source_id}
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIn("PLAN_PROGRESS_MISSING", self.codes(report, "warnings"))
 
-    def test_multiple_active_plans_warn_but_completed_plan_does_not(self) -> None:
+    def test_multiple_active_plans_are_resolved_by_runtime(self) -> None:
         files = {
             "docs/spec/checkout-flow.md": self.spec(),
             "docs/plan/checkout-recovery.md": self.plan(),
@@ -191,26 +181,9 @@ source_id: {source_id}
         result, report = self.run_validator(files)
 
         self.assertEqual(0, result.returncode, result.stderr)
-        self.assertEqual(
-            2,
-            self.codes(report, "warnings").count("MULTIPLE_ACTIVE_PLANS_FOR_SPEC"),
-        )
-
-        files["docs/plan/checkout-migration.md"] = self.plan(
-            plan_id="checkout-migration", status="completed"
-        )
-        result, report = self.run_validator(files)
-        self.assertEqual(0, result.returncode, result.stderr)
         self.assertNotIn("MULTIPLE_ACTIVE_PLANS_FOR_SPEC", self.codes(report, "warnings"))
 
-        files["docs/plan/checkout-migration.md"] = self.plan(
-            plan_id="checkout-migration", status="abandoned"
-        )
-        result, report = self.run_validator(files)
-        self.assertEqual(0, result.returncode, result.stderr)
-        self.assertNotIn("MULTIPLE_ACTIVE_PLANS_FOR_SPEC", self.codes(report, "warnings"))
-
-    def test_active_plan_requires_ready_unfinished_source_spec(self) -> None:
+    def test_plan_source_lifecycle_is_checked_at_resume_not_lint(self) -> None:
         for source_status in ("draft", "completed", "abandoned"):
             with self.subTest(source_status=source_status):
                 result, report = self.run_validator(
@@ -219,13 +192,10 @@ source_id: {source_id}
                         "docs/plan/checkout-recovery.md": self.plan(),
                     }
                 )
-                self.assertEqual(1, result.returncode)
-                self.assertIn(
-                    "PLAN_SOURCE_SPEC_NOT_EXECUTABLE",
-                    self.codes(report, "errors"),
-                )
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertNotIn("PLAN_SOURCE_SPEC_NOT_EXECUTABLE", self.codes(report, "errors"))
 
-    def test_plan_has_no_draft_stage_and_source_status_cannot_lag(self) -> None:
+    def test_plan_has_no_draft_stage_but_source_status_can_lag(self) -> None:
         result, report = self.run_validator(
             {
                 "docs/spec/checkout-flow.md": self.spec(),
@@ -241,16 +211,8 @@ source_id: {source_id}
                 "docs/plan/checkout-recovery.md": self.plan(status="in_progress"),
             }
         )
-        self.assertEqual(1, result.returncode)
-        self.assertIn("PLAN_SOURCE_SPEC_STATUS_BEHIND", self.codes(report, "errors"))
-
-        result, report = self.run_validator(
-            {
-                "docs/spec/checkout-flow.md": self.spec(status="not_started"),
-                "docs/plan/checkout-recovery.md": self.plan(status="not_started"),
-            }
-        )
         self.assertEqual(0, result.returncode, result.stderr)
+        self.assertNotIn("PLAN_SOURCE_SPEC_STATUS_BEHIND", self.codes(report, "errors"))
 
     def test_legacy_plan_shapes_are_rejected(self) -> None:
         cases = {
@@ -322,7 +284,7 @@ source_id: {source_id}
                 self.assertEqual(1, result.returncode)
                 self.assertIn("RETIRED_ARTIFACT_TYPE", self.codes(report, "errors"))
 
-    def test_plan_cannot_be_a_boundary_artifact_source(self) -> None:
+    def test_boundary_artifact_provenance_is_not_a_validated_graph(self) -> None:
         result, report = self.run_validator(
             {
                 "docs/spec/checkout-flow.md": self.spec(),
@@ -340,8 +302,8 @@ source_id: {source_id}
             }
         )
 
-        self.assertEqual(1, result.returncode)
-        self.assertIn("PLAN_CANNOT_BE_BOUNDARY_SOURCE", self.codes(report, "errors"))
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual([], report["errors"])
 
     def test_backlog_allows_empty_dependency_list(self) -> None:
         result, report = self.run_validator(
@@ -351,10 +313,34 @@ source_id: {source_id}
                 id: deferred-cleanup
                 artifact_type: backlog
                 status: draft
-                source_type: conversation
-                source_id: current-session
                 depends_on: []
                 recommended_resume: after-priority-review
+                ---
+                """,
+            }
+        )
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertNotIn("MISSING_REQUIRED_FIELD", self.codes(report, "errors"))
+
+    def test_acceptance_and_handoff_do_not_require_source_fields(self) -> None:
+        result, report = self.run_validator(
+            {
+                "docs/acceptance/manual-check.md": """
+                ---
+                id: manual-check
+                artifact_type: acceptance
+                status: draft
+                acceptance_type: interactive
+                round: 1
+                ---
+                """,
+                "docs/handoff/local-state.md": """
+                ---
+                id: local-state
+                artifact_type: handoff
+                status: draft
+                resume_from: inspect-current-diff
                 ---
                 """,
             }

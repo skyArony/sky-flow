@@ -22,14 +22,14 @@ export const ACCEPTANCE_TYPES = [
   'html_interactive',
 ] as const;
 
-// Only mechanically necessary fields belong here. Content sufficiency stays in
-// the semantic pass so the schema does not recreate a rigid workflow.
+// Only mechanically necessary fields belong here. Content sufficiency stays
+// with the artifact-owning skill so this schema does not recreate a workflow.
 export const REQUIRED_FIELDS: Record<string, string[]> = {
   base: ['id', 'artifact_type', 'status'],
   plan: ['source_type', 'source_id'],
-  acceptance: ['acceptance_type', 'source_type', 'source_id', 'round'],
-  backlog: ['source_type', 'source_id', 'depends_on', 'recommended_resume'],
-  handoff: ['source_type', 'source_id', 'resume_from'],
+  acceptance: ['acceptance_type', 'round'],
+  backlog: ['depends_on', 'recommended_resume'],
+  handoff: ['resume_from'],
 };
 
 // Legacy topology fields must not leak into the simplified artifact model.
@@ -58,8 +58,8 @@ export const RETIRED_TOPOLOGY_FIELDS = [
 ] as const;
 
 // These fields belonged to the archived plan workflow. The active thin plan
-// derives its authority from source_type/source_id and keeps execution context
-// in the body rather than rebuilding the old lifecycle in frontmatter.
+// keeps a stable spec locator in source_type/source_id and execution context in
+// the body rather than rebuilding the old lifecycle in frontmatter.
 export const RETIRED_PLAN_FIELDS = [
   'goal',
   'spec',

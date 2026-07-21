@@ -19,7 +19,7 @@ description: 'Align, create, or maintain a durable Sky Flow spec only when the u
 6. 对真实分叉给出 2-3 个互斥方案及取舍；没有真实分叉时直接说明判断，不机械凑选项。
 7. 分段呈现设计并及时校准；只把稳定结论写入 spec，不记录问答过程或决策树。
 8. 用`就绪证明`判断是否可执行；ready 后让 Progress `Next` 指向目标级恢复入口。
-9. 创建或修改 spec 后运行 `validate-flow`。只要求设计产物时请用户 review；用户已明确要求继续实现且没有人类决策未关闭时，可直接进入 `to-implement`，不增加仪式性确认轮次。
+9. 创建或修改 spec 后由当前 Skill 直接对改动路径运行 deterministic validator，不进入 `validate-flow` Skill。spec 语义一致性由本 Skill 的就绪证明和 Self-Review 收口；只要求设计产物时请用户 review，用户已明确要求继续实现且没有人类决策未关闭时可直接进入 `to-implement`。
 
 ## 底座对齐
 
@@ -161,4 +161,4 @@ Progress 是覆盖更新的语义恢复快照，只回答：当前稳定成立�
 - 尚未进入设计的问题证据：`to-issue`；bug / root cause 与事故回归：`to-debug`；普通测试策略和验证组合由 native runtime 决定。
 - 真正人类 gate：`to-acceptance`；长期离队：`to-backlog`；易失接力：`to-handoff`。
 
-创建或更新 spec 后运行校验并明确就绪状态。是否停下来等 review 取决于用户当前请求和仍存在的人类决策，不设置额外固定 gate。
+创建或更新 spec 后直接运行局部 deterministic lint 并明确就绪状态。是否停下来等 review 取决于用户当前请求和仍存在的人类决策，不设置额外固定 gate。

@@ -15,7 +15,7 @@ description: 'Run a Sky Flow review-fix-rereview loop only when the user explici
 2. 完成首轮一体化 review；默认由当前 executor 同时检查设计 / spec 符合性和代码质量，只有用户明确要求或出现真实高风险证据缺口时才增加独立 reviewer。
 3. 逐条核验 finding，回答“实际会不会出 Bug”和“修复代价”，分为 blocking、当前轮高 ROI、deferred / rejected。
 4. 只修 scope 内且证据充分的问题；优先一到两个聚焦 batch。
-5. 运行与改动风险匹配的最小验证；durable artifact 或 plan 结构 / 恢复边界变化时运行 `validate-flow`，plan body-only snapshot 遵循其批量时机。
+5. 运行与改动风险匹配的最小验证；durable artifact 或 plan 结构变化时直接对改动路径运行 deterministic validator，不进入 `validate-flow` Skill；plan body-only snapshot 可批量到恢复 / 提交边界。
 6. 直接检查重复 / 临时代码、补丁感和明显 diff 熵值；只有用户同时显式调用 `$to-consolidation` 时才进入专项收敛流程。
 7. 修复完成后做一次整合复审，同时给出设计 / spec 符合性与代码质量结论，避免为同一范围机械叠加重复 review。
 8. 默认用定向测试和修复后 diff 完成 closure；只有用户明确要求、P0 证据冲突或真实高风险证据缺口时才增加一个独立 verifier。

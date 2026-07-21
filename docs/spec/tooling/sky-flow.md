@@ -121,19 +121,18 @@ SKY_FLOW_LANG = "简体中文"
 - `not_started`：已 ready，但执行尚未开始。
 - `in_progress`：正在推进；短期阻塞也保持此状态并写入恢复条件。
 - `completed`：该 artifact 的目标和必要验证 / 人类 gate 已结束。
-- `abandoned`：有明确事实或人类依据不再继续，并应关联 backlog 或说明依据。
+- `abandoned`：有明确事实或人类依据不再继续，并在 artifact 内说明依据；长期保留时可关联 backlog。
 
-plan 没有 pre-readiness `draft` 阶段：恢复价值成立但尚未执行时使用 `not_started`，开始实施后 plan 与 source spec 都使用 `in_progress`。plan 的 `abandoned` 只表示丢弃当前 working set / approach，不代表放弃 source spec；只有 source work 真正退出 active queue 时才以 durable source 创建 backlog。
+plan 没有 pre-readiness `draft` 阶段：恢复价值成立但尚未执行时使用 `not_started`，开始实施后使用 `in_progress`。plan status 只描述 working set，不与 source spec lifecycle 机械双写；source spec 是否仍 ready / unfinished 在真实 resume 边界检查。plan 的 `abandoned` 只表示丢弃当前 working set / approach，不代表放弃 source spec；只有 source work 真正退出 active queue 时才创建 backlog。
 
 ### Naming And Source
 
 - artifact 文件 stem 必须等于 frontmatter `id`。
 - spec 不使用数字编号前缀。
 - plan 默认位于 `plan/<id>.md`，不使用数字排序、parent / child role 或反向绑定。
-- plan 必须用单向 `source_type: spec` / `source_id: <spec-id>` 指向 ready、unfinished 规范性真相源；不允许 conversation、issue 或另一份 plan 作为来源。`in_progress` plan 要求 source spec 同样为 `in_progress`。
+- plan 必须用单向 `source_type: spec` / `source_id: <spec-id>` 保存稳定恢复 locator；不允许 conversation、issue 或另一份 plan 作为来源。full-set audit / commit / CI 检查 source spec 是否存在，`to-implement` 在真实 resume 时检查它是否仍 ready、unfinished。
 - 未完成 issue 位于 `issue/<id>.md`；completed issue 位于 `issue/fixed/<id>.md`。
-- acceptance、backlog、handoff 使用单向 `source_type` / `source_id`；不维护反向绑定图。
-- `conversation` + `current-session` 可作为没有上游 artifact 的来源，但正文必须补足上下文。
+- acceptance、backlog、handoff 必须正文自包含；只有稳定上游能提高可发现性时才保存可选 `source_type` / `source_id` provenance。provenance 不赋予 authority，也不形成需要全局一致的文档图。
 
 ## Spec Contract
 
@@ -247,7 +246,7 @@ source_id: <spec-id>
 - `Progress` 使用覆盖快照，保存 Done / Active / Next / Blockers；允许模块、文件、symbol 或实现 slice 级定位，但 blocker 只限当前 slice 的局部实施问题，目标级 blocker 只引用 spec Progress。不得保存 tool call、Agent 消息、owner、依赖边、并行批次或时间流水。
 - `Verification` 保存下一轮需要复用的验证入口、最近结论和未验证范围，不复制完整命令输出。
 
-spec 是规范性真相源，plan 只是活动实现上下文；冲突时 spec 胜出。默认一份 spec 同时只保持一份 active plan；出现多份时由 validator warning 要求收敛或证明为什么 spec 不应拆分，不建立 plan graph。
+spec 是规范性真相源，plan 只是活动实现上下文；冲突时 spec 胜出。默认优先复用一份 active plan；恢复时出现多份由 `to-implement` 根据当前 slice 收敛、废弃过期项或确认 spec 是否应拆分，validator 不建立 plan graph。
 
 用户直接提供 active plan path / id 时，它只是 resume locator：先解析并验证 source spec 的 readiness 与 lifecycle，再交给 `to-implement`；plan 不拥有独立 goal。
 
@@ -338,7 +337,7 @@ acceptance 只承载 Agent 无法自行判断或必须由人类拍板、且需�
 
 backlog 只在工作退出当前执行队列、等待长期外部依赖、人类决定或环境条件时创建。短期阻塞写 spec Progress。
 
-必须记录 source、blocker、depends_on、recommended_resume 和恢复后的第一动作。
+必须记录 blocker、depends_on、recommended_resume 和恢复后的第一动作；source provenance 只有在能提高恢复效率时才写入。
 
 ### Handoff
 
@@ -364,7 +363,7 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
 | `to-backlog` | 长期阻塞与恢复条件 |
 | `to-handoff` | 易失接力状态 |
 | `to-commit` | scoped stage / commit |
-| `validate-flow` | 轻量 artifact 校验 |
+| `validate-flow` | 显式 full-set / migration artifact audit；routine lint 由 owning Skill 直接运行脚本 |
 | `to-knowledge` | 通用技术知识 |
 | `to-claude-review` | Codex 到 Claude Code 的只读 review bridge |
 
@@ -372,20 +371,21 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
 
 ## Validation Model
 
+routine artifact 写回不进入独立 Skill。当前 owning Skill 直接对 changed paths 运行 deterministic validator；staged workflow artifact commit、CI 和 migration 才运行 full-set scan。用户明确要求 full-set / migration / 独立 artifact audit 时才进入 `$validate-flow`。
+
 确定性校验只覆盖：
 
 - frontmatter、最小字段、枚举、id / 文件名和 root。
 - issue fixed 路径规则。
-- plan 不允许 `draft`，必须单向来源于 ready、unfinished spec；`in_progress` plan 的 source spec 也必须为 `in_progress`。全量扫描中的孤儿 plan 是 error，显式局部范围缺失 source 才是 warning。
-- acceptance / backlog / handoff 继续使用各自单向 source，且不得以 plan 为规范性来源。
-- active plan 的 Progress 存在性，以及同一 spec 多份 active plan 的收敛 warning。
-- abandoned 与 backlog / 人类依据。
+- plan 不允许 `draft`，必须保留稳定 `source_type: spec` / `source_id` locator；full-set scan 中的孤儿 plan 是 error，显式局部范围不解析 source、也不产生 missing-source warning。
+- acceptance / backlog / handoff 的 source metadata 是可选 provenance，不进入 graph 或 referential-integrity 检查。
+- active plan 的 Progress heading 存在性。
 - ready / active / completed spec 的 Progress 存在性。
 - retired task / step artifact 或 legacy plan/task topology 字段残留。
 
-语义收口看设计一致性、spec Progress 快照、thin plan 的物化价值、blocker 分层与非规范性边界、真实 constraints、acceptance 价值、backlog 恢复和 handoff 易失性。spec Progress 必须保持语义级；plan 可使用文件 / 模块 / symbol / slice 级定位，但仍排除 tool / Agent 流水、owner、依赖边、并行 lane 和微步骤。
+validator report 使用 `sky-flow-validate-report/v3`，只输出配置、summary、checked artifacts、errors 和 warnings；不输出 source graph 或通用 LLM review hints。spec 设计一致性与 Progress 由 `to-spec` 收口；thin plan 的物化价值、source lifecycle、多 active plan、blocker 分层、promotion 和 closure 由 `to-implement` 在真实边界收口；其他 artifact 的内容充分性由各自 owning Skill 负责。
 
-校验时机按成本分层：plan create、source / status、decision promotion、closure，以及 plan 即将作为恢复 / handoff / commit 输入时必须运行 deterministic precheck；有 warning 或规范性判断时做 focused semantic pass。仅覆盖 body working-set snapshot 的高频更新可批量到下一个恢复 / 提交边界，不要求每次都触发完整 validator / model pass。
+changed artifact 的局部 lint 不触发第二轮模型审查；plan body snapshot 可批量到恢复 / 提交边界。plan resume 直接解析 source spec 并做一次 runtime readiness / ambiguity 检查，不先启动全库 audit；commit / CI / migration 使用 full-set deterministic scan。
 
 ## Migration And Archive
 
@@ -438,7 +438,7 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
 
 7. 旧执行 artifact 被拒绝。
    - Given checked docs 仍声明 retired artifact type 或拓扑字段
-   - When `validate-flow` 运行
+   - When owning Skill 的 deterministic lint 或显式 `$validate-flow` audit 运行
    - Then 返回明确 migration error，不提供兼容执行路径
 
 8. 多个 spec 可以派生一个 runtime goal。
@@ -484,10 +484,10 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
 16. 日常实现不自动加载重型能力。
    - Given 用户要求普通实现、测试修改或修复，且 source spec 没有独立评估 constraint
    - When runtime 执行并验证结果
-   - Then 直接判断测试 ROI 并运行必要测试、静态检查、build、真实路径和 diff sanity，不自动进入 `to-review`、`to-consolidation`、多 Agent 或 artifact 写入
+   - Then 直接判断测试 ROI 并运行必要测试、静态检查、build、真实路径和 diff sanity，不自动进入 `to-review`、`to-consolidation`、`validate-flow`、多 Agent 或 artifact 写入
 
-17. 重型能力由用户主动开启。
-   - Given 用户需要专门 review、review-fix-rereview、diff 收敛、知识沉淀、第二意见、多 Agent 或 durable acceptance
+17. 专项能力由用户主动开启。
+   - Given 用户需要专门 review、review-fix-rereview、diff 收敛、full-set / migration artifact audit、知识沉淀、第二意见、多 Agent 或 durable acceptance
    - When 用户显式调用对应 `$skill`；或 source spec 已持久化独立评估 constraint
    - Then 只运行被请求的 Skill；独立评估 constraint 由 runtime 用最小充分路径满足，不隐式加载其他重型 Skill
 
@@ -512,7 +512,7 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
    - Then 记入 plan；如果它改变 material scope、stable constraint、no-touch、外部行为、contract、data semantics、authority、acceptance 或长期架构，先提升到 spec 再继续
 
 22. thin plan 不恢复旧执行拓扑。
-   - Given plan 已创建并由 `validate-flow` 检查
+   - Given plan 已创建并由 owning Skill 直接运行 deterministic lint
    - When 文件包含 tasks、plan role、dependency / parallel fields、owner lanes 或 task / step artifact
    - Then validator 拒绝 legacy topology；只有 thin plan 的单向 source、snapshot Progress 和非规范性内容可以通过
 
@@ -521,20 +521,30 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
    - When 路由执行
    - Then 先解析 source spec、校验 readiness 与 lifecycle，再进入 `to-implement`；plan 不成为独立 goal 或规范性来源
 
-24. plan 与 source spec lifecycle 保持一致。
+24. plan lifecycle 不制造双写门禁。
    - Given implementation working set 的恢复价值已经成立
    - When plan 尚未开始或已经推进
-   - Then plan 分别使用 `not_started` 或 `in_progress`，不创建 `draft` 阶段；`in_progress` plan 对应 `in_progress` source spec
+   - Then plan 分别使用 `not_started` 或 `in_progress`，不创建 `draft` 阶段；source spec lifecycle 不与 plan status 机械同步，而在 direct resume 时确认仍 ready、unfinished
 
 25. plan 收口不自动收口 spec。
    - Given 当前 implementation slice 已完成，但 source spec 仍有 durable scope
    - When plan closure
-   - Then durable decision / outcome / evidence / risk 先提升到 spec，plan 压缩或删除且不进入 `plan/done`；高频 body snapshot 可以批量校验，但 closure 必须完成确定性与必要语义校验
+   - Then durable decision / outcome / evidence / risk 先提升到 spec，plan 压缩或删除且不进入 `plan/done`；高频 body snapshot 可以批量 lint，closure 的语义收口由 `to-implement` 完成
 
 26. 多轮对齐能按 ROI 收口。
    - Given 用户显式调用 `$to-align`，原始需求同时包含跨系统兼容、真实失败恢复和低概率边角
    - When Agent 完成仓库取证并推进实质决策前沿
    - Then 它覆盖每个原始 requirement、只把 human-owned 实质分叉交用户、用简单方案处理低影响边角，并以 ready 或明确 blocker 停止；新 scope 先失效旧 readiness，稳定结论交 `to-spec`，只读时报告 unpersisted，不创建对齐 artifact 或提前修改产品代码
+
+27. routine artifact lint 不拉起独立 Skill。
+   - Given owning Skill 创建或修改一份 Sky Flow artifact
+   - When 执行写后校验
+   - Then 直接对 changed path 运行 deterministic validator；报告不包含 graph 或通用 LLM hints，也不进入 `validate-flow` Skill
+
+28. 边界 artifact 不维护关系图。
+   - Given acceptance、backlog 或 handoff 可以从正文独立恢复
+   - When 创建或更新其 metadata
+   - Then `source_type` / `source_id` 可省略；存在时只作为 provenance，不要求反向链接、source lifecycle 同步或全局 referential integrity
 
 ## Requirements
 
@@ -544,7 +554,7 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
 - R4: spec Progress 必须是覆盖更新的恢复快照，不是 append-only 执行日志。
 - R5: 人类 gate、长期阻塞和易失交接必须分别归入 acceptance、backlog、handoff。
 - R6: active installer 和 routing 不得发现或推荐 archived skills。
-- R7: validator 必须接受符合 thin contract 的 plan，拒绝 retired task / step artifact 和 legacy plan/task topology 字段，并提供迁移方向。
+- R7: validator 必须接受带稳定 source spec locator 的 thin plan，在 full-set scan 中拒绝 orphan plan，并拒绝 retired task / step artifact 和 legacy plan/task topology 字段。
 - R8: 独立 review、人类 approval、no-touch 和不可逆操作约束不得因删除执行图而消失。
 - R9: 简单工作必须保留直接 runtime 快速路径。
 - R10: 所有 active skill 必须以 spec Progress、可选 thin plan 或 runtime state 表达执行上下文，不引用旧文件化拓扑。
@@ -561,11 +571,11 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
 - R21: 多消费者 runtime context 可按需投影目标、成功边界、关键约束、相关契约和当前事实，但不得自动成为固定 packet；只有满足 thin plan 物化边界的 implementation working set 才可持久化。
 - R22: 显式 `to-review` 必须默认由一个 reviewer 同时判断设计 / spec 符合性和代码质量；finding 修复默认定点验证，额外 reviewer / verifier 只在用户 / spec 明确要求或高风险证据不足时触发。
 - R23: `to-spec` 必须有覆盖简单任务、仓库事实、authority、外部契约和过大 scope 的轻量回归夹具。
-- R24: 重型 Skill 必须使用显式调用策略；普通实现、测试修改、修复和交付检查不得因宽泛 description 自动加载它们。
+- R24: 专项 / 重型 Skill（包括 full-set / migration `$validate-flow` audit）必须使用显式调用策略；普通实现、测试修改、修复和 artifact 写回不得因宽泛 description 自动加载它们。
 - R25: runtime 必须直接完成与风险匹配的确定性验证；显式 Skill policy 不得被误解为可以跳过 test、lint、typecheck、build、真实路径或权限 gate。
 - R26: 测试 ROI、stable seam、普通测试实现与验证组合必须属于 native runtime；真实事故回归必须留在 `to-debug`，不得要求独立测试 workflow 才能完成。
 - R27: `to-implement` 必须使用 `runtime-first, plan-on-demand`；简单或单会话可靠完成的工作不创建 plan，复杂长周期工作可在开始时或中途物化 plan。
-- R28: plan 必须单向来源于 ready、unfinished spec，不得使用 `draft`，且 `in_progress` plan 必须对应 `in_progress` spec；plan 不得作为 acceptance、backlog 或 handoff 的规范性 source。
+- R28: plan 必须保留单向 source spec locator 且不得使用 `draft`；source spec 的 ready / unfinished 状态和多 active plan 歧义只在真实 resume 边界检查，不与 plan status 做通用 validator 双写同步。
 - R29: plan 必须使用覆盖更新的 working-set 快照，不得存储 task graph、owner、dependency、parallelism、fan-in batching、tool / Agent 过程或时间流水。
 - R30: plan decision 只能承载边界内局部、可逆工程选择；会改变 material scope、stable constraint、no-touch、外部行为、contract、data semantics、authority、acceptance 或长期架构的事实 / 决策必须先提升到 spec。
 - R31: plan 完成时必须先把 durable decisions、semantic outcomes、evidence 和 residual risk 提升到 spec，再压缩或删除；不恢复 `plan/done` 或 task archive。
@@ -573,9 +583,11 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
 - R33: 必须有代表性 eval 覆盖简单工作绕过、单会话复杂工作绕过、长周期物化、中途物化、direct plan resume、decision 提升、closure 和 handoff 边界。
 - R34: spec Progress 只拥有 goal-level、external、authority 或 durable-constraint blocker；plan 只拥有当前 slice 的局部实施 blocker，并引用而不复制 spec blocker。
 - R35: 用户直接提供 active plan 时，routing 必须先解析和验证 source spec，再由 `to-implement` 恢复；不得把 plan 当作独立 goal。
-- R36: plan create、source / status、promotion、closure 和恢复 / handoff / commit 边界必须校验；纯 body snapshot 可批量到下一个边界，避免每次更新触发完整模型 pass。
+- R36: owning Skill 必须对 changed artifact paths 直接运行 deterministic lint；plan body snapshot 可批量到恢复 / 提交边界，commit / CI / migration 使用 full-set scan，成功报告不得触发完整模型 pass。
 - R37: 显式 `to-align` 必须在编码前维护原始 requirement 覆盖、实质决策前沿、ROI guard 和 ready / blocked-and-stop 终态；稳定结论与 readiness 委托 `to-spec`，不得创建新 artifact、保存问答流水或提前修改产品代码。
 - R38: `to-align` 不得擅自 deferred 用户原始 outcome、重复追问无新证据的人类 blocker，或把历史泛化授权 / 旧 readiness 用于变化后的 scope；只读时必须能以 unpersisted 终态结束，代表性 eval 必须覆盖这些停止与边界行为。
+- R39: validator report 必须保持轻量，使用 v3 schema 且不输出 source graph 或通用 LLM review hints；`validate-flow` Skill 只允许显式 full-set / migration / 独立 audit。
+- R40: acceptance、backlog、handoff 的 `source_type` / `source_id` 必须是可选 provenance；正文自包含性不能依赖全局 referential integrity、反向链接或 lifecycle 同步。
 
 ## Decisions
 
@@ -598,9 +610,12 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
 - 决策: plan 没有独立 authoring / draft lifecycle，直接恢复也必须先回到 ready source spec。
   - 归属: Agent（已确认边界内）。
   - 理由: `not_started` 已能表达物化后尚未执行；额外 draft 或 plan-owned goal 会重新制造 readiness gate。
-- 决策: plan 校验按结构与恢复边界分层，高频 body snapshot 允许批量。
+- 决策: routine artifact 校验由 owning Skill 直接调用 deterministic script，`validate-flow` 只保留为 explicit full-set / migration audit。
   - 归属: Agent（已确认边界内）。
-  - 理由: source / status / promotion / closure 必须确定性可靠，但每次 working-set 覆盖都启动完整模型 pass 会抵消 thin plan 的收益。
+  - 理由: validator 的机器成本很低，但自动 Skill 切换、全库关系推导和通用 LLM hints 会重复加载上下文；局部 lint、提交期 full scan 与运行时 resume 检查足以覆盖真实风险。
+- 决策: 只保留 plan → spec 的稳定恢复 locator，不维护通用 artifact relationship graph 或 plan / spec status 双写。
+  - 归属: 人类确认方向，Agent 负责边界设计。
+  - 理由: plan 必须能恢复到规范性真相源；acceptance、backlog、handoff 可以通过自包含正文和可选 provenance 恢复，不值得支付全局 referential-integrity 成本。
 - 决策: 第一阶段不恢复 active `$to-plan`、`pick-plan`、`to-task` 或 `to-archive`。
   - 归属: Agent（已确认边界内）。
   - 理由: plan 的当前缺口是实现期存储而非独立编排能力；由 `to-implement` 按需管理能保持最小 skill / prompt surface。
@@ -654,8 +669,10 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
   - active install list 不包含 archived skills。
   - internal reviewer profile 不进入 active install list。
   - stale active copies 与无法安全删除的 retired installs 被 readiness 拒绝。
-  - validator 接受 source spec 单向绑定的 thin plan，拒绝 task / step artifact 与 legacy topology 字段。
-  - 同一 spec 多份 active plan 产生收敛 warning，plan 来源非 spec 时确定性失败。
+  - validator 接受 source spec locator 正确的 thin plan，full-set scan 拒绝 orphan plan，并拒绝 task / step artifact 与 legacy topology 字段。
+  - source spec lifecycle 与多 active plan 歧义由 `to-implement` 在真实 resume 时检查，不由通用 validator 维护双写关系。
+  - acceptance / backlog / handoff 无 source metadata 仍可通过；存在的 provenance 不进入全局关系图。
+  - validator v3 report 不包含 `graph` 或 `llm_review_hints`，routine artifact 写回不自动进入 `validate-flow` Skill。
   - current spec 自身通过 deterministic validation。
   - active docs / Skill 没有旧路由或旧 artifact lifecycle 残留。
   - `to-implement` 清楚表达 runtime-first、plan-on-demand、中途 materialization、decision promotion 和双快照写回。
@@ -667,7 +684,7 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
   - `to-spec` 能区分仓库事实、人类 / Agent 决策、runtime 选择和外部未知，并形成可解释就绪证明。
   - `to-align` 只显式触发，覆盖原始需求后以 ready 或明确 blocker 停止，把稳定结论交给 `to-spec`；scope 变化使旧 readiness 失效，只读时可报告 unpersisted，不提前编码或为低影响理论风险扩张流程。
   - 深度对齐参考只按复杂度加载，评估夹具覆盖 6 类代表性案例。
-  - 仍 active 的 heavy Skill 使用 `allow_implicit_invocation: false`，routing 与 description 不再自动推荐它们。
+  - 仍 active 的专项 / heavy Skill 使用 explicit routing；`validate-flow` 同样只在用户要求 full-set / migration / 独立 audit 时进入。
   - `to-test` 与 `to-bdd-regression` 不在 active discovery / routing；installer 能识别并清理它们指向当前 checkout 的旧直链。
   - review context 同时携带 source spec / goal 和 diff；finding 修复默认定点验证，review-loop 不再强制 consolidation、独立 verifier 或双 verifier。
   - 普通实现路径仍直接运行必要测试、静态检查、build、真实路径和 diff sanity，显式调用策略不降低验证完整性。
@@ -679,7 +696,8 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
   - `./install.sh list --json`
   - `./install.sh --dry-run --no-deps`
   - retired artifact / topology negative fixtures
-  - thin plan positive、invalid-source、source-status、direct-resume、full / partial orphan、multiple-active 和 runtime-bypass fixtures
+  - thin plan positive、invalid-source、direct-resume、full / partial orphan、source-status decoupling、multiple-active runtime ownership 和 runtime-bypass fixtures
+  - optional boundary provenance 与 v3 report negative-key fixtures
   - copy-mode managed subtree freshness fixtures，覆盖 nested Skill、reference 与 script
   - active tree residual keyword scan
   - `python3 skills/to-review/scripts/test_prepare_review_context.py`
@@ -715,11 +733,12 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
 
 ## Progress
 
-- Checkpoint: `runtime-first, plan-on-demand` 已完整落地；简单 / 单会话工作仍直接 runtime，复杂长周期实现可在开始时或执行中按需物化非规范性 thin plan，并从 plan 安全恢复到 source spec。
+- Checkpoint: `runtime-first, plan-on-demand` 与 lightweight artifact lint 已完整落地；routine 写回不再拉起独立 validation Skill，复杂长周期实现仍可从 thin plan 安全恢复到 source spec。
 - Completed:
   - `plan` 已作为第六种 active artifact 恢复，但旧 plan/task/step 拓扑、`to-plan`、`pick-plan`、owner / dependency / lane 和 `plan/done` lifecycle 仍保持退役。
-  - thin plan 的 source、status、working-set、decision / blocker 分层、direct resume、promotion 与 closure contract 已进入 schema、validator、routing、`to-implement` 和相关 artifact Skill。
-  - validator 已覆盖 ready unfinished source、source lifecycle、full / partial orphan、legacy topology、active Progress 和同一 spec 多 active plan；高频 body snapshot 与恢复 / 提交边界采用分层校验。
+  - thin plan 的 stable source locator、working-set、decision / blocker 分层、direct resume、promotion 与 closure contract 已进入 schema、validator、routing、`to-implement` 和相关 artifact Skill；source lifecycle 与多 active plan 由真实 resume 边界处理。
+  - validator 已升级到 v3：routine changed-path lint 不解析全局关系，full-set scan 只保留 orphan plan 与结构检查，报告移除 source graph 和通用 LLM hints。
+  - `validate-flow` 已改为 explicit full-set / migration audit；acceptance、backlog、handoff 的 source metadata 已降为可选 provenance，artifact-owning Skill 负责正文语义和局部 lint。
   - installer / doctor 的 copy-mode freshness 已扩展到完整 managed subtree，可发现 nested Skill、reference 或 script 的缺失与过期。
   - 代表性 `to-implement` eval 已覆盖 runtime bypass、长周期 / 中途 materialization、direct resume、decision promotion、closure 和 handoff 分流；确定性回归已覆盖 validator 与 installer 行为。
   - active docs、routing、review / commit / handoff 边界与 archive 说明已同步，spec 始终保持规范性真相源。
@@ -728,4 +747,4 @@ handoff 只保存易失接力状态：未提交 diff、当前终端、临时环�
 - Blockers:
   - none
 - Last verified:
-  - 2026-07-20：`to-align` quick validation、显式调用策略回归、suite validator、installer discovery / dry-run、eval JSON 与 Windows 插件场景前向测试均通过；无已知残余阻塞。
+  - 2026-07-21：validator v3 full-set / changed-path 模式、24 个 validator / installer 回归、16 个 review / preflight 回归、install list / dry-run、三组 eval JSON、active-tree residual scan 与 diff check 全部通过；无已知残余阻塞。

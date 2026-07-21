@@ -109,7 +109,7 @@ description: 'Capture a concise, source-backed, project-agnostic developer knowl
 - 发现尚不进入实施的问题或机会：推荐 `to-issue`。
 - 当前阶段被阻塞且需要恢复条件：推荐 `to-backlog`。
 - 需要跨会话可执行恢复状态：推荐 `to-handoff`。
-- 创建或修改了真正的 Sky Flow workflow artifact：运行 `validate-flow`。只写普通 knowledge note 时不需要运行 `validate-flow`。
+- 创建或修改了真正的 Sky Flow workflow artifact：直接对改动路径运行 deterministic validator，不进入 `validate-flow` Skill。只写普通 knowledge note 时不需要 artifact lint。
 
 ## Self-Review
 

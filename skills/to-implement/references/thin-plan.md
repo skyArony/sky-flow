@@ -7,9 +7,9 @@
 - 使用 `${SKY_FLOW_ROOT:-docs}/plan/<id>.md`，id 使用稳定描述性名称，不使用 `001-` / `001a-` 排序。
 - 必须使用 `source_type: spec` 和稳定 `source_id`。
 - 用户直接给出 plan path / id 时，只允许 `not_started` / `in_progress` plan 作为 resume locator；再解析 source spec 并确认仍 ready、unfinished，然后进入 `to-implement`。completed / abandoned plan 只能作为历史背景，plan 自身不拥有 goal 或 readiness。
-- plan 没有 `draft` 阶段：恢复价值成立但尚未执行时用 `not_started`；开始实施后，plan 与 source spec 都使用 `in_progress`。
+- plan 没有 `draft` 阶段：恢复价值成立但尚未执行时用 `not_started`，开始实施后用 `in_progress`。source spec lifecycle 在真实 resume / writeback 边界按其 durable progress 判断，不与 plan status 做机械双写同步。
 - 恢复时只寻找当前 source spec 的 active plan，不对 plan 做候选排名或 mtime 选择。
-- 默认一份 spec 同时只有一份 active plan。多份时先收敛、废弃过期项，或确认 spec 是否应拆分；不建立 plan graph。
+- 默认优先复用一份 active plan。恢复时若发现多份，由 `to-implement` 根据当前 slice 收敛、废弃过期项，或确认 spec 是否应拆分；通用 validator 不为此建立或维护 plan graph。
 - spec 是规范性真相源。plan 中的代码事实在恢复时按风险做定点复核；与 spec 冲突时 spec 胜出。
 
 ## Shape
@@ -69,9 +69,9 @@ section 是推荐形状，不是为简单工作制造的模板 gate。省略无�
 
 ## Validation
 
-- create、source / status 变化、decision promotion、closure，以及 plan 即将作为恢复 / handoff / commit 输入时，运行 deterministic `validate-flow`；有 warning 或规范性边界判断时再完成 focused semantic pass。
-- 只改 body working-set snapshot 时可以批量到下一个恢复或提交边界，不要求每次覆盖更新都触发完整 validator / model pass。
-- 最终 closure 前必须完成确定性校验和必要语义收口。
+- create、frontmatter / source locator 变化和 closure 后，由当前执行者直接对 changed plan 路径运行 deterministic validator；不进入 `validate-flow` Skill，也不从成功报告派生模型 pass。
+- plan resume 时由 `to-implement` 直接解析 source spec，确认仍 ready / unfinished，并在多 active plan 时完成运行时选择；不先运行全库关系审计。
+- 只改 body working-set snapshot 时可以批量到下一个恢复或提交边界。commit / CI 对 artifact root 做 full-set deterministic scan；最终 closure 前由 `to-implement` 完成必要 promotion 与语义收口。
 
 ## Closure
 
@@ -81,6 +81,6 @@ plan 完成不自动完成 spec。收口顺序：
 2. 把 semantic outcomes、关键 evidence、residual risk 和目标级 resume target 写回 spec Progress。
 3. 将 plan 压缩为最小 completed 摘要，或在没有独立保留价值时删除。
 
-`abandoned` 只表示丢弃当前 working set / approach，不表示放弃 source spec。先保留简短原因并提升仍有价值的教训，再压缩或删除；只有 source work 真正退出 active queue 时，才创建以 durable source spec 为来源的 backlog。
+`abandoned` 只表示丢弃当前 working set / approach，不表示放弃 source spec。先保留简短原因并提升仍有价值的教训，再压缩或删除；只有 source work 真正退出 active queue 时才创建 backlog，并在正文引用 durable source spec；frontmatter provenance 仍可省略。
 
 不移入 `plan/done`，不保留 task archive，不调用已归档的 `$to-plan`、`pick-plan`、`to-task` 或 `to-archive`。

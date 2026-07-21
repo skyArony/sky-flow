@@ -53,7 +53,7 @@ description: 'Execute or continue a ready Sky Flow spec, derived runtime goal, o
 ## 执行与收敛
 
 - 简单工作直接完成；复杂工作可使用轻量 runtime checklist，只有符合 Plan Materialization 时才增加 file-backed plan。subagent 只按上面的显式条件使用。
-- 日常测试、typecheck、lint、build、真实路径检查和 diff sanity 由 native runtime 直接完成；artifact 校验遵循 `validate-flow` 的分层时机。
+- 日常测试、typecheck、lint、build、真实路径检查和 diff sanity 由 native runtime 直接完成；artifact 写回后由当前执行者直接对改动路径运行 deterministic validator，不进入 `validate-flow` Skill。
 - 对可观察的高风险行为、关键不变量、外部契约和真实回归补测试；不要为覆盖率测试日志、mock 次数、私有 helper，或已由类型、schema、lint 直接约束的内容。
 - `$to-review`、`$to-review-loop`、`$to-consolidation`、`$to-acceptance`、`$to-knowledge` 和 provider second opinion 只在用户显式调用时使用，不构成固定流水线。
 - finding 修复后默认做定点验证，不自动重开完整 review 或 consolidation。只有用户显式要求多 Agent / 多 reviewer，或 source spec 明确要求独立评估时，才建立满足任务所需的最小 change map 和 fan-in 结构。

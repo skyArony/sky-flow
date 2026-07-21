@@ -492,319 +492,92 @@ function registryKey(type: string, id: string): string {
   return `${type}:${id}`;
 }
 
-function isArtifactSource(sourceType: string): boolean {
-  return ARTIFACT_TYPES.includes(sourceType as never);
-}
-
-function validateRelationships(
+function validateArtifactSet(
   registry: Map<string, ArtifactRecord>,
   errors: ValidationIssue[],
   warnings: ValidationIssue[],
-  llmHints: Record<string, string>[],
   projectRoot: string,
-  partialScope: boolean,
+  fullScope: boolean,
 ) {
   const records = [...registry.values()];
-  const byType = (type: string) => records.filter((item) => item.artifact_type === type);
-  const specs = byType('spec');
-  const plans = byType('plan');
-  const issues = byType('issue');
-  const acceptances = byType('acceptance');
-  const backlogs = byType('backlog');
-  const handoffs = byType('handoff');
-  const sourceLinks: Record<string, string>[] = [];
-  const activePlanStatuses = new Set(['not_started', 'in_progress']);
-
-  for (const artifact of [...plans, ...acceptances, ...backlogs, ...handoffs]) {
-    const sourceType = String(artifact.data.source_type || '');
-    const sourceId = String(artifact.data.source_id || '');
-
-    if (artifact.artifact_type === 'plan') {
-      if (sourceType !== 'spec') {
-        addIssue(
-          errors,
-          'PLAN_SOURCE_MUST_BE_SPEC',
-          'error',
-          artifact.data,
-          artifact.path,
-          'source_type',
-          'thin plans must derive authority from exactly one source spec',
-          projectRoot,
-        );
-        continue;
-      }
-      if (sourceId === 'current-session') {
-        addIssue(
-          errors,
-          'PLAN_SOURCE_ID_INVALID',
-          'error',
-          artifact.data,
-          artifact.path,
-          'source_id',
-          'thin plans require a stable source spec id; current-session is not allowed',
-          projectRoot,
-        );
-        continue;
-      }
-      if (!sourceId) continue;
-    } else if (sourceType === 'plan') {
-      addIssue(
-        errors,
-        'PLAN_CANNOT_BE_BOUNDARY_SOURCE',
-        'error',
-        artifact.data,
-        artifact.path,
-        'source_type',
-        'plan is a disposable implementation working set; acceptance, backlog, and handoff must point to a durable source such as spec',
-        projectRoot,
-      );
-      continue;
-    }
-
-    if (!sourceId || sourceId === 'current-session' || sourceType === 'conversation') continue;
-
-    if (RETIRED_ARTIFACT_TYPES.includes(sourceType as never)) {
-      addIssue(
-        errors,
-        'RETIRED_SOURCE_TYPE',
-        'error',
-        artifact.data,
-        artifact.path,
-        'source_type',
-        `${sourceType} sources were retired; point to a spec, issue, acceptance, backlog, handoff, or conversation`,
-        projectRoot,
-      );
-      continue;
-    }
-    if (!isArtifactSource(sourceType)) {
-      addIssue(
-        warnings,
-        'SOURCE_TYPE_UNCHECKED',
-        'warning',
-        artifact.data,
-        artifact.path,
-        'source_type',
-        `source_type ${sourceType} is not a Sky Flow artifact type`,
-        projectRoot,
-      );
-      continue;
-    }
-
-    const source = registry.get(registryKey(sourceType, sourceId));
-    if (!source) {
-      if (artifact.artifact_type === 'plan' && !partialScope) {
-        addIssue(
-          errors,
-          'PLAN_SOURCE_SPEC_MISSING',
-          'error',
-          artifact.data,
-          artifact.path,
-          'source_id',
-          `thin plan source spec/${sourceId} is missing from the full Sky Flow artifact set`,
-          projectRoot,
-        );
-      } else {
-        addIssue(
-          warnings,
-          'SOURCE_ARTIFACT_MISSING',
-          'warning',
-          artifact.data,
-          artifact.path,
-          'source_id',
-          `${artifact.artifact_type} source ${sourceType}/${sourceId} is not present in checked artifacts`,
-          projectRoot,
-        );
-      }
-      continue;
-    }
-    if (
-      artifact.artifact_type === 'plan' &&
-      activePlanStatuses.has(artifact.status) &&
-      !['not_started', 'in_progress'].includes(source.status)
-    ) {
-      addIssue(
-        errors,
-        'PLAN_SOURCE_SPEC_NOT_EXECUTABLE',
-        'error',
-        artifact.data,
-        artifact.path,
-        'source_id',
-        `active thin plan requires a ready, unfinished source spec; spec/${sourceId} has status ${source.status}`,
-        projectRoot,
-      );
-    }
-    if (
-      artifact.artifact_type === 'plan' &&
-      artifact.status === 'in_progress' &&
-      source.status === 'not_started'
-    ) {
-      addIssue(
-        errors,
-        'PLAN_SOURCE_SPEC_STATUS_BEHIND',
-        'error',
-        artifact.data,
-        artifact.path,
-        'source_id',
-        `in-progress thin plan requires source spec/${sourceId} to be in_progress`,
-        projectRoot,
-      );
-    }
-    sourceLinks.push({
-      from: `${source.artifact_type}/${source.id}`,
-      to: `${artifact.artifact_type}/${artifact.id}`,
-    });
-  }
-
-  const activePlansBySpec = new Map<string, ArtifactRecord[]>();
-  for (const plan of plans) {
-    if (!activePlanStatuses.has(plan.status)) continue;
-    if (String(plan.data.source_type || '') !== 'spec') continue;
-    const sourceId = String(plan.data.source_id || '');
-    if (!sourceId || sourceId === 'current-session') continue;
-    const siblings = activePlansBySpec.get(sourceId) || [];
-    siblings.push(plan);
-    activePlansBySpec.set(sourceId, siblings);
-  }
-  for (const [sourceId, activePlans] of activePlansBySpec) {
-    if (activePlans.length < 2) continue;
-    for (const plan of activePlans) {
-      addIssue(
-        warnings,
-        'MULTIPLE_ACTIVE_PLANS_FOR_SPEC',
-        'warning',
-        plan.data,
-        plan.path,
-        'source_id',
-        `spec ${sourceId} has ${activePlans.length} active thin plans; converge them or split the spec instead of creating a plan graph`,
-        projectRoot,
-      );
-    }
-  }
-
   for (const artifact of records) {
-    if (artifact.status !== 'abandoned') continue;
-    if (artifact.artifact_type === 'plan') continue;
-    const linkedBacklog = backlogs.some(
-      (backlog) =>
-        String(backlog.data.source_type || '') === artifact.artifact_type &&
-        String(backlog.data.source_id || '') === artifact.id,
-    );
-    if (!linkedBacklog) {
-      addIssue(
-        warnings,
-        'ABANDONED_WITHOUT_BACKLOG',
-        'warning',
-        artifact.data,
-        artifact.path,
-        'status',
-        'abandoned artifact should have a linked backlog or explicit human-agreement evidence',
-        projectRoot,
-      );
-    }
-  }
-
-  for (const spec of specs) {
-    const hasProgress = /^## Progress\s*$/im.test(spec.body);
-    if (['not_started', 'in_progress', 'completed'].includes(spec.status) && !hasProgress) {
+    if (artifact.artifact_type === 'spec') {
+      const hasProgress = /^## Progress\s*$/im.test(artifact.body);
+      if (!['not_started', 'in_progress', 'completed'].includes(artifact.status) || hasProgress) {
+        continue;
+      }
       addIssue(
         warnings,
         'SPEC_PROGRESS_MISSING',
         'warning',
-        spec.data,
-        spec.path,
+        artifact.data,
+        artifact.path,
         'body',
         'ready, active, or completed spec should keep a compact Progress snapshot',
         projectRoot,
       );
+      continue;
     }
-    llmHints.push({
-      artifact_id: spec.id,
-      check: 'spec_alignment',
-      reason:
-        'Verify intent, scope, requirements, decisions, acceptance scenarios, and implementation readiness are coherent.',
-    });
-    llmHints.push({
-      artifact_id: spec.id,
-      check: 'spec_progress_snapshot',
-      reason:
-        'Verify Progress is a compact semantic recovery snapshot with Checkpoint, Completed, Next, Blockers, and Last verified; keep outcomes, decisions, evidence, blockers, risks, and a goal-level resume target, not code line numbers, per-file diffs, command/tool/agent history, a persisted work graph, or a chronological log.',
-    });
-    llmHints.push({
-      artifact_id: spec.id,
-      check: 'execution_constraints',
-      reason:
-        'Verify any no-touch boundary, human gate, irreversible operation, or independent-review requirement is explicit without pre-assigning runtime workers.',
-    });
-  }
 
-  for (const plan of plans) {
-    const hasProgress = /^## Progress\s*$/im.test(plan.body);
-    if (['not_started', 'in_progress'].includes(plan.status) && !hasProgress) {
+    if (artifact.artifact_type !== 'plan') continue;
+
+    const sourceType = String(artifact.data.source_type || '');
+    const sourceId = String(artifact.data.source_id || '');
+    if (sourceType && sourceType !== 'spec') {
+      addIssue(
+        errors,
+        'PLAN_SOURCE_MUST_BE_SPEC',
+        'error',
+        artifact.data,
+        artifact.path,
+        'source_type',
+        'thin plans require one stable source spec locator',
+        projectRoot,
+      );
+    }
+    if (sourceId === 'current-session') {
+      addIssue(
+        errors,
+        'PLAN_SOURCE_ID_INVALID',
+        'error',
+        artifact.data,
+        artifact.path,
+        'source_id',
+        'thin plans require a stable source spec id; current-session is not allowed',
+        projectRoot,
+      );
+    } else if (
+      fullScope &&
+      sourceType === 'spec' &&
+      sourceId &&
+      !registry.has(registryKey('spec', sourceId))
+    ) {
+      addIssue(
+        errors,
+        'PLAN_SOURCE_SPEC_MISSING',
+        'error',
+        artifact.data,
+        artifact.path,
+        'source_id',
+        `thin plan source spec/${sourceId} is missing from the full Sky Flow artifact set`,
+        projectRoot,
+      );
+    }
+
+    const hasProgress = /^## Progress\s*$/im.test(artifact.body);
+    if (['not_started', 'in_progress'].includes(artifact.status) && !hasProgress) {
       addIssue(
         warnings,
         'PLAN_PROGRESS_MISSING',
         'warning',
-        plan.data,
-        plan.path,
+        artifact.data,
+        artifact.path,
         'body',
         'active thin plan should keep a compact Done / Active / Next / Blockers snapshot',
         projectRoot,
       );
     }
-    llmHints.push({
-      artifact_id: plan.id,
-      check: 'thin_plan_materialization',
-      reason:
-        'Verify this work is complex, long-running, interruption-prone, or expensive to reconstruct enough to justify a file-backed plan; simple or reliably single-session work should stay runtime-only.',
-    });
-    llmHints.push({
-      artifact_id: plan.id,
-      check: 'thin_plan_boundary',
-      reason:
-        'Verify the plan references a ready unfinished spec rather than duplicating or overriding it, remains non-normative, contains only useful implementation context and reversible local decisions, and promotes any material scope, stable constraint, no-touch, external behavior, contract, data, authority, acceptance, or durable architecture change back to spec.',
-    });
-    llmHints.push({
-      artifact_id: plan.id,
-      check: 'thin_plan_snapshot',
-      reason:
-        'Verify Progress is an overwrite snapshot with concrete resume context and reusable verification entry points. Slice-local implementation blockers may stay here; goal-level, external, authority, or durable-constraint blockers belong in spec Progress and should only be referenced. Reject task graphs, owner/dependency/parallel lane models, tool or agent transcripts, microstep scripts, and chronological logs.',
-    });
   }
-
-  for (const issue of issues) {
-    llmHints.push({
-      artifact_id: issue.id,
-      check: 'issue_actionability',
-      reason:
-        'Verify the issue preserves evidence and a useful next decision without expanding into an implementation script.',
-    });
-  }
-  for (const acceptance of acceptances) {
-    llmHints.push({
-      artifact_id: acceptance.id,
-      check: 'acceptance_evidence',
-      reason:
-        'Verify the artifact contains a real human gate, source, round, concise evidence, and unresolved feedback.',
-    });
-  }
-  for (const backlog of backlogs) {
-    llmHints.push({
-      artifact_id: backlog.id,
-      check: 'backlog_recovery_context',
-      reason:
-        'Verify the work truly left the active execution queue and has a concrete blocker, dependency, and resume condition.',
-    });
-  }
-  for (const handoff of handoffs) {
-    llmHints.push({
-      artifact_id: handoff.id,
-      check: 'handoff_resumability',
-      reason:
-        'Verify the handoff stores only volatile transfer state and does not duplicate the spec Progress snapshot.',
-    });
-  }
-
-  return { source_links: sourceLinks };
 }
 
 function main(): number {
@@ -823,7 +596,6 @@ function main(): number {
   const runtimeConfig = readRuntimeConfig(projectRoot);
   const errors: ValidationIssue[] = [];
   const warnings: ValidationIssue[] = [];
-  const llmHints: Record<string, string>[] = [];
   const checkedArtifacts: Record<string, unknown>[] = [];
   const registry = new Map<string, ArtifactRecord>();
   const explicit = inputs.length > 0;
@@ -944,16 +716,9 @@ function main(): number {
     });
   }
 
-  const graph = validateRelationships(
-    registry,
-    errors,
-    warnings,
-    llmHints,
-    projectRoot,
-    !fullScope,
-  );
+  validateArtifactSet(registry, errors, warnings, projectRoot, fullScope);
   const report = {
-    schema_version: 'sky-flow-validate-report/v2',
+    schema_version: 'sky-flow-validate-report/v3',
     project_root: projectRoot,
     sky_flow_root: runtimeConfig.skyFlowRoot,
     sky_flow_lang: runtimeConfig.skyFlowLang,
@@ -965,10 +730,8 @@ function main(): number {
       warnings: warnings.length,
     },
     checked_artifacts: checkedArtifacts,
-    graph,
     errors,
     warnings,
-    llm_review_hints: llmHints,
   };
 
   console.log(JSON.stringify(report, null, 2));
