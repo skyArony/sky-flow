@@ -46,24 +46,26 @@ description: 'Execute or continue a ready Sky Flow spec, derived runtime goal, o
 3. 工作开始时可以不创建 plan；执行中扩大、中断或出现高成本上下文时可中途 materialize，不重启 workflow。
 4. 按参考中的分层校验规则处理高频 snapshot 与结构 / 恢复边界。
 
-默认由当前 Agent 执行。只有用户显式要求 delegation / subagent，或 source spec 明确要求独立评估时才派发；派发只补充 mission 所需的 write scope、no-touch、evidence 或 stop condition，不建立固定 lane。
+默认由当前 Agent 执行。runtime 仅在子任务边界清楚、证据可独立收敛、并行收益明确且不会造成共享写冲突时自主派发；用户或 source spec 要求独立评估时必须保留该边界。派发使用紧凑任务包，只补充 mission 所需的 write scope、no-touch、evidence、输出预算或 stop condition，不建立固定 lane，也不默认传递完整历史。
 
 若 runtime 支持模型选择，清楚、局部、可验证的工作优先使用满足要求的最小模型；高歧义、高风险、跨契约裁决或最终冲突仲裁使用更强模型。模型选择是运行时优化，不是 artifact 约束。
 
 ## 执行与收敛
 
-- 简单工作直接完成；复杂工作可使用轻量 runtime checklist，只有符合 Plan Materialization 时才增加 file-backed plan。subagent 只按上面的显式条件使用。
+- 简单工作直接完成；复杂工作可使用轻量 runtime checklist，只有符合 Plan Materialization 时才增加 file-backed plan。subagent 只按上面的收益与隔离条件使用。
 - 日常测试、typecheck、lint、build、真实路径检查和 diff sanity 由 native runtime 直接完成；artifact 写回后由当前执行者直接对改动路径运行 deterministic validator，不进入 `validate-flow` Skill。
 - 对可观察的高风险行为、关键不变量、外部契约和真实回归补测试；不要为覆盖率测试日志、mock 次数、私有 helper，或已由类型、schema、lint 直接约束的内容。
 - `$to-review`、`$to-review-loop`、`$to-consolidation`、`$to-acceptance`、`$to-knowledge` 和 provider second opinion 只在用户显式调用时使用，不构成固定流水线。
-- finding 修复后默认做定点验证，不自动重开完整 review 或 consolidation。只有用户显式要求多 Agent / 多 reviewer，或 source spec 明确要求独立评估时，才建立满足任务所需的最小 change map 和 fan-in 结构。
+- finding 修复后默认做定点验证，不自动重开完整 review 或 consolidation。需要独立评估或自主并行已经满足上面的收益与隔离条件时，才建立完成任务所需的最小 change map 和 fan-in 结构。
 - 探索推翻早期判断、fan-in 冲突或验证暴露新方向时，继续取证和调整；只有触碰必须保持的边界且无法安全裁决时才询问人类。
 - 结束前确认结果支持当前 goal，未越过 authority，多来源产物无冲突 / 重复 / 临时残留，证据足以支撑结论。
 - 任何事实或决定会改变 source spec 的规范性边界时暂停并建议 `$to-spec`；边界内局部、可逆实现决策在 active plan 存在且具有恢复价值时写入 plan，否则留给 runtime。
 
 ## State Writeback
 
-spec Progress 是覆盖更新的语义恢复快照，只保存：稳定成立的能力或行为、长期关键决策、可信证据、真实 blocker 与解除条件、残余风险、下一目标级恢复入口。
+只有当前 goal 实际由 durable spec / plan 承接，且本次结果具有恢复价值时才写回 artifact；纯 runtime goal 不为满足流程创建或修改 artifact。
+
+需要写回时，spec Progress 使用覆盖更新的语义恢复快照，只保存：稳定成立的能力或行为、长期关键决策、可信证据、真实 blocker 与解除条件、残余风险、下一目标级恢复入口。
 
 不得记录具体代码行号、逐文件 diff、完整命令、tool call、子代理身份 / 消息、调度批次或逐轮时间线。必要定位可引用少量稳定模块、类、函数、公开接口或测试套件；新 checkpoint 合并或替换过期内容。
 
