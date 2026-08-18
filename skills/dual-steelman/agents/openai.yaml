@@ -1,0 +1,7 @@
+interface:
+  display_name: "双向 Steelman"
+  short_description: "用双向 Steelman 重述问题、强化论证并产出可执行判断"
+  default_prompt: "Use $dual-steelman to help me decide: <your question>."
+
+policy:
+  allow_implicit_invocation: true
