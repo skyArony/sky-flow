@@ -1,0 +1,6 @@
+interface:
+  display_name: "To Milestone"
+  short_description: "逐层评审里程碑，以 ELI5 Web 图解衔接叶子实施与验收"
+  default_prompt: "使用 $to-milestone 从稳定 spec 逐层建立里程碑树，并在每个叶子实施前提供 ELI5 Web 图解。"
+policy:
+  allow_implicit_invocation: false

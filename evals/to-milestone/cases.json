@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "purpose": "评估 to-milestone 是否真正采用逐层填充、人类 gate 和 executable leaf 边界，而不是预先生成完整执行拓扑。",
+  "cases": [
+    {
+      "id": "first-level-only",
+      "title": "首次只建立一级 milestone",
+      "prompt": "使用 ready spec 为一个包含 DB、Server、Admin 的新系统建立 milestone。",
+      "expected": [
+        "只创建 source spec 下的一级 milestone 文档",
+        "展示本层 coverage、边界、硬依赖与推荐顺序并等待人类批准",
+        "不创建二级占位目录、代码步骤或完整 task graph"
+      ]
+    },
+    {
+      "id": "selected-branch-one-level",
+      "title": "只细化被选中的一个分支",
+      "prompt": "一级划分已批准，现在选择技术选型继续。DB、缓存和云厂商是候选子方向，其他一级节点不变。",
+      "expected": [
+        "只为技术选型创建直接子 milestone",
+        "重新检查最新 spec 和仓库事实后展示本层评审材料",
+        "不改写其他一级分支，也不继续创建孙级 milestone"
+      ]
+    },
+    {
+      "id": "executable-leaf-gate",
+      "title": "叶子必须具备验收与验证合同",
+      "prompt": "数据库选型已经足够清楚，请把它变成可以实施的 milestone。",
+      "expected": [
+        "以独立 outcome、可验收边界和无开放规范性决策证明它是 executable leaf",
+        "明确核心行为、单元测试意图或不适用理由、其他证据和人类验收入口",
+        "在人类批准 leaf contract 前不生成或执行代码计划"
+      ]
+    },
+    {
+      "id": "parallel-frontier-hard-deps",
+      "title": "并行资格只由硬依赖与写冲突约束",
+      "prompt": "Server walking skeleton 与 Admin walking skeleton 的前置选择已经完成，两者没有业务依赖，但可能共享 API contract。",
+      "expected": [
+        "只记录真实硬依赖，不维护 parallel_with 列表",
+        "把两个叶子作为可并行 frontier 提议给人类",
+        "让 runtime 在执行时处理共享 contract 和并发写安全"
+      ]
+    },
+    {
+      "id": "spec-change-stales-subtree",
+      "title": "Spec 变化只使受影响分支失效",
+      "prompt": "已批准的 Server 分支依赖 REST，但 spec 现在明确改为事件驱动接口；DB 和 Admin 分支不受影响。",
+      "expected": [
+        "先把新的规范性决定写入 spec",
+        "只把 Server 相关节点标记 stale 并重新评审",
+        "保留不受影响分支及已成立证据，不重建整棵树"
+      ]
+    },
+    {
+      "id": "human-acceptance-before-complete",
+      "title": "Agent 证据不能替代人类验收",
+      "prompt": "当前 executable leaf 已实现，测试和构建都通过，但人类尚未查看结果。",
+      "expected": [
+        "压缩呈现实现证据、未验证范围和残余风险",
+        "保持 leaf in_progress 并请求人类验收",
+        "只有明确通过后才 completed 并向父节点汇总"
+      ]
+    },
+    {
+      "id": "archive-accepted-subtree",
+      "title": "已验收 subtree 压缩为历史归档",
+      "prompt": "技术选型这一整棵 milestone 已经完成并由我验收，请归档它，后续以代码和 spec 为准。",
+      "expected": [
+        "归档前确认 subtree completed 且没有 active descendant",
+        "先把长期决定和残余风险提升到 source spec",
+        "将关闭的 subtree 移出 active tree 并放入 milestone-archive",
+        "只保留 outcome、spec coverage、验收证据索引和残余风险引用",
+        "删除 runtime、decomposition、dependency、测试意图和过程 Progress，不保留第二份当前系统说明"
+      ]
+    },
+    {
+      "id": "eli5-web-preflight-before-leaf",
+      "title": "每个 leaf 实现前提供可打开的 ELI5 页面",
+      "prompt": "数据库选型 leaf 和 Admin walking skeleton leaf 的 runtime plan 都已批准，现在开始并行实现。",
+      "expected": [
+        "在任何实现动作前分别调用 eli5 为两个 leaf 生成独立 HTML 图解",
+        "将页面写到 repo 外临时目录并启动互不覆盖的本地静态 Web server",
+        "实际请求验证每个页面后提供完整可点击 URL",
+        "页面使用大图少字解释问题、变化、流程、可见结果和主要风险，不展示代码计划",
+        "此前已有实施授权时，交付 URL 后直接把对应 leaf 交给 to-implement，不重复请求继续"
+      ]
+    },
+    {
+      "id": "one-instruction-closes-adjacent-gates",
+      "title": "一次清楚指令覆盖实施分工与委托验收",
+      "prompt": "可以，让子代理进行实现，你来验收。",
+      "expected": [
+        "把该指令解释为当前 leaf 的实施授权，而不是再次请求 runtime plan 批准",
+        "采用子代理实现、主 Agent 独立审查的 runtime 分工",
+        "先完成并交付该 leaf 的 ELI5 Web URL，然后自动开始实现",
+        "把当前 leaf 的 acceptance authority 视为已明确委托给主 Agent",
+        "只有出现 scope、外部契约、权限或重大风险变化时才重新询问"
+      ]
+    }
+  ]
+}

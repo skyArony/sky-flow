@@ -19,25 +19,20 @@ description: 'Handle Sky Flow commit work: inspect the working tree, stage only 
 
 1. 读取项目本地规则，确认提交语言、message 格式和 scope；无额外规则时默认 Conventional Commits。
 2. 用 `git status`、`git diff`、必要时 `git diff --stat` 建立工作区事实。
-3. 从用户意图、source spec scope、artifact 来源和工作区状态确定提交范围；默认只包含当前会话涉及的改动。
+3. 从用户意图、source spec scope、durable document 来源和工作区状态确定提交范围；默认只包含当前会话涉及的改动。
 4. 判断单 commit 还是多 commit；用户未指定且当前会话范围内存在无关改动时，默认拆成多个小 commit。
 5. 按逻辑边界拆分：feature / refactor、前后端、格式 / 逻辑、测试 / 生产代码、依赖 / 行为变更。
 6. 精确 stage 目标范围；混合文件使用 patch staging，误暂存时用 patch unstage 或等价方式撤回。
 7. 用 `git diff --cached` review staged diff。
 8. 用 1-2 句话说明 staged change 的 what / why；如果说不清，回到提交边界拆分。
 9. 做 staged sanity check：无 secret、无临时 debug、无无关格式化、无误入文件。
-10. 如果 staged diff 包含 Sky Flow workflow artifact，直接运行 full-set deterministic validator；不进入 `validate-flow` Skill。不包含 workflow artifact 时不运行。
-11. 运行最小相关验证；无法验证时记录原因和风险。
-12. 如果 HEAD 未 push，只读上一条完整 commit message；若和当前批次明显同 scope，直接 amend。
-13. 按项目本地规则提交；写 message 时参考 `Commit message 模板`。
-14. 如需多个 commit，重复提交边界、staging、review、验证和提交步骤。
-15. 最终回复必须使用 `输出契约` 中的模板，回报 commit message、hash、本次并入内容和剩余改动。
+10. 运行最小相关验证；durable document 由其 owning Skill 的语义合同和当前 staged diff review 收口。无法验证时记录原因和风险。
+11. 如果 HEAD 未 push，只读上一条完整 commit message；若和当前批次明显同 scope，直接 amend。
+12. 按项目本地规则提交；写 message 时参考 `Commit message 模板`。
+13. 如需多个 commit，重复提交边界、staging、review、验证和提交步骤。
+14. 最终回复必须使用 `输出契约` 中的模板，回报 commit message、hash、本次并入内容和剩余改动。
 
-## Workflow Artifact Gate
-
-只有 staged diff 中包含 Sky Flow artifact 时，`to-commit` 才在提交前运行 `node .agents/skills/sky-flow/scripts/validate_flow.ts`（仓库内开发可用 `node scripts/validate_flow.ts`）做 full-set deterministic scan。workflow artifact 指 `artifact_type` 为 `spec`、`plan`、`issue`、`acceptance`、`backlog` 或 `handoff` 的文件，通常位于 `${SKY_FLOW_ROOT}` 下。该 gate 不进入 `validate-flow` Skill，也不附加通用语义 pass。
-
-`to-commit` 不执行 `to-consolidation`。提交阶段由当前 runtime 直接做 staged diff sanity、artifact 校验和最小相关验证；只有用户显式调用 `$to-consolidation` 时才进入专项收敛。
+`to-commit` 不执行 `to-consolidation`。提交阶段由当前 runtime 直接做 staged diff sanity、文档语义检查和最小相关验证；只有用户显式调用 `$to-consolidation` 时才进入专项收敛。
 
 ## Commit message 模板
 

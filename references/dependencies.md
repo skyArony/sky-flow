@@ -1,31 +1,8 @@
 # Sky Flow Dependencies
 
-Sky Flow ships a small install and readiness manager through `./install.sh`.
-
-## Runtime
-
-The core validator is written in TypeScript and runs directly on Node.js.
-
-Default requirement:
-
-- Node.js 24 or newer.
-
-Quick check from the repository root:
-
-```bash
-node --version
-node ./scripts/validate_flow.ts --root . "${SKY_FLOW_ROOT:-docs}/spec/tooling/sky-flow.md"
-```
-
-After installation, the same validator is also available under
-`~/.agents/skills/sky-flow/scripts/validate_flow.ts`.
-
-If your local `node` build cannot execute `.ts` entrypoints directly, use the
-`tsx` fallback in the Optional Tooling section below.
+Sky Flow 通过 `./install.sh` 提供安装、更新和 readiness 管理。核心 workflow 不依赖中央 artifact validator，也没有额外 Node.js runtime 要求。
 
 ## Install And Update
-
-Use the repository root installer:
 
 ```bash
 ./install.sh
@@ -36,49 +13,28 @@ Use the repository root installer:
 ./install.sh to-claude-review
 ```
 
-Installation layout:
+安装模型：
 
-- Claude reads `~/.claude/skills`.
-- Codex reads `~/.agents/skills`.
-- A separate `~/.codex/skills` directory is not required.
-- Because Claude does not discover nested skills, it receives the suite entry
-  and each callable child skill as direct links.
-- Codex receives the suite entry once and discovers callable children through
-  that root. `doctor` accepts current nested content through the suite symlink
-  and compares each managed child subtree when the suite was installed by copy.
-- Install/update removes redundant Codex child symlinks only when they point to
-  the current checkout. Copied or foreign child paths fail readiness until the
-  user explicitly replaces them with `--force`.
-- Skill-level `install_targets` still apply. For example, `to-claude-review`
-  installs only for Codex.
-- Historical skills under `archive/skills/` use `SKILL.archived.md` and are not
-  part of discovery, installation, update, or readiness checks.
-- Root `--copy` installs omit `.git` and `archive`. Root symlink installs still
-  expose the checkout as a filesystem tree, but archived files remain
-  non-discoverable because they are not named `SKILL.md`.
+- Claude 从 `~/.claude/skills` 读取 Skill。
+- Codex 从 `~/.agents/skills` 读取 Skill。
+- Claude 不发现 nested Skill，因此安装 suite entry 与 callable children 的直接链接。
+- Codex 默认安装 suite entry 并从 suite root 发现 children；需要显式顶层调用的 `to-milestone` 额外安装直接链接。
+- copy-mode 会比较完整 managed subtree，包括 references 和 scripts。
+- Skill-level `install_targets` 继续生效；例如 `to-claude-review` 只安装到 Codex。
+- `archive/skills/` 下的历史能力不参与发现、安装、更新或 readiness。
 
-After upgrading from a legacy release, run `./install.sh update` and then
-`./install.sh doctor`. Install/update removes a retired symlink only when its
-target proves that this checkout owns it. Retired copied directories or foreign
-symlinks make readiness fail and are reported with exact paths and cleanup
-commands; they are never deleted implicitly because ownership cannot be proven
-safely.
+`eli5` 位于 `skills/eli5/`，是 Sky Flow suite 内嵌的 leaf 讲解能力，不依赖用户级或项目级 Skill。`to-milestone` 通过 suite-relative 路径读取它；缺失时 leaf 必须停在实现前，不能跳过 HTML Web 讲解。
 
-`doctor` also compares copied active skill subtrees—including references and
-scripts—with current source. A `stale-copy` result is repaired explicitly with
-the command printed by doctor, for example
-`./install.sh to-implement --copy --force --no-deps`.
+升级后运行 `./install.sh update` 与 `./install.sh doctor`。安装器只自动移除明确指向当前 checkout retired path 的 symlink；copied 或 foreign install 需要用户显式处理。
 
 ## Runtime Config
 
-Sky Flow keeps project-level runtime config small and environment-driven.
+Sky Flow 只读取 runtime 提供的环境变量：
 
-Supported variables:
+- `SKY_FLOW_ROOT`：durable document 根目录，默认 `docs`。
+- `SKY_FLOW_LANG`：文档与 Skill 输出语言，默认跟随用户。
 
-- `SKY_FLOW_ROOT`: artifact root directory. Defaults to `docs`.
-- `SKY_FLOW_LANG`: default artifact and skill output language.
-
-Example:
+示例：
 
 ```toml
 [shell_environment_policy.set]
@@ -86,19 +42,6 @@ SKY_FLOW_ROOT = "docs"
 SKY_FLOW_LANG = "简体中文"
 ```
 
-## Optional Tooling
-
-If a project must stay on an older Node runtime, you can run the validator
-through `tsx` instead:
-
-```bash
-pnpm add -D tsx typescript
-pnpm exec tsx ./scripts/validate_flow.ts --root . "${SKY_FLOW_ROOT:-docs}/spec/tooling/sky-flow.md"
-```
-
 ## Project Adapter Slot
 
-`to-infra` is still a project-provided adapter slot. Sky Flow core does not ship
-project-specific infrastructure access, credentials, or observability queries.
-Projects that need infra access should provide their own `to-infra` skill and
-let it route into the project's approved tooling.
+`to-infra` 是 project-provided adapter slot。Sky Flow core 不包含项目凭据、环境范围或基础设施命令；项目按自身审批边界提供对应 Skill 与工具。

@@ -13,7 +13,7 @@ description: 'Consolidate a stable completed-stage diff only when the user expli
 
 - `to-review`：判断实现是否正确、是否有回归风险。
 - 架构审计：寻找当前 diff 之外的长期重构机会。
-- deterministic validator / 显式 `$validate-flow`：分别处理 routine artifact lint 与用户要求的 full-set / migration audit。
+- durable document 语义审查：由对应 owning Skill 或显式 document review 负责。
 
 ## P0 Boundary
 
@@ -108,7 +108,7 @@ Code smell 只是调查信号。无法证明会降低目标实现的阅读成本
 ## No Goals
 
 - 不替代正式 review、测试设计、安全审计、业务验收或架构重构。
-- 不检查 Sky Flow artifact 结构；routine 变更由 owning Skill 直接 lint，显式全量审计交 `$validate-flow`。
+- 不替代 owning Skill 对 durable document 的语义检查。
 - 不清理与目标变更无关的历史死代码。
 - 不因第一次重复强行 DRY，不制造 mode / flag / caller 特例抽象。
 - 不把代码压成更短但更难读的 clever 写法。

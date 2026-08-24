@@ -31,6 +31,47 @@ class RetiredInstallTests(unittest.TestCase):
             is_suite_entry=is_suite_entry,
         )
 
+    def test_codex_direct_child_gets_top_level_link(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            root = Path(raw_tmp)
+            repo = root / "checkout"
+            child_path = repo / "skills" / "to-milestone"
+            child_path.mkdir(parents=True)
+            (repo / "SKILL.md").write_text("suite\n", encoding="utf-8")
+            (child_path / "SKILL.md").write_text("milestone\n", encoding="utf-8")
+
+            suite = self.skill("sky-flow", repo, Path("."), is_suite_entry=True)
+            child = self.skill(
+                "to-milestone",
+                child_path,
+                Path("skills/to-milestone"),
+            )
+            registry = {suite.name: suite, child.name: child}
+            codex = root / "codex"
+
+            with (
+                mock.patch.object(skill_manager, "REPO_ROOT", repo),
+                mock.patch.object(
+                    skill_manager,
+                    "TARGET_DIRS",
+                    {"claude": root / "claude", "codex": codex},
+                ),
+            ):
+                result = skill_manager.install_skills(
+                    [child],
+                    registry,
+                    copy_mode=False,
+                    force=False,
+                    dry_run=False,
+                )
+                state = skill_manager.inspect_install_state(child, registry)
+
+            self.assertTrue((codex / "sky-flow").is_symlink())
+            self.assertTrue((codex / "to-milestone").is_symlink())
+            self.assertEqual("linked", result["to-milestone"][str(codex)])
+            self.assertEqual("linked", state["targets"]["codex"])
+            self.assertEqual("ready", state["status"])
+
     def test_cleanup_removes_only_owned_legacy_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             root = Path(raw_tmp)
@@ -58,6 +99,9 @@ class RetiredInstallTests(unittest.TestCase):
                 target_is_directory=True,
             )
 
+            owned_validator = claude / "validate-flow"
+            owned_validator.symlink_to(repo / "skills" / "validate-flow", target_is_directory=True)
+
             copied = codex / "to-task"
             copied.mkdir()
             (copied / "SKILL.md").write_text("---\nname: to-task\n---\n", encoding="utf-8")
@@ -81,10 +125,11 @@ class RetiredInstallTests(unittest.TestCase):
             self.assertFalse(owned_profile.is_symlink())
             self.assertFalse(owned_test.is_symlink())
             self.assertFalse(owned_bdd.is_symlink())
+            self.assertFalse(owned_validator.is_symlink())
             self.assertTrue((copied / "SKILL.md").is_file())
             self.assertTrue(foreign.is_symlink())
             self.assertEqual(
-                {"review-by-somestay", "to-bdd-regression", "to-plan", "to-test"},
+                {"review-by-somestay", "to-bdd-regression", "to-plan", "to-test", "validate-flow"},
                 {item["name"] for item in result["cleaned"]},
             )
             self.assertEqual(
@@ -412,6 +457,7 @@ class InvocationPolicyTests(unittest.TestCase):
     EXPLICIT_SKILL_DIRS = (
         "skills/pick-goal",
         "skills/to-align",
+        "skills/to-milestone",
         "skills/to-spec",
         "skills/to-issue",
         "skills/to-knowledge",
@@ -424,7 +470,6 @@ class InvocationPolicyTests(unittest.TestCase):
         "skills/to-handoff",
         "skills/to-consolidation",
         "skills/to-claude-review",
-        "skills/validate-flow",
     )
 
     def test_explicit_skills_disable_implicit_invocation(self) -> None:

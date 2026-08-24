@@ -16,7 +16,7 @@ description: 'Create or update a durable Sky Flow acceptance artifact only when 
 5. 如果所有内容都可由 Agent 自证，不创建 acceptance；直接报告并写回 spec Progress / evidence。
 6. 创建或更新 `${SKY_FLOW_ROOT}/acceptance/<id>.md`，不覆盖人工反馈。
 7. 每个验收组保持「问题 / 需求 → 验收步骤 → 验收结论（人类填）」。
-8. 修改 artifact 后由当前 Skill 直接对改动路径运行 deterministic validator，不进入 `validate-flow` Skill。
+8. 修改 acceptance 后按本 Skill 的 Self-Review 检查问题、步骤、结论、轮次和来源语义。
 
 ## Source And Metadata
 
@@ -134,7 +134,7 @@ Agent 自证结果可以压缩到验收组 `证据`，不能拆成独立验收�
 ## Boundaries
 
 - 不替代 spec Progress 或 runtime 执行。
-- 不替代 native runtime 测试、`to-review` 或 deterministic artifact lint。
+- 不替代 native runtime 测试或 `to-review`。
 - 不把普通 review triage 写成人工验收。
 - 不为纯 FYI、完成播报或无需人类输出的重大结论创建 acceptance；写入对话或 spec Progress / evidence。
 - 不把未验证内容包装成通过。
@@ -148,7 +148,7 @@ Agent 自证结果可以压缩到验收组 `证据`，不能拆成独立验收�
 - Agent 可自证项是否已执行并只作为 evidence。
 - 人工反馈是否未被覆盖或代填。
 - optional provenance、round、links 和 status 是否清楚。
-- artifact 修改后是否直接对改动路径运行 deterministic validator。
+- 问题、步骤、结论、轮次和来源语义是否自包含。
 
 ## Next Round
 

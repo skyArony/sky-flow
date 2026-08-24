@@ -17,7 +17,7 @@ issue 是问题记录，不是聊天摘要或实施脚本。后续如果需要�
 4. 一个独立 root cause 或决策问题对应一个 issue；不要按执行顺序、模块、owner 或依赖拆成工作图。
 5. 未完成 issue 写入 `${SKY_FLOW_ROOT}/issue/<id>.md`；completed issue 移入 `${SKY_FLOW_ROOT}/issue/fixed/<id>.md`。
 6. 同一 root cause 的完成结论被新证据推翻时移回 active 目录、改为 `in_progress` 或 `not_started`，并记录 `Reopen Evidence` / `Reopen Reason`。
-7. 修改 artifact 后由当前 Skill 直接对改动路径运行 deterministic validator，不进入 `validate-flow` Skill。
+7. 修改 issue 后按本 Skill 的 Self-Review 检查证据、影响、状态和恢复语义。
 
 ## Issue Shape
 
@@ -121,4 +121,4 @@ status: draft
 - scope 是否没有泄漏 implementation steps 或 runtime topology。
 - fixed / reopen 路径与状态是否正确。
 - 本地 TOC 规则是否遵守。
-- artifact 修改后是否直接对改动路径运行 deterministic validator。
+- 证据、影响、状态和恢复语义是否自包含。

@@ -14,7 +14,7 @@ description: 'Derive the next concise human acceptance round only when the user 
 3. 先过滤 Agent 可自行完成的验证；这些回 runtime 执行或作为 evidence，不继续占用人类 gate。
 4. 只保留失败、争议、缺信息、需要风险决策或明确未完成的人类门控项。
 5. `round` +1，旧轮次压缩到 Archive；有 related spec 时更新其 blocker / next / evidence。
-6. 修改 artifact 后由当前 Skill 直接对改动路径运行 deterministic validator，不进入 `validate-flow` Skill。
+6. 修改 acceptance 后按本 Skill 的 Self-Review 检查反馈映射、轮次压缩和剩余 gate。
 
 ## Feedback Classification
 
@@ -108,4 +108,4 @@ description: 'Derive the next concise human acceptance round only when the user 
 - 失败和证据缺口是否先区分 Agent 可补与人类必须补。
 - related spec Progress（如有）、acceptance round 和证据是否一致。
 - 旧轮次是否压缩而不是复制。
-- artifact 修改后是否直接对改动路径运行 deterministic validator。
+- 反馈映射、轮次压缩和剩余 gate 是否清楚。

@@ -7,7 +7,8 @@ Agent note:
 - If a user asks in natural language or by group, resolve that in the agent
   layer before calling this script.
 - Sky Flow is a nested suite in-repo. Claude needs direct links for the suite
-  entry and callable children; Codex discovers children through one suite root.
+  entry and callable children. Codex normally discovers children through the
+  suite root, while explicit-only children can request a direct global link.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ CLAUDE_SKILLS_DIR = Path.home() / ".claude" / "skills"
 AGENTS_SKILLS_DIR = Path.home() / ".agents" / "skills"
 TARGET_ORDER = ["claude", "codex"]
 DEFAULT_INSTALL_TARGETS = list(TARGET_ORDER)
+CODEX_DIRECT_SKILLS = {"to-milestone"}
 TARGET_ALIASES = {
     "claude": "claude",
     "claude-code": "claude",
@@ -57,6 +59,7 @@ RETIRED_SKILL_SOURCES = {
     "to-plan": Path("skills/to-plan"),
     "to-task": Path("skills/to-task"),
     "to-test": Path("skills/to-test"),
+    "validate-flow": Path("skills/validate-flow"),
 }
 RETIRED_SKILL_NAMES = tuple(RETIRED_SKILL_SOURCES)
 
@@ -1064,7 +1067,7 @@ def install_skills(
                     dry_run=dry_run,
                 )
                 for skill in selected
-                if not skill.is_suite_entry
+                if not skill.is_suite_entry and skill.name not in CODEX_DIRECT_SKILLS
             }
             status = link_or_copy_skill(
                 root_skill.path,
@@ -1074,11 +1077,18 @@ def install_skills(
                 dry_run=dry_run,
             )
             for skill in selected:
-                reported = (
-                    status
-                    if skill.is_suite_entry
-                    else child_states.get(skill.name) or via_suite_status(status)
-                )
+                if skill.is_suite_entry:
+                    reported = status
+                elif skill.name in CODEX_DIRECT_SKILLS:
+                    reported = link_or_copy_skill(
+                        skill.path,
+                        target_dir / skill.name,
+                        copy_mode=copy_mode,
+                        force=force,
+                        dry_run=dry_run,
+                    )
+                else:
+                    reported = child_states.get(skill.name) or via_suite_status(status)
                 result.setdefault(skill.name, {})[str(target_dir)] = reported
             continue
 
@@ -1109,7 +1119,11 @@ def inspect_install_state(
                     current = dest.resolve() == skill.path.resolve()
                 except OSError:
                     current = False
-                if logical_target == "codex" and not skill.is_suite_entry:
+                if (
+                    logical_target == "codex"
+                    and not skill.is_suite_entry
+                    and skill.name not in CODEX_DIRECT_SKILLS
+                ):
                     targets[logical_target] = "redundant-link" if current else "broken"
                 else:
                     targets[logical_target] = "linked" if current else "broken"
@@ -1119,7 +1133,11 @@ def inspect_install_state(
                     current = copied_tree_matches(skill.path, dest)
                 except OSError:
                     current = False
-                if logical_target == "codex" and not skill.is_suite_entry:
+                if (
+                    logical_target == "codex"
+                    and not skill.is_suite_entry
+                    and skill.name not in CODEX_DIRECT_SKILLS
+                ):
                     targets[logical_target] = "redundant-copy" if current else "stale-copy"
                 else:
                     targets[logical_target] = "copied" if current else "stale-copy"
@@ -1127,7 +1145,12 @@ def inspect_install_state(
             targets[logical_target] = "broken"
             continue
 
-        if logical_target != "codex" or skill.is_suite_entry or registry is None:
+        if (
+            logical_target != "codex"
+            or skill.is_suite_entry
+            or skill.name in CODEX_DIRECT_SKILLS
+            or registry is None
+        ):
             targets[logical_target] = "missing"
             continue
 

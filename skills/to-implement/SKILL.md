@@ -1,15 +1,15 @@
 ---
 name: to-implement
-description: 'Execute or continue a ready Sky Flow spec, derived runtime goal, or active thin-plan resume locator. Keep simple work runtime-only; materialize optional implementation working memory only when recovery value justifies it, without persisting task topology.'
+description: 'Execute or continue a ready Sky Flow spec, derived runtime goal, approved executable milestone, or active thin-plan resume locator. Keep simple work runtime-only and materialize implementation working memory only when recovery value justifies it.'
 ---
 
 # to-implement
 
-`to-implement` 是 ready spec、其派生 goal 或 active plan resume locator 与原生 runtime 之间的薄桥。plan locator 必须先解析回 source spec；spec 始终给出目标、边界与成功依据，runtime 自主选择探索、实现、调度、验证和 fan-in 方式。
+`to-implement` 是 ready spec、其派生 goal、approved executable milestone 或 active plan resume locator 与原生 runtime 之间的薄桥。milestone 必须引用 ready source spec，plan locator 必须先解析回 source spec；spec 始终给出规范性边界，runtime 自主选择探索、实现、调度、验证和 fan-in 方式。
 
 ## 快速就绪检查
 
-开始时只做一次轻量检查：目标、成功边界、关键约束、当前 spec Progress、blocker，以及 source-linked active plan（如有）是否互相一致。直接从 plan 恢复时先验证其 source spec 仍 ready 且 unfinished。能够从 spec 或仓库补齐的事实直接补齐；规范性边界存在实质缺口时回 `to-spec`，不要在执行层猜设计。
+开始时只做一次轻量检查：目标、成功边界、关键约束、当前 spec Progress、blocker，以及 source-linked milestone / active plan（如有）是否互相一致。milestone 必须是 `definition: executable`、`review: approved`，且人类最新指令已授权实施；普通 runtime plan 不要求独立批准。开始实现前还必须按 `to-milestone` 合同完成当前 leaf 的内嵌 `eli5` HTML 讲解并验证可打开 URL；已有实施授权时无需再等一句“继续”。任一实质条件缺失时回 `$to-milestone` preflight，不开始实现。直接从 plan 恢复时先验证其 source spec 仍 ready 且 unfinished。能够从 spec 或仓库补齐的事实直接补齐；规范性边界存在实质缺口时回 `to-spec`，不要在执行层猜设计。
 
 这不是重复完整 spec review，也不是固定 gate。简单且清楚的目标应立即执行。
 
@@ -20,6 +20,7 @@ description: 'Execute or continue a ready Sky Flow spec, derived runtime goal, o
 - 产品 / 业务决策、真实环境 gate、发布、删除、生产写入及其他不可逆操作仍由相应 authority 决定。
 - 同一文件或共享状态避免并发多写；交接完成后可动态更换 writer。
 - 用户或 spec 要求的独立评估不能由 implementation owner 自行清除。
+- executable milestone 的 ELI5 页面不能跳过；实施授权必须来自人类意图，但不要求重复确认。
 - 完成声明必须有与风险匹配的证据，未验证范围必须明确。
 - 只有符合物化边界并完整读取 thin-plan 参考后才创建 / 更新 plan；任何情况下都不创建 task / step artifact。
 
@@ -53,7 +54,7 @@ description: 'Execute or continue a ready Sky Flow spec, derived runtime goal, o
 ## 执行与收敛
 
 - 简单工作直接完成；复杂工作可使用轻量 runtime checklist，只有符合 Plan Materialization 时才增加 file-backed plan。subagent 只按上面的收益与隔离条件使用。
-- 日常测试、typecheck、lint、build、真实路径检查和 diff sanity 由 native runtime 直接完成；artifact 写回后由当前执行者直接对改动路径运行 deterministic validator，不进入 `validate-flow` Skill。
+- 日常测试、typecheck、lint、build、真实路径检查和 diff sanity 由 native runtime 直接完成；durable document 由 owning Skill 按自身语义合同做 Self-Review。
 - 对可观察的高风险行为、关键不变量、外部契约和真实回归补测试；不要为覆盖率测试日志、mock 次数、私有 helper，或已由类型、schema、lint 直接约束的内容。
 - `$to-review`、`$to-review-loop`、`$to-consolidation`、`$to-acceptance`、`$to-knowledge` 和 provider second opinion 只在用户显式调用时使用，不构成固定流水线。
 - finding 修复后默认做定点验证，不自动重开完整 review 或 consolidation。需要独立评估或自主并行已经满足上面的收益与隔离条件时，才建立完成任务所需的最小 change map 和 fan-in 结构。
@@ -63,13 +64,15 @@ description: 'Execute or continue a ready Sky Flow spec, derived runtime goal, o
 
 ## State Writeback
 
-只有当前 goal 实际由 durable spec / plan 承接，且本次结果具有恢复价值时才写回 artifact；纯 runtime goal 不为满足流程创建或修改 artifact。
+只有当前 goal 实际由 durable spec、milestone 或 plan 承接，且本次结果具有恢复价值时才写回文档；纯 runtime goal 不为满足流程创建文档。
 
 需要写回时，spec Progress 使用覆盖更新的语义恢复快照，只保存：稳定成立的能力或行为、长期关键决策、可信证据、真实 blocker 与解除条件、残余风险、下一目标级恢复入口。
 
 不得记录具体代码行号、逐文件 diff、完整命令、tool call、子代理身份 / 消息、调度批次或逐轮时间线。必要定位可引用少量稳定模块、类、函数、公开接口或测试套件；新 checkpoint 合并或替换过期内容。
 
 active plan 的写回与收口完全遵循 `references/thin-plan.md`。只有当前 slice 的局部实施 blocker 留在 plan；阻塞整体 goal、涉及外部条件 / authority / durable constraint 的 blocker 写入 spec Progress，plan 只保留引用，避免双份真相。
+
+当前 goal 来自 executable milestone 时，把 outcome、关键 evidence、未验证范围和残余风险压缩写回该 leaf。默认保持 `status: in_progress` 并请求人类验收；若人类已明确把当前 leaf 的验收委托给主 Agent，则由未承担该 leaf 实现的 Agent 按 acceptance contract 裁决，通过后标记 `completed` 并向父节点汇总。
 
 spec 只有在整个 durable scope、必要验证和真实人类 gate 都结束时才标记 `completed`；plan 或单个 runtime goal 完成不自动完成 spec。长期离队使用 backlog，易失本地接力才使用 handoff。
 

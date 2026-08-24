@@ -9,7 +9,7 @@
 - 用户直接给出 plan path / id 时，只允许 `not_started` / `in_progress` plan 作为 resume locator；再解析 source spec 并确认仍 ready、unfinished，然后进入 `to-implement`。completed / abandoned plan 只能作为历史背景，plan 自身不拥有 goal 或 readiness。
 - plan 没有 `draft` 阶段：恢复价值成立但尚未执行时用 `not_started`，开始实施后用 `in_progress`。source spec lifecycle 在真实 resume / writeback 边界按其 durable progress 判断，不与 plan status 做机械双写同步。
 - 恢复时只寻找当前 source spec 的 active plan，不对 plan 做候选排名或 mtime 选择。
-- 默认优先复用一份 active plan。恢复时若发现多份，由 `to-implement` 根据当前 slice 收敛、废弃过期项，或确认 spec 是否应拆分；通用 validator 不为此建立或维护 plan graph。
+- 默认优先复用一份 active plan。恢复时若发现多份，由 `to-implement` 根据当前 slice 收敛、废弃过期项，或确认 spec 是否应拆分；Sky Flow 不维护中央 plan graph。
 - spec 是规范性真相源。plan 中的代码事实在恢复时按风险做定点复核；与 spec 冲突时 spec 胜出。
 
 ## Shape
@@ -67,11 +67,11 @@ section 是推荐形状，不是为简单工作制造的模板 gate。省略无�
 - 不在 plan 中存储 owner、Agent 消息、task / step graph、dependency / parallel fields、fan-in 批次、tool calls、完整 diff、长命令输出或微步骤。
 - 不保存 secret / credential 值。未提交 diff、终端、临时环境和短期 credential state 属于用户授权时的 handoff，不属于 plan。
 
-## Validation
+## Self-Review
 
-- create、frontmatter / source locator 变化和 closure 后，由当前执行者直接对 changed plan 路径运行 deterministic validator；不进入 `validate-flow` Skill，也不从成功报告派生模型 pass。
-- plan resume 时由 `to-implement` 直接解析 source spec，确认仍 ready / unfinished，并在多 active plan 时完成运行时选择；不先运行全库关系审计。
-- 只改 body working-set snapshot 时可以批量到下一个恢复或提交边界。commit / CI 对 artifact root 做 full-set deterministic scan；最终 closure 前由 `to-implement` 完成必要 promotion 与语义收口。
+- create、source locator 变化、resume 和 closure 时，由 `to-implement` 检查 source spec、working-set 边界、promotion 与状态语义。
+- plan resume 直接解析 source spec，确认仍 ready / unfinished，并在多 active plan 时完成运行时选择；不运行全库关系审计。
+- body snapshot 可以批量到下一个恢复或提交边界；最终 closure 前完成必要 promotion、证据写回与语义收口。
 
 ## Closure
 

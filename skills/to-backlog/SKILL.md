@@ -15,7 +15,7 @@ description: 'Create or update a Sky Flow backlog artifact only when the user ex
 4. 判断是否真的需要长期回收；如果现在仍可安全推进，回到 runtime 或 `to-implement`。
 5. 创建 / 更新 `${SKY_FLOW_ROOT}/backlog/<id>.md`。
 6. abandoned work 必须有事实或人类依据；不要单方面放弃。
-7. 修改 artifact 后由当前 Skill 直接对改动路径运行 deterministic validator，不进入 `validate-flow` Skill。
+7. 修改 backlog 后按本 Skill 的 Self-Review 检查 blocker、恢复条件和来源语义。
 
 ## Metadata
 
@@ -97,4 +97,4 @@ recommended_resume: after-dependency-ready
 - depends_on 和 resume condition 是否可判定。
 - 后续会话是否不看聊天也能判断何时恢复。
 - 是否确实已退出当前执行队列。
-- artifact 修改后是否直接对改动路径运行 deterministic validator。
+- blocker、恢复条件和来源语义是否足以恢复工作。

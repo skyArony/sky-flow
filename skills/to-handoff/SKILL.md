@@ -19,7 +19,7 @@ handoff 默认写入 `${SKY_FLOW_ROOT}/handoff/`，并应由项目 `.gitignore` 
 4. 收集易失事实：未提交范围、终端 / 进程、临时环境、短期凭据状态、未保存 evidence、接手动作和 stop conditions。
 5. 创建或更新 `${SKY_FLOW_ROOT}/handoff/<id>.md`。
 6. 如果 handoff 目录未被忽略，提醒用户；不要默认提交。
-7. 修改 artifact 后由当前 Skill 直接对改动路径运行 deterministic validator，不进入 `validate-flow` Skill。
+7. 修改 handoff 后按本 Skill 的 Self-Review 检查恢复动作、易失边界和敏感信息。
 
 ## Source And Naming
 
@@ -100,4 +100,4 @@ resume_from: <checkpoint-or-current-session>
 - 下一轮能否直接接手，且知道 allowed / no-touch。
 - 风险、stop conditions 和缺失证据是否明确。
 - handoff 是否保持本地、紧凑且无敏感数据。
-- artifact 修改后是否直接对改动路径运行 deterministic validator。
+- 恢复动作、易失边界和敏感信息是否检查完成。
