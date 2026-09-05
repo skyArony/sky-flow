@@ -7,7 +7,7 @@ description: 'Explicitly turn a stable Sky Flow spec into a human-reviewed, prog
 
 `to-milestone` 把稳定 spec 转换为一棵按需展开、与人类逐层对齐的交付里程碑树。它持久化阶段边界、层级、硬依赖、验收目标和完成状态；当前叶子的代码步骤、工具、顺序和调度仍属于 runtime plan。
 
-本 Skill 只在用户显式调用 `$to-milestone` 时进入。简单工作、一次性实现和无需长期分阶段交付的 ready spec 直接交给 `to-implement`。
+本 Skill 只在用户明确选择 milestone 流程时进入，可通过 `$to-milestone` 或等价自然语言表达；继续或恢复此前已选择的流程无需重复授权。简单工作、一次性实现和无需长期分阶段交付的 ready spec 直接交给 `to-implement`。
 
 创建、细化、恢复或收口 milestone 文档前，完整读取 [milestone-docs.md](references/milestone-docs.md)。
 

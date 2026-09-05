@@ -9,9 +9,9 @@ description: 'Execute or continue a ready Sky Flow spec, derived runtime goal, a
 
 ## 快速就绪检查
 
-开始时只做一次轻量检查：目标、成功边界、关键约束、当前 spec Progress、blocker，以及 source-linked milestone / active plan（如有）是否互相一致。milestone 必须是 `definition: executable`、`review: approved`，且人类最新指令已授权实施；普通 runtime plan 不要求独立批准。开始实现前还必须按 `to-milestone` 合同完成当前 leaf 的内嵌 `eli5` HTML 讲解并验证可打开 URL；已有实施授权时无需再等一句“继续”。任一实质条件缺失时回 `$to-milestone` preflight，不开始实现。直接从 plan 恢复时先验证其 source spec 仍 ready 且 unfinished。能够从 spec 或仓库补齐的事实直接补齐；规范性边界存在实质缺口时回 `to-spec`，不要在执行层猜设计。
+默认由 native runtime 根据用户目标自主探索、实现和验证。只有用户明确选择 milestone 流程（包括继续此前已选择的流程）时，才检查 leaf 的 `definition: executable`、`review: approved`、实施授权、ELI5 preflight 和阶段验收；不因存在 milestone 文档而自动进入该流程。
 
-这不是重复完整 spec review，也不是固定 gate。简单且清楚的目标应立即执行。
+直接执行 ready spec 或派生 goal 时，只核对目标、成功边界、关键约束和真实 blocker；不要求创建 milestone、ELI5 页面或普通 runtime plan 审批。从 active plan 恢复时解析其 source spec，确认目标仍有效且未完成。能从仓库补齐的事实自主补齐；实质设计缺口只暂停依赖该决定的部分。
 
 ## 必须保持
 
@@ -20,7 +20,7 @@ description: 'Execute or continue a ready Sky Flow spec, derived runtime goal, a
 - 产品 / 业务决策、真实环境 gate、发布、删除、生产写入及其他不可逆操作仍由相应 authority 决定。
 - 同一文件或共享状态避免并发多写；交接完成后可动态更换 writer。
 - 用户或 spec 要求的独立评估不能由 implementation owner 自行清除。
-- executable milestone 的 ELI5 页面不能跳过；实施授权必须来自人类意图，但不要求重复确认。
+- 用户已选择 milestone 流程时，对应 executable milestone 的 ELI5 页面不能跳过；实施授权必须来自人类意图，但不要求重复确认。
 - 完成声明必须有与风险匹配的证据，未验证范围必须明确。
 - 只有符合物化边界并完整读取 thin-plan 参考后才创建 / 更新 plan；任何情况下都不创建 task / step artifact。
 
@@ -72,7 +72,7 @@ description: 'Execute or continue a ready Sky Flow spec, derived runtime goal, a
 
 active plan 的写回与收口完全遵循 `references/thin-plan.md`。只有当前 slice 的局部实施 blocker 留在 plan；阻塞整体 goal、涉及外部条件 / authority / durable constraint 的 blocker 写入 spec Progress，plan 只保留引用，避免双份真相。
 
-当前 goal 来自 executable milestone 时，把 outcome、关键 evidence、未验证范围和残余风险压缩写回该 leaf。默认保持 `status: in_progress` 并请求人类验收；若人类已明确把当前 leaf 的验收委托给主 Agent，则由未承担该 leaf 实现的 Agent 按 acceptance contract 裁决，通过后标记 `completed` 并向父节点汇总。
+用户已选择 milestone 流程且当前 goal 来自 executable milestone 时，把 outcome、关键 evidence、未验证范围和残余风险压缩写回该 leaf。默认保持 `status: in_progress` 并请求人类验收；若人类已明确把当前 leaf 的验收委托给主 Agent，则由未承担该 leaf 实现的 Agent 按 acceptance contract 裁决，通过后标记 `completed` 并向父节点汇总。
 
 spec 只有在整个 durable scope、必要验证和真实人类 gate 都结束时才标记 `completed`；plan 或单个 runtime goal 完成不自动完成 spec。长期离队使用 backlog，易失本地接力才使用 handoff。
 

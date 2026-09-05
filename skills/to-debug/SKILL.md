@@ -1,11 +1,11 @@
 ---
 name: to-debug
-description: Sky Flow 通用 Debug 诊断入口。定位问题、复现异常、分析 root cause、本地测试失败、线上异常、性能退化、间歇性 bug、用户描述坏了 / 报错 / 不稳定时使用；先建立可信反馈环，再从最小充分假设集按 prediction 取证、修复、固化真实事故回归、验证和清理。需要基础设施 / 数据源查询或操作时转项目级 to-infra。
+description: Sky Flow 通用 Debug 诊断入口。定位问题、复现异常、分析 root cause、本地测试失败、线上异常、性能退化、间歇性 bug、用户描述坏了 / 报错 / 不稳定时使用；先建立可信反馈环，再从最小充分假设集按 prediction 取证；已授权修复时再修复、固化真实事故回归、验证和清理。需要基础设施 / 数据源查询或操作时转项目级 to-infra。
 ---
 
 # to-debug
 
-`to-debug` 是 Sky Flow 的通用诊断循环。它负责把“坏了”转成可重复、可证伪、可验证的调查过程：先建立反馈环，再复现同一个现象，从最小充分假设集按 prediction 取证，修复源头，验证并清理临时 instrumentation。
+`to-debug` 是 Sky Flow 的通用诊断循环。它负责把“坏了”转成可重复、可证伪、可验证的调查过程：先建立反馈环，再复现同一个现象，从最小充分假设集按 prediction 取证，诊断以证据、结论与验证局限交付；已授权修复时再修复源头、验证并清理临时 instrumentation。
 
 它不替代项目级基础设施 / 数据源查询能力；普通回归与真实事故固化都属于本诊断循环：
 
@@ -15,6 +15,8 @@ description: Sky Flow 通用 Debug 诊断入口。定位问题、复现异常、
 
 ## 入口边界
 
+- Skill 触发不增加写入授权。仅要求解释、审阅或诊断时保持只读取证；用户要求实施或修复时，完成范围内修复与适度验证。
+
 - 默认 Debug 入口是本 Skill：用户说 debug、排查、坏了、报错、不稳定、本地测试失败、线上异常、性能退化时，先建立反馈环。
 - 用户明确要求查日志、查数据库、查 Redis、查 Metrics、查 Grafana、查告警或执行基础设施操作时，可以直接转 `to-infra`，但输出要说明这只是 infra / evidence 步骤，不等于完整诊断闭环。
 - 排查过程中需要基础设施或数据源证据时，先在本 Skill 中说明 hypothesis、prediction、目标环境、时间范围和关键实体，再转 `to-infra`。
@@ -22,7 +24,7 @@ description: Sky Flow 通用 Debug 诊断入口。定位问题、复现异常、
 
 ## 总原则
 
-- 反馈环第一。没有可运行、可重复、可验证的 pass / fail 信号时，不继续猜根因。
+- 反馈环第一。优先建立可重复的 pass / fail 信号；暂时无法运行时，继续分析相关代码和现有证据，区分已验证结论与待验证假设，不凭推测实施修复。
 - 复现用户描述的同一个现象，不修附近另一个错误。
 - 从最小充分假设集开始：明显、确定性、本地化的问题可以先验证一个最高概率假设；首个 prediction 失败、问题间歇、跨组件或证据冲突时，再扩展为 3-5 个排序假设。
 - 每个 probe 必须对应一个 hypothesis 和 prediction。
@@ -102,13 +104,13 @@ Evidence: [实际观察]
 - 性能问题先建立 baseline measurement，再 profile 或 bisect；不要先凭感觉改代码。
 - 需要基础设施、日志、DB、缓存或 Metrics 证据时转 `to-infra`，并带上 hypothesis、prediction 和范围约束。
 
-### 6. 修复与回归
+### 6. 修复与回归（仅限已授权修复）
 
 - 有正确测试 seam 时，先把最小复现转成失败测试，再修复。
 - 真实事故在 expected behavior 与稳定 seam 可确认时，先把最小复现固化成能命中 incorrect path 的失败测试；修复后用同一测试验证 correct path。只断言可观察行为，不硬编码事故 ID、不测试日志 / mock 次数 / 私有 helper，也不引入 test-only 生产分支。
 - 没有稳定 seam 时保留可重复 replay、smoke evidence 和 residual risk，不为形式完整强行造测试。
 - 同一问题连续 2 次修复尝试失败时，停止继续打补丁，回到假设矩阵并标记被证伪的假设。
-- 连续 3 次失败时暂停，说明缺失证据、测试 seam 或架构边界；必要时转 `to-spec` 或记录 issue。
+- 连续失败时重新评估假设和验证路径，停止重复已被证伪的修补方式；仍有范围内的可验证路径时继续。缺少关键输入、权限或可行路径时，说明已尝试内容及所需帮助；长期文档按对应 Skill 的显式触发规则处理。
 
 ### 7. 验证与清理
 
@@ -117,7 +119,7 @@ Evidence: [实际观察]
 - 清理所有 `[DEBUG-...]` instrumentation。
 - 删除 throwaway harness，或移动到明确标注的 debug 位置并说明原因。
 - 在交付说明、commit 或 PR 中写清最终成立的 root cause 假设，让下一次排查可以复用。
-- 复盘是否暴露架构问题；如是，记录为 issue 或转入 spec 设计对齐。
+- 发现范围外的架构问题时简短报告；仅在用户明确要求时记录 issue 或转入 spec 设计对齐。
 
 ## `to-infra` 交接格式
 
@@ -163,11 +165,11 @@ Residual Risk
 
 ## Checklist
 
-- [ ] 已建立可信反馈环，或已停止并说明缺少什么制品。
-- [ ] 已确认复现的是用户描述的同一现象。
+- [ ] 已建立可信反馈环，或已完成可行的只读取证并说明验证局限及缺失输入。
+- [ ] 已核对证据是否对应用户描述的同一现象；未复现时不宣称复现成功。
 - [ ] 已检查 Recent Changes，并只把它们作为可证伪假设来源。
 - [ ] 已使用与复杂度匹配的最小充分假设集；复杂调查已扩展并排序可证伪假设。
 - [ ] 跨组件问题已记录关键边界的 input / output / config / state。
 - [ ] 需要基础设施 / 数据源查询或操作时已转 `to-infra`。
-- [ ] 真实事故在 expected behavior 与稳定 seam 可确认时已用同一测试完成 incorrect path → correct path；否则已保留替代证据与 residual risk。
+- [ ] 已授权修复的真实事故在 expected behavior 与稳定 seam 可确认时已用同一测试完成 incorrect path → correct path；否则已保留替代证据与 residual risk。
 - [ ] 临时 debug instrumentation 已清理。

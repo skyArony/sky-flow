@@ -38,8 +38,8 @@
 
 - spec 仍缺少会改变阶段 outcome、系统边界或验收的规范性决定：回 `$to-spec`。
 - 只需要实现一个清楚目标：直接 `to-implement`，不创建 milestone tree。
-- 需要多个阶段、人类逐层评审、滚动清晰化或长期交付恢复：显式 `$to-milestone`。
-- approved executable leaf 的 runtime goal 包含 milestone outcome、leaf acceptance、source spec constraints 和当前 evidence；具体步骤不持久化到 milestone。
+- 只有用户明确选择 milestone 流程时才进入 `$to-milestone`；已有选择可沿用，不因任务复杂或发现 milestone 文档而自动进入。
+- 在用户已选择的 milestone 流程内，approved executable leaf 的 runtime goal 包含 milestone outcome、leaf acceptance、source spec constraints 和当前 evidence；具体步骤不持久化到 milestone。
 - 实现产生长期决定：先回 `$to-spec`，再让受影响 milestone 重新评审。
 - 实现完成但人类未验收：leaf 保持 active；只有需要 durable gate 且用户显式要求时才创建 acceptance document。
 
@@ -50,7 +50,7 @@ ready spec、其派生 goal、approved executable milestone 或已解析回 read
 - 简单或低恢复成本工作直接执行。
 - 复杂但当前可连续完成的工作可以只用 runtime checklist。
 - 只有跨会话恢复价值超过维护成本时才 materialize thin plan。
-- 多 Agent 只按用户或 source constraint 进入；共享 contract、schema、部署配置和同一文档避免并发多写。
+- 默认由 native runtime 根据任务和运行时权限选择执行方式，不强制多 Agent 或多模型；显式要求的独立评估仍须保留。共享 contract、schema、部署配置和同一文档避免并发多写。
 - 测试 ROI、stable seam、验证组合和 diff sanity 由 runtime 按风险决定。
 
 ## Real Boundary Routing

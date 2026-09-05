@@ -11,11 +11,11 @@ Sky Flow 使用 Skill-owned durable documents，而不是中央 artifact schema�
 
 ## Quick Path
 
-1. 用户点名 Sky Flow 或子能力时进入；普通局部工作直接使用 native runtime。
+1. 用户点名 Sky Flow 或子能力时进入；其他工作默认使用 native runtime，不强制阶段拆分、多 Agent 或多模型。
 2. 文档根目录 `SKY_FLOW_ROOT` 默认 `docs`，语言 `SKY_FLOW_LANG` 默认跟随用户。
 3. 持续多轮关闭实质需求决策时显式使用 `$to-align`；长期设计、readiness 与 spec Progress 使用 `$to-spec`。
-4. 大型 spec 需要分阶段落地时显式使用 `$to-milestone`，每次只展开当前节点的直接子层，并在人类批准后继续。
-5. ready spec、approved executable milestone 派生的 runtime goal，或 active thin plan locator 由 `to-implement` 执行。
+4. 只有用户明确选择 milestone 流程时才使用 `to-milestone`，按其合同展开、讲解和验收；已有选择在继续或恢复同一流程时有效。
+5. ready spec 或 active thin plan locator 由 `to-implement` 交给 runtime；只有用户已选择 milestone 流程时才应用 executable leaf 的额外检查。
 6. 普通测试、静态检查、build、真实路径和 diff sanity 由 runtime 直接完成；专门 review、consolidation、知识沉淀和 durable acceptance 只在用户显式调用时进入。
 
 ## Core Model
