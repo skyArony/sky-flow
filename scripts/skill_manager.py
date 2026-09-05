@@ -29,7 +29,7 @@ CLAUDE_SKILLS_DIR = Path.home() / ".claude" / "skills"
 AGENTS_SKILLS_DIR = Path.home() / ".agents" / "skills"
 TARGET_ORDER = ["claude", "codex"]
 DEFAULT_INSTALL_TARGETS = list(TARGET_ORDER)
-CODEX_DIRECT_SKILLS = {"to-milestone"}
+CODEX_DIRECT_SKILLS = {"to-milestone", "show-me"}
 TARGET_ALIASES = {
     "claude": "claude",
     "claude-code": "claude",
@@ -51,6 +51,7 @@ TARGET_LABELS = {
 # remain as internal files, while archive/skills/to-implement stores an old
 # implementation whose top-level name is still active.
 RETIRED_SKILL_SOURCES = {
+    "eli5": Path("skills/eli5"),
     "pick-plan": Path("skills/pick-plan"),
     "review-by-sanyuan": Path("skills/to-review/reviewers/review-by-sanyuan"),
     "review-by-somestay": Path("skills/to-review/reviewers/review-by-somestay"),

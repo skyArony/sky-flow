@@ -23,7 +23,7 @@ Useful commands:
 - Claude installs live under `~/.claude/skills`.
 - Codex installs live under `~/.agents/skills`.
 - Claude receives the suite entry and each callable child as direct links because it does not discover nested skills.
-- Codex receives the suite entry once and discovers callable children through that root.
+- Codex receives the suite entry once and discovers callable children through that root; `to-milestone` and `show-me` also get direct links for standalone invocation.
 - Copy-mode freshness compares the complete managed subtree, including references and scripts.
 - Skill-level `install_targets` remain effective; Codex-only skills stay out of Claude installs.
 - Historical skills under `archive/skills/` are not discovered or installed.
@@ -35,7 +35,8 @@ Useful commands:
 - `$to-align` owns sustained, multi-round alignment before coding and delegates stable conclusions to `$to-spec`.
 - `$to-spec` owns durable design, readiness, normative decisions, and the goal-level Progress snapshot.
 - `$to-milestone` turns a large stable spec into a human-reviewed milestone tree. It creates only the current level, deepens selected branches, and stops at independently acceptable executable leaves.
-- Sky Flow embeds `eli5` under `skills/eli5/`; `to-milestone` uses it to render each approved leaf as a temporary HTML explainer before implementation.
+- Invoke `/show-me <topic>` in Claude or `$show-me <topic>` in Codex for a standalone visual explanation; no spec or milestone is required.
+- Sky Flow embeds HumanLayer’s `show-me` under `skills/show-me/`; `to-milestone` uses it to explain each approved leaf with a focused visual before implementation, choosing inline diagrams or HTML as appropriate.
 - `$pick-goal` derives a portable runtime goal without creating a new document.
 - `to-implement` executes a ready spec, derived goal, approved executable milestone, or active thin-plan resume locator.
 - Simple and continuous work stays runtime-only. Long-running work may materialize a thin plan when cross-session recovery value exceeds maintenance cost.

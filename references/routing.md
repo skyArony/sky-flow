@@ -32,6 +32,7 @@
 | `to-handoff` | 显式 `$` | 易失本地状态需要换会话 / Agent 接力 | 不复制长期 Progress |
 | `to-commit` | 自动 | stage、commit、message 或拆分提交 | scoped stage、项目验证与 staged sanity |
 | `to-consolidation` | 显式 `$` | 对稳定 diff 做专项熵值收敛 | 普通最终检查由 runtime 完成 |
+| `show-me` | 讲解请求 / 显式调用 | 独立讲解当前主题，也可供 milestone 调用 | 无需 spec、milestone 或实施授权；按主题选择最小充分图示 |
 | `to-claude-review` | 显式 `$` | Claude Code 第二意见 | Codex-only bridge |
 
 ## Milestone Routing

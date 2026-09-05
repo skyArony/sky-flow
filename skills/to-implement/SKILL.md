@@ -9,9 +9,9 @@ description: 'Execute or continue a ready Sky Flow spec, derived runtime goal, a
 
 ## 快速就绪检查
 
-默认由 native runtime 根据用户目标自主探索、实现和验证。只有用户明确选择 milestone 流程（包括继续此前已选择的流程）时，才检查 leaf 的 `definition: executable`、`review: approved`、实施授权、ELI5 preflight 和阶段验收；不因存在 milestone 文档而自动进入该流程。
+默认由 native runtime 根据用户目标自主探索、实现和验证。只有用户明确选择 milestone 流程（包括继续此前已选择的流程）时，才检查 leaf 的 `definition: executable`、`review: approved`、实施授权、show-me preflight 和阶段验收；不因存在 milestone 文档而自动进入该流程。
 
-直接执行 ready spec 或派生 goal 时，只核对目标、成功边界、关键约束和真实 blocker；不要求创建 milestone、ELI5 页面或普通 runtime plan 审批。从 active plan 恢复时解析其 source spec，确认目标仍有效且未完成。能从仓库补齐的事实自主补齐；实质设计缺口只暂停依赖该决定的部分。
+直接执行 ready spec 或派生 goal 时，只核对目标、成功边界、关键约束和真实 blocker；不要求创建 milestone、show-me 可视化讲解或普通 runtime plan 审批。从 active plan 恢复时解析其 source spec，确认目标仍有效且未完成。能从仓库补齐的事实自主补齐；实质设计缺口只暂停依赖该决定的部分。
 
 ## 必须保持
 
@@ -20,7 +20,7 @@ description: 'Execute or continue a ready Sky Flow spec, derived runtime goal, a
 - 产品 / 业务决策、真实环境 gate、发布、删除、生产写入及其他不可逆操作仍由相应 authority 决定。
 - 同一文件或共享状态避免并发多写；交接完成后可动态更换 writer。
 - 用户或 spec 要求的独立评估不能由 implementation owner 自行清除。
-- 用户已选择 milestone 流程时，对应 executable milestone 的 ELI5 页面不能跳过；实施授权必须来自人类意图，但不要求重复确认。
+- 用户已选择 milestone 流程时，对应 executable milestone 的 show-me 可视化讲解不能跳过；实施授权必须来自人类意图，但不要求重复确认。
 - 完成声明必须有与风险匹配的证据，未验证范围必须明确。
 - 只有符合物化边界并完整读取 thin-plan 参考后才创建 / 更新 plan；任何情况下都不创建 task / step artifact。
 

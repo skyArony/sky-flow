@@ -20,7 +20,7 @@ description: 'Explicitly turn a stable Sky Flow spec into a human-reviewed, prog
 5. 从已批准且硬依赖满足的节点中推荐下一 frontier。人类可以选择一个节点，也可以批准多个互不冲突的节点并行推进。
 6. 对选中节点只细化一层：如果仍包含多个不可独立验收的 outcome，创建直接子 milestone；如果已满足叶子标准，将其定义为 executable leaf。
 7. executable leaf 的 outcome、边界、验收、核心行为测试、单元测试意图和其他证据明确后，从人类指令判断是否已授权实施；普通 Agent plan 不单独制造批准 gate。
-8. 任何实现动作开始前，调用内嵌 `eli5` 为当前 leaf 生成 HTML 图解，启动本地 Web 服务器，验证页面可访问并把 URL 交给人类。若此前已经获得实施授权，展示 URL 后直接交给 `to-implement`；只有人类要求先看讲解，或讲解暴露实质问题时才等待。
+8. 任何实现动作开始前，调用内嵌 `show-me` 为当前 leaf 提供最小充分的可视化讲解。若此前已经获得实施授权，交付讲解后直接交给 `to-implement`；只有人类要求先看讲解，或讲解暴露实质问题时才等待。
 9. 实现跨会话且恢复价值成立时，thin plan 仍以 spec 为 source，并在 Current Slice 中引用当前 milestone。
 10. Agent 完成确定性验证后按当前 acceptance authority 收口：默认请求人类验收；若人类已明确委托 Agent 验收，则由独立于实现者的 Agent 按约定标准裁决。通过后把 leaf 标记 `completed`，向父节点汇总并推荐下一 frontier。
 11. 已关闭且没有 active descendant 的 milestone 可以归档：先把规范性结论提升到 spec，再将实施期文档压缩成完成摘要并移出 active tree。代码是实现事实，spec 是规范性事实，archive 只保存交付历史。
@@ -60,7 +60,7 @@ description: 'Explicitly turn a stable Sky Flow spec into a human-reviewed, prog
 - 每个被选 branch 的直接子层划分。
 - executable leaf 的定义与验收合同。
 - 会改变 scope、外部行为、关键风险或执行授权的 runtime 方向。
-- 当前叶子的 ELI5 Web 讲解必须在实现前交付；是否等待再次回复取决于已有授权和人类要求。
+- 当前叶子的 show-me 可视化讲解必须在实现前交付；是否等待再次回复取决于已有授权和人类要求。
 - 实现后的最终验收。
 
 一个清楚的人类指令可以同时关闭多个相邻 checkpoint。例如“可以，让子代理实现，你来验收”同时授权当前 leaf 实施、指定 runtime 分工，并把该 leaf 的 acceptance authority 委托给主 Agent；不得再要求形式化 runtime-plan 批准。
@@ -80,18 +80,15 @@ description: 'Explicitly turn a stable Sky Flow spec into a human-reviewed, prog
 - 多个 executable leaf 可以同时 active，但 runtime 必须检查共享文件、schema、公共 contract、部署配置和 single-writer 状态，避免并发多写。
 - 并行调度、owner、Agent lane、fan-in 和具体顺序只存在于 runtime，不写进 milestone 文档。
 
-## ELI5 Leaf Preflight
+## Show-Me Leaf Preflight
 
-每个 executable leaf 获得实施授权后，完整读取并调用 Sky Flow 内嵌的 [`eli5`](../eli5/SKILL.md)，把当前 leaf 讲成不需要技术背景也能理解的 HTML 图解。讲解聚焦：要解决的问题、系统会发生什么变化、关键数据或交互如何流动、完成后人类能看到什么，以及主要风险；使用大图、流程图或简单类比，少字，不展示代码和逐文件计划。
+每个 executable leaf 获得实施授权后，完整读取并调用 Sky Flow 内嵌的 [`show-me`](../show-me/SKILL.md)。按主题选择最小充分的图示：伪代码、调用树、组件树、文件树、Mermaid、diff 或聚焦的 HTML。讲解聚焦问题、变化、关键数据或交互、可见结果和主要风险；根据读者背景保留必要细节，避免堆叠代码和逐文件计划。
 
-- 把 HTML 写到 repo 外的临时目录，例如 `${TMPDIR}/sky-flow-eli5/<spec-id>/<leaf-id>/index.html`；它是交互产物，不写入 milestone、spec 或 Git。
-- 用可持续跨当前人类 gate 的 runtime session 启动静态 Web server。默认绑定 `127.0.0.1`，动态选择空闲端口；不要启动项目 dev server，也不要占用固定端口。
-- 在输出前实际请求页面并确认成功响应。向人类提供完整可点击 URL，例如 `http://127.0.0.1:<port>/`，同时用一句话说明该页面对应哪个 leaf。
-- 页面不可访问、内嵌 `eli5` 不可读取或 runtime 无法维持服务器时停止，不得用文字摘要冒充已完成 preflight。
-- 如果最新指令已经明确要求开始实施，交付 URL 后直接继续，不再请求“请确认继续”。只有人类明确要求 review-before-run，或讲解暴露新的规范性问题时才暂停。
-- 服务器在该 leaf 开始后可按 runtime 需要保留；人类确认不再需要、leaf 完成、切换 leaf 或任务结束时停止进程并清理临时目录。
-
-多个并行 leaf 各自生成独立页面和 URL，不用一个页面混合多个 leaf，也不共享可相互覆盖的临时目录。
+- 简洁图示直接在对话中展示，并紧邻对应的简短说明；每个 leaf 的讲解保持清晰可辨。
+- 需要 HTML 时，写入 repo 外的临时目录，例如 `${TMPDIR}/sky-flow-show-me/<spec-id>/<leaf-id>/index.html`，验证产物可打开并为用户打开。若环境需要 HTTP 预览，使用可管理的本地静态服务并验证 URL；不强制每次启动服务器。
+- 内嵌 `show-me` 不可读取或所选产物无法展示时，先解决展示问题，不将未交付的讲解标为完成。
+- 如果最新指令已经明确要求开始实施，交付讲解后直接继续，不再请求“请确认继续”。只有人类明确要求 review-before-run，或讲解暴露新的规范性问题时才暂停。
+- HTML 临时目录按 leaf 隔离；任务结束或不再需要时清理本次创建的临时产物和服务。
 
 ## Spec And Runtime Boundary
 
@@ -119,7 +116,7 @@ description: 'Explicitly turn a stable Sky Flow spec into a human-reviewed, prog
 - source spec 的成功边界或关键契约不足以安全切分。
 - 当前层仍等待人类批准。
 - 当前 leaf 尚未获得实施授权，或仍存在会改变结果的实质选择。
-- ELI5 页面尚未生成或 Web 地址未验证；仅当人类要求先看后决定时，等待其回复。
+- show-me 可视化讲解尚未交付，或所选 HTML 产物尚未验证可打开；仅当人类要求先看后决定时，等待其回复。
 - 实现完成但人类验收尚未通过。
 - 规范性变化尚未写回 spec，或 spec 变化使当前分支 stale。
 - 下一动作需要新权限、外部写入、发布、删除、生产变更或其他不可逆授权。
@@ -135,4 +132,4 @@ description: 'Explicitly turn a stable Sky Flow spec into a human-reviewed, prog
 - 人类意图、验收 authority 和 spec authority 是否都未被 Agent 自行扩大；是否避免了重复批准请求。
 - 完成与 stale 状态是否只影响必要分支，父级汇总是否准确。
 - 归档是否只包含已验收且无 active descendant 的节点，长期事实已提升到 spec，压缩后没有与代码或 spec 竞争真相源。
-- 每个待执行 leaf 是否已有独立、实际可访问的 ELI5 页面；已有实施授权时是否避免了多余的“继续”确认。
+- 每个待执行 leaf 是否已有清晰对应的 show-me 可视化讲解，HTML 产物是否已验证可打开；已有实施授权时是否避免了多余的“继续”确认。

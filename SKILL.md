@@ -61,6 +61,7 @@ milestone delivery status 与人类验收回写当前节点并向上汇总；关
 | --- | --- |
 | 正式编码前持续多轮需求对齐 | `$to-align`（稳定结论交 `$to-spec`） |
 | 长期设计、readiness、spec / Progress | `$to-spec` |
+| 独立讲解当前主题 / 可视化理解 | `$show-me`（无需 spec 或 milestone） |
 | 大型 spec 的逐层交付分解 | `$to-milestone` |
 | 选择、恢复或启动 spec-derived goal | `$pick-goal` |
 | 执行 ready spec / goal / executable milestone | `to-implement` |

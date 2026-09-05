@@ -18,7 +18,7 @@
 | Spec authority | 长期架构或外部语义决定先提升到 spec；变化只使受影响分支 stale。 |
 | 状态汇总 | 人类接受后 leaf 才完成；branch 准确汇总 required children，不制造重复父级 gate。 |
 | 归档压缩 | 只归档已验收且无 active descendant 的节点；长期事实进入 spec，实施细节回归代码，archive 只保留完成历史。 |
-| ELI5 preflight | 每个 leaf 实现前有独立 HTML 图解和已验证 Web URL；已有实施授权时展示后继续，不额外索要口令。 |
+| show-me preflight | 每个 leaf 实现前有最小充分的可视化讲解；按主题选择内联图示或 HTML，HTML 验证可打开；已有实施授权时展示后继续。 |
 
 ## 失败信号
 
@@ -27,12 +27,12 @@
 - 把文件清单、代码步骤、命令、commit、Agent owner 或 fan-in 写进 milestone。
 - 仅因 milestone 很大、耗时长或文件多就拆分，拆出的节点没有独立 outcome。
 - 人类只批准一个层级，却继续细化或开始编码。
-- 人类已经说“开始实现”、指定执行分工或等价授权后，仍机械要求批准 runtime plan、ELI5 continue 或重复状态转换。
+- 人类已经说“开始实现”、指定执行分工或等价授权后，仍机械要求批准 runtime plan、show-me continue 或重复状态转换。
 - 测试通过后自动完成 leaf，没有等待要求中的人类验收。
 - Spec 改动导致全树重建，或受影响分支未标记 stale 仍继续实施。
 - 使用 `parallel_with` 维护易漂移的全局关系，或把无硬依赖误解为必须并发。
 - 把未验收或仍有 active descendant 的 milestone 归档，或让 archive 保存当前代码结构、API / schema 细节和实施过程。
-- 在 ELI5 页面和可访问 URL 交给人类前开始实现，复用页面混淆多个 leaf，或只给文件路径 / 文字摘要而未启动并验证 Web server。
+- 在 show-me 可视化讲解交付前开始实现、混淆多个 leaf，或交付未验证可打开的 HTML；明明内联图示足够却机械要求 HTML 和 Web server。
 
 ## 效率指标
 

@@ -75,15 +75,15 @@
       ]
     },
     {
-      "id": "eli5-web-preflight-before-leaf",
-      "title": "每个 leaf 实现前提供可打开的 ELI5 页面",
+      "id": "show-me-preflight-before-leaf",
+      "title": "每个 leaf 实现前提供适合主题的可视化讲解",
       "prompt": "数据库选型 leaf 和 Admin walking skeleton leaf 的 runtime plan 都已批准，现在开始并行实现。",
       "expected": [
-        "在任何实现动作前分别调用 eli5 为两个 leaf 生成独立 HTML 图解",
-        "将页面写到 repo 外临时目录并启动互不覆盖的本地静态 Web server",
-        "实际请求验证每个页面后提供完整可点击 URL",
-        "页面使用大图少字解释问题、变化、流程、可见结果和主要风险，不展示代码计划",
-        "此前已有实施授权时，交付 URL 后直接把对应 leaf 交给 to-implement，不重复请求继续"
+        "在任何实现动作前调用 show-me，为两个 leaf 分别选择最小充分的可视化讲解",
+        "简单流程直接展示 Mermaid 或其他内联图示，不强制 HTML 或 Web server",
+        "需要 HTML 时写入互不覆盖的 repo 外临时目录，验证可打开并为用户打开；需要 HTTP 预览时再验证 URL",
+        "讲解聚焦问题、变化、流程、可见结果和主要风险，按主题选择必要细节",
+        "此前已有实施授权时，交付讲解后直接把对应 leaf 交给 to-implement，不重复请求继续"
       ]
     },
     {
@@ -93,7 +93,7 @@
       "expected": [
         "把该指令解释为当前 leaf 的实施授权，而不是再次请求 runtime plan 批准",
         "采用子代理实现、主 Agent 独立审查的 runtime 分工",
-        "先完成并交付该 leaf 的 ELI5 Web URL，然后自动开始实现",
+        "先完成并交付该 leaf 的 show-me 可视化讲解，然后自动开始实现",
         "把当前 leaf 的 acceptance authority 视为已明确委托给主 Agent",
         "只有出现 scope、外部契约、权限或重大风险变化时才重新询问"
       ]
